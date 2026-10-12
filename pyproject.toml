@@ -4,7 +4,9 @@ version = "0.0.1"
 description = "Windows için yerel/API LLM destekli masaüstü asistanı (bitirme projesi)"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "litellm>=1.105.0",
+]
 
 [project.scripts]
 gengar = "gengar.__main__:main"

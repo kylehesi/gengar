@@ -20,6 +20,9 @@ class Profile:
     model: str
     description: str = ""
     key_env: str | None = None
+    reasoning_effort: str | None = None
+    # Sağlayıcıya olduğu gibi iletilen ek parametreler (örn. Ollama num_ctx).
+    options: dict = field(default_factory=dict)
 
     @property
     def is_local(self) -> bool:
@@ -37,6 +40,9 @@ class Settings:
     default_profile: str
     ollama_host: str
     required_models: list[str]
+    system_prompt_path: Path
+    max_history_messages: int
+    timeout: float
     raw: dict = field(repr=False)
 
 
@@ -69,6 +75,8 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
             model=p["model"],
             description=p.get("description", ""),
             key_env=p.get("key_env"),
+            reasoning_effort=p.get("reasoning_effort"),
+            options=dict(p.get("options", {})),
         )
         for name, p in llm.get("profiles", {}).items()
     }
@@ -80,7 +88,10 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
     return Settings(
         profiles=profiles,
         default_profile=default,
-        ollama_host=ollama.get("host", "http://localhost:11434").rstrip("/"),
+        ollama_host=ollama.get("host", "http://127.0.0.1:11434").rstrip("/"),
         required_models=list(ollama.get("required_models", [])),
+        system_prompt_path=PROJECT_ROOT / llm.get("system_prompt", "config/prompts/system.md"),
+        max_history_messages=int(llm.get("max_history_messages", 40)),
+        timeout=float(llm.get("timeout", 120)),
         raw=raw,
     )

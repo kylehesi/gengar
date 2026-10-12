@@ -51,10 +51,23 @@ uv run gengar doctor        # her şey hazır mı?
 uv run pytest               # testler
 ```
 
+## Kullanım
+
+```bash
+uv run gengar                    # varsayılan profille sohbet
+uv run gengar chat -p gemini     # belirli bir profille
+```
+
+Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
+`/think` (düşünme modu), `/clear` (yeni sohbet), `/exit`.
+
+Yeni model eklemek için `config/settings.toml` dosyasına bir `[llm.profiles.<ad>]`
+bölümü eklemek yeterli; kod değişmez.
+
 ## Yol haritası
 
 - [x] **Faz 0** — Kurulum, proje iskeleti, `gengar doctor`
-- [ ] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
+- [x] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
 - [ ] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
 - [ ] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
 - [ ] **Faz 4** — Araştırma (web arama, sayfa okuma)

@@ -3,13 +3,27 @@
 [llm]
 # Varsayılan profil: aşağıdaki [llm.profiles.*] adlarından biri.
 default = "local"
+# Sistem promptu (proje köküne göre yol).
+system_prompt = "config/prompts/system.md"
+# Sohbet geçmişinde tutulan en fazla mesaj (sistem promptu hariç).
+max_history_messages = 40
+# Yanıt bekleme süresi (saniye).
+timeout = 120
 
 # Her profil bir modeldir. "model" alanı LiteLLM formatındadır: "<sağlayıcı>/<model>".
 # key_env: o sağlayıcının API anahtarının .env içindeki adı (yerel modelde yok).
+# reasoning_effort: "none" düşünmeyi kapatır (hızlı); "low"/"medium"/"high" açar.
+#   Belirtilmezse sağlayıcının varsayılanı kullanılır. Sohbette /think ile değişir.
 
 [llm.profiles.local]
 model = "ollama_chat/qwen3:8b"
 description = "Yerel Qwen3 8B (Ollama, GPU) — ücretsiz, internetsiz"
+reasoning_effort = "none"
+
+# options: sağlayıcıya olduğu gibi iletilen ek parametreler.
+[llm.profiles.local.options]
+num_ctx = 8192        # bağlam penceresi (token). 8 GB VRAM'de model + 8k rahat sığar.
+keep_alive = "30m"    # model 30 dk boyunca VRAM'de kalsın; her soruda yeniden yüklenmesin.
 
 [llm.profiles.gemini]
 model = "gemini/gemini-flash-latest"
@@ -32,7 +46,9 @@ key_env = "ANTHROPIC_API_KEY"
 description = "Claude Haiku — ucuz, araç kullanımında güçlü"
 
 [ollama]
-host = "http://localhost:11434"
+# "localhost" değil: Windows önce IPv6 (::1) dener, Ollama ise IPv4'te dinler;
+# bu her istekte ~5 sn gecikme demek.
+host = "http://127.0.0.1:11434"
 # `gengar doctor` bu modellerin indirilmiş olduğunu kontrol eder.
 required_models = ["qwen3:8b", "bge-m3"]
 
