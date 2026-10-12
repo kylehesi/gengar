@@ -48,6 +48,8 @@ _SEGMENT_SPLIT = re.compile(r"[;|\n{}()]")
 _CMDLET = re.compile(r"^([A-Za-z]+)-[A-Za-z]+$")
 _PROPERTY_ACCESS = re.compile(r"\)(\.\w+)+")
 _HASH_KEY = re.compile(r"^\s*\w+\s*=")
+# Yol içermeyen tek bir program adı + --version (PATH'teki programın sürümünü sorar)
+_VERSION_QUERY = re.compile(r"^\s*[\w-]+(\.exe)?\s+--version\s*$", re.IGNORECASE)
 _SAFE_STATIC = re.compile(r"\[math\]::(Round|Floor|Ceiling|Abs|Max|Min|Pow|Sqrt)\b", re.IGNORECASE)
 
 
@@ -55,6 +57,9 @@ def classify(command: str) -> Risk:
     """Komut yalnızca okuma yapıyorsa READ, aksi halde SYSTEM."""
     # [math]::Round(...) gibi saf hesaplamalar güvenli; diğer .NET çağrıları değil.
     command = _SAFE_STATIC.sub("0", command)
+    # "ollama --version", "git --version": sadece sürüm sorar.
+    if _VERSION_QUERY.match(command):
+        return Risk.READ
     if not command.strip() or _UNSAFE_PATTERN.search(command):
         return Risk.SYSTEM
 

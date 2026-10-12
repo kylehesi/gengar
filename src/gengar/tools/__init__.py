@@ -1,6 +1,6 @@
 """Araçlar: PowerShell, dosya, Windows, web, kod çalıştırma (Faz 2-5)."""
 
-from . import apps, files, powershell, settings, system, ui
+from . import apps, files, powershell, settings, system, ui, web
 from .base import Risk, Tool, ToolError, ToolRegistry
 
 
@@ -12,6 +12,7 @@ def default_registry() -> ToolRegistry:
     """
     return ToolRegistry([
         system.TOOL, apps.TOOL, settings.TOOL, ui.TOOL,
+        *web.TOOLS,
         *files.TOOLS,
         powershell.TOOL,
     ])

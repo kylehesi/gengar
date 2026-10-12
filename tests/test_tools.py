@@ -23,6 +23,8 @@ from gengar.tools.powershell import classify, run_powershell
     "Test-Path C:\\Windows",
     "Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}",
     "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory | ForEach-Object { $_ / 1GB }",
+    "ollama --version",
+    "git.exe --version",
 ])
 def test_read_only_commands(cmd):
     assert classify(cmd) == Risk.READ
@@ -46,6 +48,9 @@ def test_read_only_commands(cmd):
     "Set-ItemProperty HKCU:\\x -Name y -Value 1",
     "shutdown /s",
     "reg delete HKCU\\Software\\X /f",
+    "ollama --version; Remove-Item x",
+    ".\\kotu.exe --version",
+    "ollama rm qwen3:8b --version",
     "",
 ])
 def test_risky_commands_need_confirmation(cmd):

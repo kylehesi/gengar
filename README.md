@@ -63,7 +63,8 @@ Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
 
 Örnek istekler: "C diskinde ne kadar boş yer var?", "Not defterini aç", "Sesi 30 yap",
 "Karanlık moda geç", "Hangi uygulamalar açık?", "Masaüstümde kaç dosya var?",
-"şu dosyayı oku ve özetle".
+"şu dosyayı oku ve özetle", "Python'un en son sürümü hangisi?",
+"Get-StartApps komutu ne işe yarar, araştır".
 
 ### Araçlar
 
@@ -73,6 +74,8 @@ Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
 | `apps` | açık/kurulu listesi: okuma · aç: değişiklik · kapat: sistem | Uygulama aç/kapat (Türkçe/İngilizce adla), dosya/URL/`ms-settings:` sayfası aç |
 | `settings` | oku: okuma · değiştir: değişiklik | Tema, ses, sessiz, parlaklık, duvar kağıdı |
 | `windows_ui` | listele/incele: okuma · tıkla/yaz/tuş: sistem | Pencere içindeki düğme ve alanları UI Automation ile kullanma |
+| `web_search` | okuma | Web araması (DuckDuckGo/Bing, anahtar gerektirmez) |
+| `fetch_page` | okuma · yerel ağ adresi: sistem | Sayfa/PDF okuma; sadece soruyla ilgili parçalar (BM25) döner |
 | `read_file`, `list_directory`, `find_files` | okuma | Dosya okuma, listeleme, arama |
 | `write_file`, `edit_file` | değişiklik | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem) |
 | `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
@@ -88,7 +91,10 @@ Her eylem `logs/audit-YYYY-MM-DD.jsonl` dosyasına kaydedilir.
   serbest PowerShell yazması gerektiğinde bazen hatalı komut/uydurma sayı.
 - Düşünme açık (`/think`): ~6 kat yavaş, karmaşık görevlerde belirgin şekilde daha doğru.
 - Bağlam 8192 token (`num_ctx`); 8 GB VRAM'de model + 8k bağlam tamamen GPU'da.
-  10 aracın şeması ~1900 token tutuyor.
+  12 aracın şeması ~2300 token tutuyor.
+- Araştırma: "en son sürüm" gibi sorularda artık arayıp kaynaktan cevap veriyor.
+  "Araştır + bilgisayarda kontrol et + karşılaştır" gibi çok adımlı görevlerde düşünme
+  kapalıyken adımları atlayabiliyor; `/think` ile ya da API modeliyle daha iyi.
 
 Yeni model eklemek için `config/settings.toml` dosyasına bir `[llm.profiles.<ad>]`
 bölümü eklemek yeterli; kod değişmez.
@@ -99,7 +105,7 @@ bölümü eklemek yeterli; kod değişmez.
 - [x] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
 - [x] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
 - [x] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
-- [ ] **Faz 4** — Araştırma (web arama, sayfa okuma)
+- [x] **Faz 4** — Araştırma (web arama, sayfa okuma)
 - [ ] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
 - [ ] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
 - [ ] **Faz 7** — Text menü arayüzü

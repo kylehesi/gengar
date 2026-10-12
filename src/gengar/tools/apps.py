@@ -278,7 +278,8 @@ TOOL = Tool(
         "Manage applications. action=open: start an app by name (e.g. 'Not Defteri', 'chrome', 'Spotify'), "
         "or open a file/folder path, a URL, or a Settings page like 'ms-settings:bluetooth'. "
         "action=close: close an app's windows by name (force=true kills it). "
-        "action=running: list open windows. action=installed: list installed programs (name filters)."
+        "action=running: list open windows. action=installed: installed programs with their versions "
+        "(name filters, e.g. 'ollama')."
     ),
     parameters={
         "type": "object",
