@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Gizli anahtarlar — asla commit edilmez
+.env
+
+# Çalışma zamanı verileri
+logs/*
+!logs/.gitkeep
+data/

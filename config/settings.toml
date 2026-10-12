@@ -1,0 +1,40 @@
+# Gengar ayarları. Kod içinde sabit değer yerine buradan okunur.
+
+[llm]
+# Varsayılan profil: aşağıdaki [llm.profiles.*] adlarından biri.
+default = "local"
+
+# Her profil bir modeldir. "model" alanı LiteLLM formatındadır: "<sağlayıcı>/<model>".
+# key_env: o sağlayıcının API anahtarının .env içindeki adı (yerel modelde yok).
+
+[llm.profiles.local]
+model = "ollama_chat/qwen3:8b"
+description = "Yerel Qwen3 8B (Ollama, GPU) — ücretsiz, internetsiz"
+
+[llm.profiles.gemini]
+model = "gemini/gemini-flash-latest"
+key_env = "GEMINI_API_KEY"
+description = "Google Gemini Flash — ücretsiz kota ile geliştirme"
+
+[llm.profiles.deepseek]
+model = "deepseek/deepseek-chat"
+key_env = "DEEPSEEK_API_KEY"
+description = "DeepSeek — çok ucuz, güçlü"
+
+[llm.profiles.openrouter]
+model = "openrouter/deepseek/deepseek-chat"
+key_env = "OPENROUTER_API_KEY"
+description = "OpenRouter — tek anahtarla birçok model"
+
+[llm.profiles.claude-haiku]
+model = "anthropic/claude-haiku-5-5"
+key_env = "ANTHROPIC_API_KEY"
+description = "Claude Haiku — ucuz, araç kullanımında güçlü"
+
+[ollama]
+host = "http://localhost:11434"
+# `gengar doctor` bu modellerin indirilmiş olduğunu kontrol eder.
+required_models = ["qwen3:8b", "bge-m3"]
+
+[memory]
+embed_model = "bge-m3"
