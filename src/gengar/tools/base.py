@@ -19,12 +19,12 @@ class Risk(IntEnum):
     """Bir eylemin riski. İzin katmanı neyin sorulacağına buna bakarak karar verir."""
 
     READ = 0     # sadece okur: dosya okuma, listeleme, Get-* komutları
-    WRITE = 1    # dosya oluşturur/değiştirir
-    SYSTEM = 2   # keyfi komut, sistem ayarı, silme — her zaman sorulur
+    WRITE = 1    # geri alınabilir değişiklik: dosya yazma, uygulama açma, ses/tema ayarı
+    SYSTEM = 2   # keyfi komut, silme, uygulama kapatma, tıklama/yazma — her zaman sorulur
 
     @property
     def label(self) -> str:
-        return {Risk.READ: "okuma", Risk.WRITE: "yazma", Risk.SYSTEM: "sistem"}[self]
+        return {Risk.READ: "okuma", Risk.WRITE: "değişiklik", Risk.SYSTEM: "sistem"}[self]
 
 
 class ToolError(Exception):

@@ -61,25 +61,34 @@ uv run gengar chat -p gemini     # belirli bir profille
 Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
 `/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/clear` (yeni sohbet), `/exit`.
 
-Örnek istekler: "Masaüstümde kaç dosya var?", "C diskinde ne kadar boş yer var?",
-"Not defterini aç", "şu dosyayı oku ve özetle".
+Örnek istekler: "C diskinde ne kadar boş yer var?", "Not defterini aç", "Sesi 30 yap",
+"Karanlık moda geç", "Hangi uygulamalar açık?", "Masaüstümde kaç dosya var?",
+"şu dosyayı oku ve özetle".
 
-### Araçlar (Faz 2)
+### Araçlar
 
 | Araç | Risk | Ne yapar |
 |---|---|---|
-| `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
+| `system_info` | okuma | OS, CPU, RAM, diskler, GPU, pil, ağ — birimleri hazır hesaplanmış |
+| `apps` | açık/kurulu listesi: okuma · aç: değişiklik · kapat: sistem | Uygulama aç/kapat (Türkçe/İngilizce adla), dosya/URL/`ms-settings:` sayfası aç |
+| `settings` | oku: okuma · değiştir: değişiklik | Tema, ses, sessiz, parlaklık, duvar kağıdı |
+| `windows_ui` | listele/incele: okuma · tıkla/yaz/tuş: sistem | Pencere içindeki düğme ve alanları UI Automation ile kullanma |
 | `read_file`, `list_directory`, `find_files` | okuma | Dosya okuma, listeleme, arama |
-| `write_file`, `edit_file` | yazma | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem riski) |
+| `write_file`, `edit_file` | değişiklik | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem) |
+| `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
 
-Onay sorusunda: `e` evet, `h` hayır, `o` oturum boyunca izin (yalnızca yazma için).
+Risk seviyeleri: **okuma** onaysız · **değişiklik** (geri alınabilir) onaylı, oturum boyu
+izin verilebilir · **sistem** (silme, kapatma, tıklama, keyfi komut) her seferinde onaylı.
+Onay sorusunda: `e` evet, `h` hayır, `o` oturum boyunca izin.
 Her eylem `logs/audit-YYYY-MM-DD.jsonl` dosyasına kaydedilir.
 
 ### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
 
-- Düşünme kapalı: ~45 token/sn, basit görevlerde hızlı ama bazen hatalı komut/uydurma sayı.
-- Düşünme açık (`/think`): ~6 kat yavaş, belirgin şekilde daha doğru.
+- Düşünme kapalı: ~45 token/sn. Hazır araçlarla (Faz 3) basit görevlerde güvenilir;
+  serbest PowerShell yazması gerektiğinde bazen hatalı komut/uydurma sayı.
+- Düşünme açık (`/think`): ~6 kat yavaş, karmaşık görevlerde belirgin şekilde daha doğru.
 - Bağlam 8192 token (`num_ctx`); 8 GB VRAM'de model + 8k bağlam tamamen GPU'da.
+  10 aracın şeması ~1900 token tutuyor.
 
 Yeni model eklemek için `config/settings.toml` dosyasına bir `[llm.profiles.<ad>]`
 bölümü eklemek yeterli; kod değişmez.
@@ -89,7 +98,7 @@ bölümü eklemek yeterli; kod değişmez.
 - [x] **Faz 0** — Kurulum, proje iskeleti, `gengar doctor`
 - [x] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
 - [x] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
-- [ ] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
+- [x] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
 - [ ] **Faz 4** — Araştırma (web arama, sayfa okuma)
 - [ ] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
 - [ ] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
