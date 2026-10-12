@@ -6,6 +6,7 @@ istatistik toplama ve hataları kullanıcıya anlaşılır Türkçe mesajlara ç
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
@@ -68,9 +69,76 @@ class Stats:
         if self.output_tokens:
             parts.append(f"{self.output_tokens} token")
             gen_time = self.elapsed - (self.first_token or 0)
-            if gen_time > 0:
+            # Yanıt tek parçada geldiyse (örn. sadece araç çağrısı) hız anlamsız olur.
+            if gen_time > 0.25:
                 parts.append(f"{self.output_tokens / gen_time:.0f} tok/sn")
         return " · ".join(parts)
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """Modelin istediği bir araç çağrısı. `arguments` JSON metnidir."""
+
+    id: str
+    name: str
+    arguments: str
+
+    def parsed_args(self) -> dict[str, Any]:
+        """Argümanları sözlüğe çevirir; geçersiz JSON'da ValueError."""
+        if not self.arguments.strip():
+            return {}
+        args = json.loads(self.arguments)
+        if not isinstance(args, dict):
+            raise ValueError("argümanlar bir JSON nesnesi olmalı")
+        return args
+
+    def to_message(self) -> dict[str, Any]:
+        return {"id": self.id, "type": "function",
+                "function": {"name": self.name, "arguments": self.arguments}}
+
+
+class _ToolCallBuffer:
+    """Akışta parça parça gelen araç çağrılarını birleştirir.
+
+    OpenAI tarzı sağlayıcılar bir çağrıyı parçalara böler (ilk parçada id+ad,
+    sonrakilerde argüman devamı, hepsi aynı `index` ile). Ollama ise çağrıyı
+    tek parçada ve argümanları sözlük olarak gönderir. İkisini de destekler.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._by_index: dict[int, dict[str, Any]] = {}
+
+    def add(self, tc: Any) -> None:
+        idx = getattr(tc, "index", None)
+        tc_id = getattr(tc, "id", None) or None
+        fn = getattr(tc, "function", None)
+        name = getattr(fn, "name", None) if fn else None
+        args = getattr(fn, "arguments", None) if fn else None
+        if isinstance(args, dict):
+            args = json.dumps(args, ensure_ascii=False)
+
+        cur = self._by_index.get(idx) if idx is not None else None
+        if cur is None and idx is None and self.calls and not tc_id and not name:
+            cur = self.calls[-1]  # index'siz devam parçası
+        if cur is None or (tc_id and cur["id"] and tc_id != cur["id"]):
+            cur = {"id": tc_id, "name": "", "arguments": ""}
+            self.calls.append(cur)
+            if idx is not None:
+                self._by_index[idx] = cur
+        if tc_id and not cur["id"]:
+            cur["id"] = tc_id
+        if name and not cur["name"]:
+            cur["name"] = name
+        if args:
+            cur["arguments"] += args
+
+    def finish(self) -> list[ToolCall]:
+        return [
+            ToolCall(id=c["id"] or f"call_{i}", name=c["name"], arguments=c["arguments"])
+            for i, c in enumerate(self.calls)
+            if c["name"]
+        ]
 
 
 class LLMClient:
@@ -79,6 +147,7 @@ class LLMClient:
         self.profile = self._check(profile or settings.default_profile)
         self.reasoning_override: str | None = None  # /think ile oturum boyunca değişir
         self.last_stats: Stats | None = None
+        self.last_tool_calls: list[ToolCall] = []
 
     def _check(self, name: str) -> Profile:
         profile = self.settings.profiles.get(name)
@@ -105,7 +174,13 @@ class LLMClient:
     def thinking_enabled(self) -> bool:
         return self.reasoning_effort not in (None, "none")
 
-    def _request_args(self, messages: list[dict]) -> dict[str, Any]:
+    @property
+    def context_tokens(self) -> int | None:
+        """Modelin bağlam penceresi; bilinmiyorsa None (API modelleri için genelde çok büyük)."""
+        n = self.profile.options.get("num_ctx")
+        return int(n) if n else None
+
+    def _request_args(self, messages: list[dict], tools: list[dict] | None) -> dict[str, Any]:
         args: dict[str, Any] = {
             **self.profile.options,
             "model": self.profile.model,
@@ -118,18 +193,22 @@ class LLMClient:
             args["api_base"] = self.settings.ollama_host
         if self.reasoning_effort is not None:
             args["reasoning_effort"] = self.reasoning_effort
+        if tools:
+            args["tools"] = tools
         return args
 
-    def stream_chat(self, messages: list[dict]) -> Iterator[Delta]:
-        """Yanıtı parça parça üretir. Bitince `last_stats` dolar."""
+    def stream_chat(self, messages: list[dict], tools: list[dict] | None = None) -> Iterator[Delta]:
+        """Yanıtı parça parça üretir. Bitince `last_stats` ve `last_tool_calls` dolar."""
         litellm = _get_litellm()
         self.last_stats = None
+        self.last_tool_calls = []
         start = time.perf_counter()
         first: float | None = None
         tokens: int | None = None
+        calls = _ToolCallBuffer()
 
         try:
-            for chunk in litellm.completion(**self._request_args(messages)):
+            for chunk in litellm.completion(**self._request_args(messages, tools)):
                 usage = getattr(chunk, "usage", None)
                 if usage and getattr(usage, "completion_tokens", None):
                     tokens = usage.completion_tokens
@@ -138,8 +217,11 @@ class LLMClient:
                 delta = chunk.choices[0].delta
                 thinking = getattr(delta, "reasoning_content", None)
                 text = getattr(delta, "content", None)
-                if (thinking or text) and first is None:
+                tool_calls = getattr(delta, "tool_calls", None) or []
+                if (thinking or text or tool_calls) and first is None:
                     first = time.perf_counter() - start
+                for tc in tool_calls:
+                    calls.add(tc)
                 if thinking:
                     yield Delta("thinking", thinking)
                 if text:
@@ -147,6 +229,7 @@ class LLMClient:
         except Exception as e:  # LiteLLM sağlayıcıya göre çok çeşitli hatalar fırlatıyor
             raise _translate(e, self.profile, self.settings) from e
 
+        self.last_tool_calls = calls.finish()
         self.last_stats = Stats(self.profile.name, time.perf_counter() - start, first, tokens)
 
     def complete(self, messages: list[dict]) -> str:

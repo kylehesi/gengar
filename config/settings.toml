@@ -52,5 +52,24 @@ host = "http://127.0.0.1:11434"
 # `gengar doctor` bu modellerin indirilmiş olduğunu kontrol eder.
 required_models = ["qwen3:8b", "bge-m3"]
 
+[agent]
+# Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.
+max_steps = 15
+
+[ui]
+# Düşünme modu açıkken modelin düşünce metni ekrana basılsın mı?
+# false: sadece "[düşünüyor…]" göstergesi (sohbette /thinklog ile değişir).
+show_thinking = false
+
+[permissions]
+# normal: okuma serbest, yazma/sistem eylemleri sorulur
+# strict: her şey sorulur
+# trust : hiçbir şey sorulmaz — yalnızca test/değerlendirme için!
+mode = "normal"
+
+[logs]
+# Her eylemin kaydı (JSON Lines). Proje köküne göre yol.
+dir = "logs"
+
 [memory]
 embed_model = "bge-m3"

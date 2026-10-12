@@ -2,9 +2,12 @@ import io
 from datetime import datetime
 
 from gengar.config import load_settings
-from gengar.core.conversation import Conversation, render_system_prompt
-from gengar.llm import Delta, LLMError
+from gengar.core import Agent, AuditLog, Conversation, PermissionPolicy, render_system_prompt
+from gengar.llm import LLMError
+from gengar.tools import default_registry
 from gengar.ui.repl import Repl
+
+from fakes import ScriptedClient, call
 
 
 def test_messages_start_with_system_prompt():
@@ -42,56 +45,69 @@ def test_drop_last_user_only_drops_user():
 
 def test_system_prompt_template(tmp_path):
     p = tmp_path / "s.md"
-    p.write_text("Tarih: {date} / {os}\n", encoding="utf-8")
+    p.write_text("Tarih: {date} / {os} / {user} / {home} / {folders}\n", encoding="utf-8")
     text = render_system_prompt(p, datetime(2026, 10, 12, 9, 30))
     assert text.startswith("Tarih: 2026-10-12")
-    assert "{os}" not in text
+    assert "{" not in text
 
 
-class FakeClient:
-    """Repl testleri için LLMClient yerine geçen basit sahte istemci."""
-
-    def __init__(self, reply=None, error=None):
-        self.reply, self.error = reply, error
-        self.profile = load_settings().profiles["local"]
-        self.reasoning_override = None
-        self.last_stats = None
-
-    @property
-    def thinking_enabled(self):
-        return self.reasoning_override not in (None, "none")
-
-    def use(self, name):
-        raise LLMError(f"'{name}' diye bir profil yok.")
-
-    def stream_chat(self, messages):
-        if self.error:
-            raise self.error
-        for part in self.reply:
-            yield Delta("text", part)
+def test_real_system_prompt_renders():
+    s = load_settings()
+    assert "Gengar" in render_system_prompt(s.system_prompt_path)
 
 
-def make_repl(client):
+def make_repl(steps, tmp_path, answers=()):
     out = io.StringIO()
-    return Repl(load_settings(), client, Conversation("SYS"), out=out), out
+    answers = list(answers)
+    agent = Agent(ScriptedClient(steps), default_registry(), PermissionPolicy("normal"),
+                  AuditLog(tmp_path), Conversation("SYS"))
+    return Repl(load_settings(), agent, out=out, read=lambda _: answers.pop(0)), out
 
 
-def test_repl_ask_records_reply():
-    repl, out = make_repl(FakeClient(reply=["Mer", "haba"]))
+def test_repl_ask_records_reply(tmp_path):
+    repl, out = make_repl([("Merhaba", [])], tmp_path)
     repl.ask("selam")
-    assert repl.conversation.history[-1] == {"role": "assistant", "content": "Merhaba"}
+    assert repl.agent.conversation.history[-1]["content"].strip() == "Merhaba"
     assert "Merhaba" in out.getvalue()
 
 
-def test_repl_error_drops_user_message():
-    repl, out = make_repl(FakeClient(error=LLMError("bağlanılamadı")))
+def test_repl_error_drops_user_message(tmp_path):
+    repl, out = make_repl([LLMError("bağlanılamadı")], tmp_path)
     repl.ask("selam")
-    assert repl.conversation.history == []
+    assert repl.agent.conversation.history == []
     assert "bağlanılamadı" in out.getvalue()
 
 
-def test_repl_commands():
-    repl, out = make_repl(FakeClient(reply=[]))
+def test_repl_confirmation_prompt(tmp_path):
+    steps = [("", [call("run_powershell", command="Stop-Process -Name notepad")]), ("Tamam.", [])]
+    repl, out = make_repl(steps, tmp_path, answers=["belki", "h"])
+    repl.ask("not defterini kapat")
+    text = out.getvalue()
+    assert "Onay gerekiyor (sistem)" in text
+    assert "Stop-Process -Name notepad" in text
+    assert "[o]turum" not in text  # sistem eylemine oturum izni verilmez
+    assert "denied" in repl.agent.conversation.history[2]["content"]
+
+
+def test_repl_hides_thinking_by_default(tmp_path):
+    from gengar.llm import Delta
+
+    repl, out = make_repl([], tmp_path)
+    repl.on_delta(Delta("thinking", "gizli düşünce"))
+    repl.on_delta(Delta("text", "Cevap"))
+    repl.on_step_end(None)
+    text = out.getvalue()
+    assert "gizli düşünce" not in text
+    assert "13 karakter" in text and "Cevap" in text
+
+    repl.handle_command("/thinklog")
+    repl.on_delta(Delta("thinking", "görünür düşünce"))
+    repl.on_step_end(None)
+    assert "görünür düşünce" in out.getvalue()
+
+
+def test_repl_commands(tmp_path):
+    repl, out = make_repl([], tmp_path)
     assert repl.handle_command("/think")
     assert repl.client.thinking_enabled
     assert repl.handle_command("/model yok")

@@ -59,7 +59,27 @@ uv run gengar chat -p gemini     # belirli bir profille
 ```
 
 Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
-`/think` (düşünme modu), `/clear` (yeni sohbet), `/exit`.
+`/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/clear` (yeni sohbet), `/exit`.
+
+Örnek istekler: "Masaüstümde kaç dosya var?", "C diskinde ne kadar boş yer var?",
+"Not defterini aç", "şu dosyayı oku ve özetle".
+
+### Araçlar (Faz 2)
+
+| Araç | Risk | Ne yapar |
+|---|---|---|
+| `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
+| `read_file`, `list_directory`, `find_files` | okuma | Dosya okuma, listeleme, arama |
+| `write_file`, `edit_file` | yazma | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem riski) |
+
+Onay sorusunda: `e` evet, `h` hayır, `o` oturum boyunca izin (yalnızca yazma için).
+Her eylem `logs/audit-YYYY-MM-DD.jsonl` dosyasına kaydedilir.
+
+### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
+
+- Düşünme kapalı: ~45 token/sn, basit görevlerde hızlı ama bazen hatalı komut/uydurma sayı.
+- Düşünme açık (`/think`): ~6 kat yavaş, belirgin şekilde daha doğru.
+- Bağlam 8192 token (`num_ctx`); 8 GB VRAM'de model + 8k bağlam tamamen GPU'da.
 
 Yeni model eklemek için `config/settings.toml` dosyasına bir `[llm.profiles.<ad>]`
 bölümü eklemek yeterli; kod değişmez.
@@ -68,7 +88,7 @@ bölümü eklemek yeterli; kod değişmez.
 
 - [x] **Faz 0** — Kurulum, proje iskeleti, `gengar doctor`
 - [x] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
-- [ ] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
+- [x] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
 - [ ] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
 - [ ] **Faz 4** — Araştırma (web arama, sayfa okuma)
 - [ ] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)

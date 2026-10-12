@@ -1,35 +1,60 @@
-"""Basit terminal sohbeti (Faz 1). Faz 7'de Textual arayüzü bunun yerini alacak."""
+"""Basit terminal arayüzü. Faz 7'de Textual arayüzü bunun yerini alacak.
+
+`AgentUI` protokolünü uygular: modelin akışını, araç çağrılarını ve onay
+sorularını terminalde gösterir.
+"""
 
 from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from typing import TextIO
 
 from .. import __version__
 from ..config import Settings
-from ..core.conversation import Conversation
-from ..llm import LLMClient, LLMError
+from ..core.agent import Agent, Answer
+from ..llm import Delta, LLMError, Stats, ToolCall
+from ..tools.base import Risk, Tool
 
-DIM, BOLD, RED, CYAN, RESET = "\033[2m", "\033[1m", "\033[31m", "\033[36m", "\033[0m"
+DIM, BOLD, RED, GREEN, YELLOW, CYAN, RESET = (
+    "\033[2m", "\033[1m", "\033[31m", "\033[32m", "\033[33m", "\033[36m", "\033[0m")
+
+RISK_COLOR = {Risk.READ: GREEN, Risk.WRITE: YELLOW, Risk.SYSTEM: RED}
 
 HELP = """\
 Komutlar:
   /model          profilleri listele
   /model <ad>     profili değiştir (örn. /model gemini)
-  /think          modelin düşünme modunu aç/kapat
+  /think          modelin düşünme modunu aç/kapat (daha doğru ama yavaş)
+  /thinklog       düşünce metnini göster/gizle
   /clear          yeni sohbet başlat
   /help           bu yardım
-  /exit           çık (Ctrl+C de olur)"""
+  /exit           çık (Ctrl+C de olur)
+
+Ctrl+C yanıt ya da komut sürerken basılırsa yalnızca o işlemi durdurur."""
+
+
+def _preview(text: str, lines: int = 4, width: int = 160) -> str:
+    rows = text.strip().splitlines()
+    shown = [r if len(r) <= width else r[:width] + "…" for r in rows[:lines]]
+    if len(rows) > lines:
+        shown.append(f"… (+{len(rows) - lines} satır)")
+    return "\n".join(shown)
 
 
 class Repl:
-    def __init__(self, settings: Settings, client: LLMClient, conversation: Conversation,
-                 out: TextIO = sys.stdout):
+    def __init__(self, settings: Settings, agent: Agent, out: TextIO = sys.stdout,
+                 read: Callable[[str], str] = input):
         self.settings = settings
-        self.client = client
-        self.conversation = conversation
+        self.agent = agent
+        self.client = agent.client
         self.out = out
+        self.read = read
+        self.show_thinking = settings.show_thinking
+        self._thinking_open = False
+        self._thinking_chars = 0
+        self._line_open = False
 
     def print(self, text: str = "", end: str = "\n") -> None:
         self.out.write(text + end)
@@ -37,8 +62,9 @@ class Repl:
 
     def banner(self) -> None:
         p = self.client.profile
-        self.print(f"{BOLD}Gengar {__version__}{RESET} · profil: {CYAN}{p.name}{RESET} ({p.model})")
-        self.print(f"{DIM}Komutlar için /help yazın.{RESET}")
+        self.print(f"{BOLD}Gengar {__version__}{RESET} · profil: {CYAN}{p.name}{RESET} ({p.model})"
+                   f" · izin modu: {self.agent.policy.mode}")
+        self.print(f"{DIM}{len(self.agent.tools)} araç hazır. Komutlar için /help yazın.{RESET}")
 
     def run(self) -> int:
         if os.name == "nt":
@@ -47,7 +73,7 @@ class Repl:
         while True:
             try:
                 # ﻿: PowerShell'den yönlendirilen girdinin başındaki görünmez BOM karakteri
-                line = input(f"\n{BOLD}sen>{RESET} ").strip().lstrip("﻿")
+                line = self.read(f"\n{BOLD}sen>{RESET} ").strip().lstrip("﻿")
             except (EOFError, KeyboardInterrupt):
                 self.print()
                 return 0
@@ -71,7 +97,7 @@ class Repl:
         if cmd == "/help":
             self.print(HELP)
         elif cmd == "/clear":
-            self.conversation.clear()
+            self.agent.conversation.clear()
             self.print("Yeni sohbet başladı.")
         elif cmd == "/model":
             if arg:
@@ -84,8 +110,11 @@ class Repl:
                 self.list_profiles()
         elif cmd == "/think":
             self.client.reasoning_override = "none" if self.client.thinking_enabled else "medium"
-            state = "açık" if self.client.thinking_enabled else "kapalı"
+            state = "açık (daha doğru, daha yavaş)" if self.client.thinking_enabled else "kapalı"
             self.print(f"Düşünme modu {state}.")
+        elif cmd == "/thinklog":
+            self.show_thinking = not self.show_thinking
+            self.print(f"Düşünce metni {'gösterilecek' if self.show_thinking else 'gizlenecek'}.")
         else:
             self.print(f"Bilinmeyen komut: {cmd}. /help yazın.")
         return True
@@ -99,34 +128,77 @@ class Repl:
     # --- sohbet ---------------------------------------------------------
 
     def ask(self, text: str) -> None:
-        self.conversation.add_user(text)
-        reply: list[str] = []
-        thinking_open = False
-
-        self.print(f"{BOLD}{CYAN}gengar>{RESET} ", end="")
         try:
-            for delta in self.client.stream_chat(self.conversation.messages()):
-                if delta.kind == "thinking":
-                    if not thinking_open:
-                        self.print(f"{DIM}[düşünüyor] ", end="")
-                        thinking_open = True
-                    self.print(delta.text, end="")
-                    continue
-                if thinking_open:
-                    self.print(f"{RESET}\n", end="")
-                    thinking_open = False
-                reply.append(delta.text)
-                self.print(delta.text, end="")
+            self.agent.run(text, self)
         except KeyboardInterrupt:
-            self.print(f"{RESET}\n{DIM}(durduruldu){RESET}")
-            self.conversation.drop_last_user()
-            return
+            self._close_line()
+            self.print(f"{DIM}(durduruldu){RESET}")
         except LLMError as e:
-            self.print(f"{RESET}\n{RED}{e}{RESET}")
-            self.conversation.drop_last_user()
-            return
+            self._close_line()
+            self.print(f"{RED}{e}{RESET}")
 
-        self.print(RESET)
-        self.conversation.add_assistant("".join(reply))
-        if self.client.last_stats:
-            self.print(f"{DIM}[{self.client.last_stats.summary()}]{RESET}")
+    def _close_line(self) -> None:
+        if self._thinking_open:
+            self._end_thinking()
+        if self._line_open:
+            self.print(RESET)
+        self._line_open = False
+
+    # --- AgentUI --------------------------------------------------------
+
+    def on_delta(self, delta: Delta) -> None:
+        if not self._line_open:
+            self.print(f"{BOLD}{CYAN}gengar>{RESET} ", end="")
+            self._line_open = True
+        if delta.kind == "thinking":
+            if not self._thinking_open:
+                self.print(f"{DIM}[düşünüyor{'] ' if self.show_thinking else '…'}", end="")
+                self._thinking_open = True
+                self._thinking_chars = 0
+            self._thinking_chars += len(delta.text)
+            if self.show_thinking:
+                self.print(delta.text, end="")
+            return
+        if self._thinking_open:
+            self._end_thinking()
+        self.print(delta.text, end="")
+
+    def _end_thinking(self) -> None:
+        if self.show_thinking:
+            self.print(f"{RESET}\n", end="")
+        else:
+            self.print(f" {self._thinking_chars} karakter]{RESET} ", end="")
+        self._thinking_open = False
+
+    def on_step_end(self, stats: Stats | None) -> None:
+        self._close_line()
+        if stats:
+            self.print(f"{DIM}[{stats.summary()}]{RESET}")
+
+    def on_tool_start(self, call: ToolCall, summary: str, risk: Risk) -> None:
+        first = summary.strip().splitlines()[0] if summary.strip() else ""
+        more = " …" if len(summary.strip().splitlines()) > 1 else ""
+        self.print(f"{RISK_COLOR[risk]}» {call.name}{RESET} {first[:200]}{more}")
+
+    def on_tool_end(self, call: ToolCall, output: str, ok: bool) -> None:
+        color = DIM if ok else RED
+        self.print(f"{color}{_preview(output)}{RESET}")
+
+    def confirm(self, tool: Tool, summary: str, risk: Risk, can_grant: bool) -> Answer:
+        color = RISK_COLOR[risk]
+        self.print(f"{color}{BOLD}Onay gerekiyor ({risk.label}){RESET} — {tool.name}:")
+        for row in summary.strip().splitlines() or [""]:
+            self.print(f"  {color}{row}{RESET}")
+        choices = "[e]vet / [h]ayır" + (" / [o]turum boyunca izin ver" if can_grant else "")
+        while True:
+            try:
+                answer = self.read(f"{choices}: ").strip().lower().lstrip("﻿")
+            except (EOFError, KeyboardInterrupt):
+                self.print()
+                return "no"
+            if answer in ("e", "evet", "y", "yes"):
+                return "yes"
+            if answer in ("h", "hayır", "hayir", "n", "no", ""):
+                return "no"
+            if can_grant and answer in ("o", "oturum"):
+                return "session"
