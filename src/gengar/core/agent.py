@@ -13,6 +13,7 @@ import time
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from ..llm import Delta, LLMClient, LLMError, Stats, ToolCall
+from ..tools import guard
 from ..tools.base import Risk, Tool, ToolError, ToolRegistry, is_failure
 from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
@@ -35,6 +36,14 @@ MAX_EMPTY_RETRIES = 2
 CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
 FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you already have above, write your "
                 "final answer to the user's request now. Do not redo the work.")
+CLAIMED = ("[Gengar] Your answer says something was created, saved, changed or deleted, but nothing was "
+           "changed in this turn: no tool that writes or deletes succeeded. If the task needs it, do it now "
+           "with the tools (e.g. write_file); otherwise correct your answer and say plainly what was and was "
+           "not done.")
+PROTECTED = ("Not executed: this would delete, move or overwrite something inside Gengar's own installation "
+             "folder ({root}) — matched: {path}. Gengar's files are protected. If the user meant one of their "
+             "own folders, find it under their home folder (Desktop, Documents…) with find_files and use its "
+             "absolute path.")
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
 
@@ -48,6 +57,25 @@ def _announces_action(text: str) -> bool:
     """Cevap, yapılacak bir işi duyurup bitiyorsa (henüz hiçbir araç çağrılmamışken) True."""
     tail = text.strip()[-300:]
     return bool(tail) and bool(_FUTURE_ACTION.search(tail)) and "?" not in tail[-80:]
+
+
+# "Oluşturdum / kaydedildi / sildim …": yapılmış bir değişiklik iddiası. Olumsuzları ("silinmedi",
+# "oluşturulamadı") eşleşmez. "yazdım" tek başına sohbette yazılan metin de olabilir; dosya/klasör
+# sözüyle birlikte geçince sayılır.
+_CLAIM = re.compile(
+    r"\b\w*(oluşturdum|oluşturuldu|kaydettim|kaydedildi|sildim|silindi|taşıdım|taşındı|güncelledim|"
+    r"güncellendi|değiştirdim|değiştirildi)\b"
+    r"|\b(dosya|klasör)\w*\b[^.\n]{0,40}\b(yazdım|yazıldı|hazırladım|hazırlandı|ekledim|eklendi)\b"
+    r"|\bI(?:'ve| have)? (created|saved|deleted|moved|wrote|written|updated)\b"
+    r"|\b(has|have) been (created|saved|deleted|moved|written|updated)\b",
+    re.IGNORECASE,
+)
+# Riski "okuma" olduğu hâlde kalıcı bir şey kaydeden araçlar (hafıza).
+_RECORDING_TOOLS = {"remember", "save_skill"}
+
+
+def _claims_change(text: str) -> bool:
+    return bool(_CLAIM.search(text))
 
 
 def _signature(call: ToolCall) -> tuple[str, str]:
@@ -83,6 +111,7 @@ class Agent:
         self.last_turn: list[dict] = []  # son tamamlanan turun mesajları (/learn için)
         self._last_failed: tuple[str, str] | None = None
         self._last_error = ""
+        self._changed = False  # bu turda yazan/silen bir araç başarıyla çalıştı mı
 
     def _max_chars(self) -> int | None:
         ctx = self.client.context_tokens
@@ -98,6 +127,7 @@ class Agent:
         """
         mark = len(self.conversation.history)
         self._last_failed = None
+        self._changed = False
         self._set_thinking(user_text)
         if self.memory:
             self.conversation.context = self.memory.context_for(user_text)
@@ -164,6 +194,7 @@ class Agent:
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
         nudged = False
+        claim_checked = False
         used_tools = False
         empty_retries = 0
         restore_think: str | None = None
@@ -210,6 +241,13 @@ class Agent:
                     # Hâlâ boşsa sessiz kalmak yerine son araç çıktısını göster.
                     text = self._fallback_answer()
                     self.conversation.add_assistant(text)
+                # "Programı oluşturdum" deyip hiçbir şey yazmamış olabilir (2026-10-13: kullanıcının
+                # istediği kurs programı hiç yazılmadı). Bir kez uyar; model ya işi yapar ya cevabı düzeltir.
+                elif not claim_checked and not self._changed and _claims_change(text):
+                    claim_checked = True
+                    self.audit.record("unbacked_claim", text=text[:300])
+                    self.conversation.add_user(CLAIMED)
+                    continue
                 return text
             failed = False
             used_tools = True
@@ -257,6 +295,13 @@ class Agent:
             ui.on_tool_end(call, output, False)
             return output
 
+        protected = guard.check(tool.name, args)
+        if protected:
+            output = PROTECTED.format(root=guard.root(), path=protected)
+            self.audit.record("tool", tool=tool.name, args=args, decision="protected", ok=False, output=output)
+            ui.on_tool_end(call, output, False)
+            return output
+
         risk = tool.risk_for(args)
         summary = tool.summary(args)
         decision = "auto"
@@ -285,5 +330,7 @@ class Agent:
 
         self.audit.record("tool", tool=tool.name, args=args, risk=risk.label, decision=decision,
                           ok=ok, seconds=round(time.perf_counter() - start, 2), output=output)
+        if ok and not is_failure(output) and (risk >= Risk.WRITE or tool.name in _RECORDING_TOOLS):
+            self._changed = True
         ui.on_tool_end(call, output, ok)
         return output

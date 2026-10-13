@@ -23,8 +23,9 @@ uv run python evals\export_sft.py "data\trajectories\gen_*seed5000*.jsonl" --out
    (ad örn. `gengar-sft`).
 2. Code → **New Notebook** → File → Import Notebook → `training\gengar_qwen35_4b_kaggle.ipynb`.
 3. Sağ panel: **Accelerator: GPU T4 x2** (ya da P100), **Internet: On**, **Add Input** → `gengar-sft`.
-4. Hücreleri sırayla çalıştırın. Bellek hatası (CUDA out of memory) alırsanız 2. hücrede
-   `MAX_LEN = 6144` yapıp 3. hücreden itibaren yeniden çalıştırın.
+4. Hücreleri sırayla çalıştırın. Model iki T4'e bölünür (`device_map="balanced"`); tek T4'te 16-bit
+   model + 6k token eğitim sığmadı. Yine de bellek hatası (CUDA out of memory) alırsanız
+   Run → Restart, 2. hücrede `LOAD_IN_4BIT = True` yapıp 2. hücreden itibaren yeniden çalıştırın.
 5. Bitince sağ panel → **Output** → `gengar_gguf/` içindeki `.gguf` dosyasını indirin.
 
 Not defteri `training\build_notebook.py` dosyasından üretilir; değişiklik o dosyada yapılır:

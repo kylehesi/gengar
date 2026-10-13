@@ -5,10 +5,13 @@ Silme/taşıma bilerek yok: onlar PowerShell üzerinden yapılır ve her zaman o
 
 from __future__ import annotations
 
+import fnmatch
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
+from . import guard
 from .base import Risk, Tool, ToolError, working_dir
 
 MAX_READ_BYTES = 2_000_000
@@ -75,18 +78,45 @@ def list_directory(path: str = "~") -> str:
     return f"{p} ({len(entries)} öğe)\n" + "\n".join(rows) + more
 
 
+# Ev klasöründe "**/ad" araması bunlara girmesin: AppData tek başına yüz binlerce dosya (dakikalar sürer).
+_SKIP_DIRS = {"appdata", "node_modules", "__pycache__", "$recycle.bin", "site-packages"}
+SEARCH_SECONDS = 20
+
+
+def _walk_match(base: Path, name_pattern: str, found: list[str]) -> bool:
+    """`**/<ad kalıbı>` için: gizli ve büyük sistem klasörlerini atlayarak dolaşır. Süre aşılırsa False."""
+    deadline = time.monotonic() + SEARCH_SECONDS
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d.lower() not in _SKIP_DIRS]
+        for name in (*dirnames, *filenames):
+            if fnmatch.fnmatch(name, name_pattern):  # Windows'ta büyük/küçük harf duyarsız
+                found.append(os.path.join(dirpath, name))
+                if len(found) >= MAX_ENTRIES:
+                    return True
+        if time.monotonic() > deadline:
+            return False
+    return True
+
+
 def find_files(pattern: str, root: str = "~") -> str:
     base = resolve(root)
     if not base.is_dir():
         raise ToolError(f"klasör yok: {base}")
-    found = []
+    found: list[str] = []
+    complete = True
+    rest = pattern.replace("\\", "/").removeprefix("**/")
     try:
-        for m in base.glob(pattern):
-            found.append(str(m))
-            if len(found) >= MAX_ENTRIES:
-                break
+        if pattern.replace("\\", "/").startswith("**/") and "/" not in rest:
+            complete = _walk_match(base, rest, found)
+        else:
+            for m in base.glob(pattern):
+                found.append(str(m))
+                if len(found) >= MAX_ENTRIES:
+                    break
     except (OSError, ValueError) as e:
         raise ToolError(f"arama yapılamadı: {e}") from e
+    if not complete:
+        found.append(f"(arama {SEARCH_SECONDS} sn sonra durduruldu; daha dar bir klasörde arayın)")
     if not found:
         return f"{base} altında '{pattern}' ile eşleşen bir şey yok."
     suffix = f"\n(ilk {MAX_ENTRIES} sonuç)" if len(found) >= MAX_ENTRIES else ""
@@ -133,12 +163,12 @@ def _protected_roots() -> list[Path]:
 
 
 def write_risk(args: dict) -> Risk:
-    """Windows/Program Files altına yazmak sistem eylemi sayılır (her seferinde sorulur)."""
+    """Windows/Program Files ve Gengar'ın kendi dosyalarına yazmak sistem eylemi sayılır (her seferinde sorulur)."""
     try:
         p = resolve(str(args.get("path", "")))
     except (OSError, ValueError):
         return Risk.SYSTEM
-    if any(p.is_relative_to(root) for root in _protected_roots()):
+    if any(p.is_relative_to(root) for root in _protected_roots()) or guard.is_protected(p):
         return Risk.SYSTEM
     return Risk.WRITE
 
@@ -180,7 +210,8 @@ TOOLS = [
     ),
     Tool(
         name="find_files",
-        description="Find files by glob pattern under a folder, e.g. pattern='**/*.pdf'.",
+        description="Find files or folders by glob pattern under a folder (default: home folder), "
+                    "e.g. pattern='**/*.pdf' or '**/çalışma programı'.",
         parameters={
             "type": "object",
             "properties": {

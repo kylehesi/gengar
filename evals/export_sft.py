@@ -38,6 +38,7 @@ def salvage(messages: list[dict]) -> tuple[list[dict], bool]:
     - "[Gengar] Your last reply was empty…": boş asistan adımı zaten geçmişten silinmişti; uyarı
       atılınca uyarıdan sonraki cevap doğrudan araç sonuçlarına verilmiş cevap olur.
     - "[Gengar] Do it now…": modelin "şunu yapacağım" deyip durduğu araçsız mesaj da atılır.
+    - "[Gengar] Your answer says something was created…": yapılmamış işi "yaptım" diyen mesaj da atılır.
     Uyarıdan sonraki asistan mesajının düşünce metni atılır (uyarıya atıf yapıyor olabilir).
     """
     out: list[dict] = []
@@ -46,7 +47,9 @@ def salvage(messages: list[dict]) -> tuple[list[dict], bool]:
         content = m.get("content") or ""
         if m["role"] == "user" and content.startswith("[Gengar]"):
             salvaged = drop_next_reasoning = True
-            if "Do it now" in content and out and out[-1]["role"] == "assistant" and not out[-1].get("tool_calls"):
+            # "Do it now" / "nothing was changed": uyarıya yol açan araçsız cevap da örnekten çıkar.
+            drops_prev = "Do it now" in content or "nothing was changed in this turn" in content
+            if drops_prev and out and out[-1]["role"] == "assistant" and not out[-1].get("tool_calls"):
                 out.pop()
             continue
         if m["role"] == "assistant" and drop_next_reasoning:

@@ -55,6 +55,9 @@ MODEL = "unsloth/Qwen3.5-4B"
 # Qwen3.5'in sözlüğü çok büyük (~248k token): uzun örneklerde çıktı olasılık tablosu GB'larca yer tutuyor.
 # Kaggle T4 x2'de 8192 bellek hatası verdi (deneme turu, 2026-10-13); 6144 örneklerin ~%93'ünü kapsıyor.
 MAX_LEN = 6144
+# Yedek plan: iki GPU'ya bölmeye rağmen bellek yetmezse True yapın (4-bit QLoRA; Unsloth Qwen3.5 için
+# önermiyor, kalite biraz düşebilir ama ~6 GB yer açar).
+LOAD_IN_4BIT = False
 EPOCHS = 2
 LEARNING_RATE = 2e-4
 LORA_R = 16
@@ -69,7 +72,14 @@ print("Eğitim verisi:", train_path)
 print("Doğrulama verisi:", val_path)
 """)
 
-md("## 3. Model\n16-bit LoRA (Unsloth: Qwen3.5'te 4-bit QLoRA önerilmiyor). T4'te bf16 yok; otomatik fp16 kullanılır.")
+md("""
+## 3. Model
+16-bit LoRA (Unsloth: Qwen3.5'te 4-bit QLoRA önerilmiyor). T4'te bf16 yok; otomatik fp16 kullanılır.
+
+**İki GPU:** 16-bit 4B model tek T4'te (~15 GB) ~9 GB tutuyor; uzun örneklerde eğitim belleği yetmedi
+(deneme turu, 2026-10-13). `device_map="balanced"` modelin katmanlarını iki T4'e böler (Unsloth'un
+belgelenmiş yöntemi); her kartta ~4.5 GB model kalır, gerisi eğitime.
+""")
 code("""
 import torch
 from unsloth import FastLanguageModel, is_bf16_supported
@@ -77,9 +87,10 @@ from unsloth import FastLanguageModel, is_bf16_supported
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = MODEL,
     max_seq_length = MAX_LEN,
-    load_in_4bit = False,
-    load_in_16bit = True,
+    load_in_4bit = LOAD_IN_4BIT,
+    load_in_16bit = not LOAD_IN_4BIT,
     full_finetuning = False,
+    device_map = "balanced" if torch.cuda.device_count() > 1 else None,
 )
 model = FastLanguageModel.get_peft_model(
     model,
@@ -93,8 +104,9 @@ model = FastLanguageModel.get_peft_model(
 )
 # Görsel model işlemcisi (processor) dönebilir; sohbet şablonu için metin tokenizer'ı kullanılır.
 tok = getattr(tokenizer, "tokenizer", tokenizer)
-print("GPU:", torch.cuda.get_device_name(0), "| bf16:", is_bf16_supported())
-print(f"Bellek: {torch.cuda.memory_allocated() / 1e9:.1f} GB ayrıldı")
+print("GPU:", torch.cuda.device_count(), "x", torch.cuda.get_device_name(0), "| bf16:", is_bf16_supported())
+for i in range(torch.cuda.device_count()):
+    print(f"  GPU {i}: {torch.cuda.memory_allocated(i) / 1e9:.1f} GB model")
 """)
 
 md("""
@@ -149,6 +161,7 @@ trainer = SFTTrainer(
         max_length = MAX_LEN,
         packing = False,
         per_device_train_batch_size = BATCH,
+        per_device_eval_batch_size = 1,   # varsayılan 8: doğrulama adımında 8 uzun örnek belleği taşırır
         gradient_accumulation_steps = GRAD_ACCUM,
         num_train_epochs = EPOCHS,
         learning_rate = LEARNING_RATE,
@@ -192,7 +205,8 @@ code("""
 import time
 start = time.time()
 stats = trainer.train()
-print(f"Süre: {(time.time() - start) / 60:.0f} dk | en yüksek bellek: {torch.cuda.max_memory_allocated() / 1e9:.1f} GB")
+peak = ", ".join(f"GPU{i} {torch.cuda.max_memory_allocated(i) / 1e9:.1f} GB" for i in range(torch.cuda.device_count()))
+print(f"Süre: {(time.time() - start) / 60:.0f} dk | en yüksek bellek: {peak}")
 print(stats)
 """)
 
