@@ -211,7 +211,8 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
              meta: dict[str, Any]) -> Result:
     # Hafıza gerçek kullanımdaki gibi hep açık (araç seti aynı olsun), ama her görevin kendi boş
     # hafıza dosyası var: görevler birbirini etkilemez. Hafıza görevlerinde oturumlar bu dosyayı paylaşır.
-    s = replace(settings, memory_db=task.root / "memory.db")
+    # Dosya görev klasörünün DIŞINDA: içeride olsaydı dosya sayma/taşıma görevlerine karışıyordu.
+    s = replace(settings, memory_db=task.root.parent / "_hafiza" / f"{task.id}.db")
     prompts = task.prompt if isinstance(task.prompt, list) else [task.prompt]
     start = time.perf_counter()
     answer, error, calls, steps, tools, sessions = "", "", 0, 0, [], []
