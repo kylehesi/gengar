@@ -193,6 +193,23 @@ def test_empty_final_answer_is_retried(tmp_path):
                for m in agent.conversation.history)
 
 
+def test_empty_answer_in_think_mode_retries_without_thinking_first(tmp_path):
+    seen_effort = []
+    agent, client = make_agent([("", [call("echo", text="x")]), ("", []), ("Sonuç: x", [])], tmp_path)
+    original = client.stream_chat
+
+    def spy(messages, tools=None):
+        seen_effort.append(client.reasoning_override)
+        yield from original(messages, tools)
+
+    client.stream_chat = spy
+    agent.think = "on"
+    assert agent.run("dene", RecordingUI()).strip() == "Sonuç: x"
+    assert seen_effort == ["medium", "medium", "none"]  # tekrar düşünmesiz
+    assert not any((m.get("content") or "").startswith("[Gengar]") for m in agent.conversation.history)
+    assert client.reasoning_override == "medium"  # sonra geri alındı
+
+
 def test_persistent_empty_answer_falls_back_to_tool_output(tmp_path):
     agent, _ = make_agent([("", [call("echo", text="Storage")]), ("", []), ("", []), ("", [])], tmp_path)
     answer = agent.run("hangi modül?", RecordingUI())

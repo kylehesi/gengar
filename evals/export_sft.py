@@ -32,16 +32,37 @@ sys.stdout.reconfigure(errors="replace")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def clean_session(session: dict, keep_reasoning: bool = True) -> dict | None:
-    messages = session["messages"]
-    if not messages or messages[-1]["role"] != "assistant" or not (messages[-1].get("content") or "").strip():
-        return None  # son cevap yoksa örnek eksik
+def salvage(messages: list[dict]) -> tuple[list[dict], bool]:
+    """Gengar'ın uyarı mesajlarını dökümden çıkarır; geriye uyarı hiç olmamış gibi bir akış kalır.
+
+    - "[Gengar] Your last reply was empty…": boş asistan adımı zaten geçmişten silinmişti; uyarı
+      atılınca uyarıdan sonraki cevap doğrudan araç sonuçlarına verilmiş cevap olur.
+    - "[Gengar] Do it now…": modelin "şunu yapacağım" deyip durduğu araçsız mesaj da atılır.
+    Uyarıdan sonraki asistan mesajının düşünce metni atılır (uyarıya atıf yapıyor olabilir).
+    """
+    out: list[dict] = []
+    drop_next_reasoning = salvaged = False
     for m in messages:
         content = m.get("content") or ""
         if m["role"] == "user" and content.startswith("[Gengar]"):
-            return None
-        if m["role"] == "tool" and content.startswith("Not executed:"):
-            return None
+            salvaged = drop_next_reasoning = True
+            if "Do it now" in content and out and out[-1]["role"] == "assistant" and not out[-1].get("tool_calls"):
+                out.pop()
+            continue
+        if m["role"] == "assistant" and drop_next_reasoning:
+            m = {k: v for k, v in m.items() if k != "_reasoning"}
+            drop_next_reasoning = False
+        out.append(m)
+    return out, salvaged
+
+
+def clean_session(session: dict, keep_reasoning: bool = True) -> dict | None:
+    if any(m["role"] == "tool" and (m.get("content") or "").startswith("Not executed:")
+           for m in session["messages"]):
+        return None  # engellenen tekrar: model aynı hatayı tekrarlamış, öğretilecek örnek değil
+    messages, salvaged = salvage(session["messages"])
+    if not messages or messages[-1]["role"] != "assistant" or not (messages[-1].get("content") or "").strip():
+        return None  # son cevap yoksa örnek eksik
     out = [{"role": "system", "content": session["system"]}]
     for m in messages:
         msg = {"role": m["role"], "content": m.get("content") or ""}
@@ -58,7 +79,7 @@ def clean_session(session: dict, keep_reasoning: bool = True) -> dict | None:
             msg["tool_call_id"] = m.get("tool_call_id", "")
             msg["name"] = m.get("name", "")
         out.append(msg)
-    return {"messages": out, "tools": session["tools"]}
+    return {"messages": out, "tools": session["tools"], "salvaged": salvaged}
 
 
 def main() -> None:
@@ -95,6 +116,8 @@ def main() -> None:
                     stats["tekrar"] += 1
                     continue
                 seen.add(key)
+                if ex.pop("salvaged"):
+                    stats["uyarısı ayıklanarak kurtarıldı"] += 1
                 ex["meta"] = {"task_id": rec["task_id"], "family": rec["family"], "category": rec["category"],
                               "session": i, "teacher": rec.get("model"), "think": rec.get("think")}
                 examples.append(ex)

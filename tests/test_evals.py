@@ -67,8 +67,23 @@ def test_export_keeps_clean_sessions_only():
 
     nudged = {**good, "messages": good["messages"][:-1] + [
         {"role": "user", "content": "[Gengar] Your last reply was empty..."},
-        {"role": "assistant", "content": "Tamam"}]}
-    assert clean_session(nudged) is None
+        {"role": "assistant", "content": "Dosyada merhaba yazıyor.", "_reasoning": "boş cevap vermişim"}]}
+    ex = clean_session(nudged)
+    assert ex["salvaged"]
+    assert [m["role"] for m in ex["messages"]][-2:] == ["tool", "assistant"]  # uyarı ayıklandı
+    assert "reasoning_content" not in ex["messages"][-1]  # uyarıya atıf yapan düşünce atıldı
+
+    announced = {**good, "messages": [good["messages"][0],
+                                      {"role": "assistant", "content": "Önce dosyayı okuyacağım."},
+                                      {"role": "user", "content": "[Gengar] Do it now: ..."},
+                                      *good["messages"][1:]]}
+    roles = [m["role"] for m in clean_session(announced)["messages"]]
+    assert roles[:3] == ["system", "user", "assistant"] and "Önce" not in clean_session(announced)["messages"][2]["content"]
+
+    blocked = {**good, "messages": good["messages"][:2] + [
+        {"role": "tool", "tool_call_id": "c1", "name": "read_file", "content": "Not executed: ..."}]
+        + good["messages"][3:]}
+    assert clean_session(blocked) is None
     no_answer = {**good, "messages": good["messages"][:-1]}
     assert clean_session(no_answer) is None
 

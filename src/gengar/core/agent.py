@@ -166,6 +166,7 @@ class Agent:
         nudged = False
         used_tools = False
         empty_retries = 0
+        restore_think: str | None = None
         blocked = 0
         for _ in range(self.max_steps):
             parts: list[str] = []
@@ -180,6 +181,8 @@ class Agent:
             calls = self.client.last_tool_calls
             self.conversation.add_assistant(text, calls, reasoning="".join(thinking))
             ui.on_step_end(self.client.last_stats)
+            if restore_think is not None:  # boş cevap tekrarından sonra düşünme ayarını geri koy
+                self.client.reasoning_override, restore_think = restore_think, None
 
             if not calls:
                 # Küçük modeller "şu adımları uygulayacağım:" / "önce dosyaları listeleyeceğim." deyip
@@ -190,12 +193,19 @@ class Agent:
                     continue
                 # Bazı modeller (örn. qwen3.5 + Ollama) araç sonucundan sonra ara sıra boş cevapla bitiriyor;
                 # aynı bağlam tekrar oynatılınca cevap geliyor, yani rastlantısal. Birkaç kez tekrar iste.
+                # Düşünme açıkken qwen3.5 bu sorunu çok daha sık yaşıyor (veri üretiminde oturumların
+                # yarısından fazlası); cevap düşünce kısmında kalıyor. İlk tekrar: aynı adım, düşünme
+                # kapalı, uyarı mesajı eklemeden (döküm temiz kalsın). Sonra: açık uyarıyla.
                 if not text.strip():
                     self.conversation.history.pop()  # boş asistan mesajını geçmişte bırakma
                     if empty_retries < MAX_EMPTY_RETRIES:
                         empty_retries += 1
                         self.audit.record("empty_answer", retry=empty_retries)
-                        self.conversation.add_user(FINAL_ANSWER)
+                        if empty_retries == 1 and self.client.reasoning_override not in (None, "none"):
+                            restore_think = self.client.reasoning_override
+                            self.client.reasoning_override = "none"
+                        else:
+                            self.conversation.add_user(FINAL_ANSWER)
                         continue
                     # Hâlâ boşsa sessiz kalmak yerine son araç çıktısını göster.
                     text = self._fallback_answer()
