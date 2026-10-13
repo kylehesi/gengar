@@ -33,7 +33,9 @@ description = "Yerel Qwen3.5 9B (Ollama, GPU) — Qwen3'ün halefi"
 reasoning_effort = "none"
 
 [llm.profiles.local35.options]
-num_ctx = 8192
+# 16k bağlam: Ollama'da OLLAMA_FLASH_ATTENTION=1 ve OLLAMA_KV_CACHE_TYPE=q8_0 (kullanıcı ortam
+# değişkeni) ile 8 GB VRAM'de %86 GPU, ~32 tok/sn. Bu ayarlar yoksa 8192 kullanın.
+num_ctx = 16384
 keep_alive = "30m"
 
 [llm.profiles.gemini]

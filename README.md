@@ -129,6 +129,27 @@ aralıklandırır, limit hatasında sağlayıcının önerdiği süre kadar bekl
   fark etmeden kaydedebiliyor. Beceriler modele "doğrulayarak kullan" notuyla verilir; kullanıcı
   `/skills` ile görüp `/forget` ile silebilir.
 
+### Varsayılan model: Qwen3.5 9B, 16k bağlam
+
+Ollama'da kullanıcı ortam değişkenleri `OLLAMA_FLASH_ATTENTION=1` ve `OLLAMA_KV_CACHE_TYPE=q8_0`
+(KV önbelleği sıkıştırma) ile 8 GB VRAM'de 16k bağlam %86 GPU'da, ~32 tok/sn çalışır.
+Bu ayarlar yoksa `config/settings.toml`'da `num_ctx = 8192` yapın.
+Ollama'yı yeniden başlatırken `llama-server.exe` süreçlerini de kapatın; kalan eski süreçler
+VRAM'i tutup modeli CPU'ya (7 tok/sn) iter.
+
+Ölçüm seti (`evals/bench.py`, 24 görev, auto düşünme):
+
+| Ayar | Başarı | Süre |
+|---|---|---|
+| Qwen3 8B, düşünme kapalı, ilk kod | 20/24 | 201 sn |
+| Qwen3 8B, düşünme açık | 22/24 | 1092 sn |
+| Qwen3 8B, auto + iyileştirmeler | 21/24 | 766 sn |
+| Qwen3.5 9B, auto + iyileştirmeler, 8k | 22/24 | 418 sn |
+| **Qwen3.5 9B, auto + iyileştirmeler, 16k** | **24/24** | **358 sn** |
+
+Her satır tek çalıştırma; yerel model her seferinde farklı yollar deneyebildiğinden ±1 görevlik
+farklar rastlantı olabilir.
+
 ### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
 
 - Düşünme kapalı: ~45 token/sn. Hazır araçlarla (Faz 3) basit görevlerde güvenilir;
