@@ -9,17 +9,17 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from .base import Risk, Tool, ToolError
+from .base import Risk, Tool, ToolError, working_dir
 
 MAX_READ_BYTES = 2_000_000
 MAX_ENTRIES = 200
 
 
 def resolve(path: str) -> Path:
-    """'~', %ORTAM% değişkenleri ve göreli yolları (ev klasörüne göre) çözer."""
+    """'~', %ORTAM% değişkenleri ve göreli yolları (çalışma klasörüne göre) çözer."""
     p = Path(os.path.expandvars(path)).expanduser()
     if not p.is_absolute():
-        p = Path.home() / p
+        p = working_dir() / p
     return p.resolve()
 
 
@@ -88,7 +88,18 @@ def find_files(pattern: str, root: str = "~") -> str:
     return "\n".join(found) + suffix
 
 
+def unescape_if_flat(content: str) -> str:
+    """Model içeriği JSON'da çift kaçışla gönderince satır sonları "\\n" metni olarak gelebiliyor.
+
+    İçerikte hiç gerçek satır sonu yokken birden fazla "\\n" varsa, bunlar satır sonuna çevrilir.
+    """
+    if "\n" not in content and content.count("\\n") >= 2:
+        return content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+    return content
+
+
 def write_file(path: str, content: str) -> str:
+    content = unescape_if_flat(content)
     p = resolve(path)
     existed = p.exists()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -138,7 +149,8 @@ TOOLS = [
         parameters={
             "type": "object",
             "properties": {
-                "path": _path_arg("File path. '~' and %ENV% vars allowed; relative paths are from the home folder."),
+                "path": _path_arg("File path. '~' and %ENV% vars allowed; relative paths are inside the "
+                                  "workspace folder."),
                 "offset": {"type": "integer", "description": "First line number (1-based)."},
                 "limit": {"type": "integer", "description": "Max lines to return (default 400)."},
             },

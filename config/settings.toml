@@ -26,6 +26,15 @@ reasoning_effort = "none"
 num_ctx = 8192        # bağlam penceresi (token). 8 GB VRAM'de model + 8k rahat sığar.
 keep_alive = "30m"    # model 30 dk boyunca VRAM'de kalsın; her soruda yeniden yüklenmesin.
 
+[llm.profiles.local35]
+model = "ollama_chat/qwen3.5:9b"
+description = "Yerel Qwen3.5 9B (Ollama, GPU) — Qwen3'ün halefi"
+reasoning_effort = "none"
+
+[llm.profiles.local35.options]
+num_ctx = 8192
+keep_alive = "30m"
+
 [llm.profiles.gemini]
 # gemini-flash-latest ve en yeni sürümler ücretsiz katmanda sık sık "yoğun" (503) dönüyor;
 # 3.5-flash hızlı ve kararlı. Alternatifler: gemini-3.5-flash-lite, gemini-flash-lite-latest
@@ -61,6 +70,9 @@ required_models = ["qwen3:8b", "bge-m3"]
 [agent]
 # Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.
 max_steps = 15
+# Düşünme modu: "auto" (karmaşık isteklerde ve bir adım başarısız olunca açılır), "on", "off".
+# Sohbette /think on|off|auto ile değişir.
+think = "auto"
 
 [code]
 # Model yer belirtilmemiş kod projelerini buraya koyar (proje köküne göre).

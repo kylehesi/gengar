@@ -75,6 +75,40 @@ def test_python_in_powershell_uses_sandbox(sandbox):
     assert str(sandbox.venv_dir) in out
 
 
+def test_literal_newlines_are_repaired(run):
+    out = run(code="x = 2\\nfor i in range(3):\\n    x += i\\nprint('sonuc', x)")
+    assert "sonuc 5" in out and "were fixed" in out
+
+
+def test_valid_code_with_backslash_n_in_string_is_untouched():
+    from gengar.tools.code import repair_code
+
+    code = "print('a\\nb')"
+    assert repair_code(code) == (code, False)
+
+
+def test_windows_path_escape_gets_hint(run, sandbox):
+    out = run(code="open('C:\\gengar\\data\\bench\\out\\x.txt', 'w')")
+    assert "--- hint ---" in out and "raw string" in out
+
+
+def test_missing_module_gets_hint(run):
+    out = run(code="import yok_boyle_bir_paket_123")
+    assert "packages=" in out
+
+
+def test_relative_paths_use_working_dir(tmp_path):
+    from gengar.tools import base, files
+
+    old = base.working_dir()
+    try:
+        base.set_working_dir(tmp_path / "ws")
+        files.write_file("proje/a.txt", "x")
+        assert (tmp_path / "ws" / "proje" / "a.txt").read_text() == "x"
+    finally:
+        base.set_working_dir(old)
+
+
 # --- metin arama -------------------------------------------------------------
 
 @pytest.fixture

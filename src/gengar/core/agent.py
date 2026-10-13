@@ -16,6 +16,7 @@ from ..tools.base import Risk, Tool, ToolError, ToolRegistry, is_failure
 from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
 from .permissions import PermissionPolicy
+from .router import needs_thinking
 
 if TYPE_CHECKING:
     from ..memory import MemorySystem
@@ -26,7 +27,9 @@ Answer = Literal["yes", "no", "session"]
 RESPONSE_RESERVE_TOKENS = 1500
 
 DENIED = "The user denied this action. Do not retry it; ask the user how they want to proceed."
-CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
+# Aynı başarısız çağrı bu kadar kez engellenirse tur durdurulur.
+MAX_BLOCKED = 3
+CONTINUE ="[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
 
@@ -51,7 +54,7 @@ class AgentUI(Protocol):
 class Agent:
     def __init__(self, client: LLMClient, tools: ToolRegistry, policy: PermissionPolicy,
                  audit: AuditLog, conversation: Conversation, max_steps: int = 15,
-                 memory: MemorySystem | None = None):
+                 memory: MemorySystem | None = None, think: str = "auto"):
         self.client = client
         self.tools = tools
         self.policy = policy
@@ -59,8 +62,11 @@ class Agent:
         self.conversation = conversation
         self.max_steps = max_steps
         self.memory = memory
+        # Düşünme modu: "auto" (isteğe göre + zorlanınca aç), "on", "off"
+        self.think = think
         self.last_turn: list[dict] = []  # son tamamlanan turun mesajları (/learn için)
         self._last_failed: tuple[str, str] | None = None
+        self._last_error = ""
 
     def _max_chars(self) -> int | None:
         ctx = self.client.context_tokens
@@ -76,6 +82,7 @@ class Agent:
         """
         mark = len(self.conversation.history)
         self._last_failed = None
+        self._set_thinking(user_text)
         if self.memory:
             self.conversation.context = self.memory.context_for(user_text)
         self.conversation.add_user(user_text)
@@ -94,6 +101,20 @@ class Agent:
             self._learn(ui)
         return answer
 
+    def _set_thinking(self, user_text: str) -> None:
+        if self.think == "on":
+            self.client.reasoning_override = "medium"
+        elif self.think == "off":
+            self.client.reasoning_override = "none"
+        elif self.think == "auto":
+            self.client.reasoning_override = "medium" if needs_thinking(user_text) else "none"
+
+    def _escalate(self, ui: AgentUI) -> None:
+        """auto modda düşünmeden başlanan istekte bir adım başarısız olduysa düşünmeyi aç."""
+        if self.think == "auto" and self.client.reasoning_override == "none":
+            self.client.reasoning_override = "medium"
+            ui.on_delta(Delta("status", "bir adım başarısız oldu; bu istek için düşünme modu açıldı"))
+
     def _learn(self, ui: AgentUI) -> None:
         """Zor bir iş başarıyla bittiyse turdan beceri çıkarmayı dene (hata sohbeti bozmasın)."""
         try:
@@ -109,6 +130,7 @@ class Agent:
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
         nudged = False
+        blocked = 0
         for _ in range(self.max_steps):
             parts: list[str] = []
             for delta in self.client.stream_chat(self.conversation.messages(self._max_chars()), schemas):
@@ -127,17 +149,31 @@ class Agent:
                     self.conversation.add_user(CONTINUE)
                     continue
                 return text
+            failed = False
             for call in calls:
                 sig = _signature(call)
                 if sig == self._last_failed:
                     # Küçük modeller başarısız çağrıyı aynen tekrarlayıp döngüye girebiliyor.
-                    output = REPEATED
+                    blocked += 1
+                    output = f"{REPEATED}\nThe previous error was:\n{self._last_error[:600]}"
                     self.audit.record("tool", tool=call.name, ok=False, output="blocked repeat")
                     ui.on_tool_end(call, output, False)
                 else:
                     output = self._execute(call, ui)
-                self._last_failed = sig if is_failure(output) else None
+                    self._last_error = output
+                if is_failure(output):
+                    failed = True
+                    self._last_failed = sig
+                else:
+                    self._last_failed = None
                 self.conversation.add_tool_result(call, output)
+            if blocked >= MAX_BLOCKED:
+                note = ("(Gengar: model aynı başarısız adımı tekrar tekrar denediği için durduruldu. "
+                        "İsteği farklı ifade etmeyi ya da /think ile düşünme modunu açmayı deneyin.)")
+                self.conversation.add_assistant(note)
+                return note
+            if failed:
+                self._escalate(ui)
 
         note = f"(Adım sınırına ulaşıldı: {self.max_steps}. Devam etmek için 'devam et' yazın.)"
         self.conversation.add_assistant(note)

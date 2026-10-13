@@ -26,7 +26,7 @@ HELP = """\
 Komutlar:
   /model          profilleri listele
   /model <ad>     profili değiştir (örn. /model gemini)
-  /think          modelin düşünme modunu aç/kapat (daha doğru ama yavaş)
+  /think <mod>    düşünme modu: on (doğru, yavaş), off (hızlı), auto (gerektiğinde açılır)
   /thinklog       düşünce metnini göster/gizle
   /mode <mod>     izin modu: normal (varsayılan), strict (her şeyi sor), trust (hiçbir şeyi sorma)
   /memory         hatırlanan bilgiler        /remember <bilgi>  bilgi ekle
@@ -117,9 +117,18 @@ class Repl:
             else:
                 self.list_profiles()
         elif cmd == "/think":
-            self.client.reasoning_override = "none" if self.client.thinking_enabled else "medium"
-            state = "açık (daha doğru, daha yavaş)" if self.client.thinking_enabled else "kapalı"
-            self.print(f"Düşünme modu {state}.")
+            modes = {"on": "açık (daha doğru, daha yavaş)", "off": "kapalı (hızlı)",
+                     "auto": "otomatik (karmaşık isteklerde ve bir adım başarısız olunca açılır)"}
+            if arg in modes:
+                self.agent.think = arg
+            elif arg:
+                self.print("Kullanım: /think on | off | auto")
+                return True
+            else:  # argümansız: on → off → auto → on
+                order = ["on", "off", "auto"]
+                current = self.agent.think if self.agent.think in order else "auto"
+                self.agent.think = order[(order.index(current) + 1) % 3]
+            self.print(f"Düşünme modu {modes[self.agent.think]}.")
         elif cmd == "/mode":
             self.set_mode(arg)
         elif cmd in ("/memory", "/remember", "/forget", "/skills", "/skill", "/learn"):

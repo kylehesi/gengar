@@ -120,6 +120,42 @@ def test_identical_failed_call_is_not_repeated(tmp_path):
     assert outputs[3] == "Error: olmadı"
 
 
+def test_stops_after_repeated_blocked_calls(tmp_path):
+    agent, client = make_agent([("", [call("boom", f"c{i}")]) for i in range(5)] + [("son", [])], tmp_path)
+    result = agent.run("dene", RecordingUI())
+    assert "durduruldu" in result
+    assert len(client.requests) == 4  # 1 gerçek hata + 3 engellenen tekrar, sonra dur
+    blocked = [m["content"] for m in agent.conversation.history if m["role"] == "tool"][1]
+    assert "previous error was" in blocked and "olmadı" in blocked
+
+
+def test_auto_think_by_request_and_escalation(tmp_path):
+    agent, client = make_agent([
+        ("", [call("boom", "a")]),        # basit istekte hata → düşünme açılmalı
+        ("Tamam", []),
+    ], tmp_path)
+    agent.think = "auto"
+    ui = RecordingUI()
+    agent.run("sesi aç", ui)
+    assert client.reasoning_override == "medium"
+    assert any(e[0] == "delta" and "düşünme modu açıldı" in e[1] for e in ui.events)
+
+    agent2, client2 = make_agent([("ok", [])], tmp_path)
+    agent2.think = "auto"
+    agent2.run("sesi aç", RecordingUI())
+    assert client2.reasoning_override == "none"
+    agent2.client.steps = [("ok", [])]
+    agent2.run("bir program yaz ve çalıştır", RecordingUI())
+    assert client2.reasoning_override == "medium"
+
+
+def test_think_on_and_off_are_respected(tmp_path):
+    agent, client = make_agent([("", [call("boom", "a")]), ("x", [])], tmp_path)
+    agent.think = "off"
+    agent.run("sesi aç", RecordingUI())
+    assert client.reasoning_override == "none"  # kapalıysa hata olsa da açılmaz
+
+
 def test_successful_call_can_be_repeated(tmp_path):
     agent, _ = make_agent([
         ("", [call("echo", "a", text="x")]),

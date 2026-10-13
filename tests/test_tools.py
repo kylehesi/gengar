@@ -114,6 +114,15 @@ def test_write_read_edit_roundtrip(tmp_path):
     assert f.read_text(encoding="utf-8") == "bir\nİKİ\nüç\n"
 
 
+def test_write_file_fixes_flat_escaped_newlines(tmp_path):
+    f = tmp_path / "r.txt"
+    files.write_file(str(f), "RAM: 16 GB\\nDisk: 1300 GB\\nPil: %90")
+    assert f.read_text(encoding="utf-8").splitlines() == ["RAM: 16 GB", "Disk: 1300 GB", "Pil: %90"]
+    g = tmp_path / "kod.py"
+    files.write_file(str(g), "print('a\\nb')\nprint(1)\n")  # gerçek satır sonu varsa dokunma
+    assert "print('a\\nb')" in g.read_text(encoding="utf-8")
+
+
 def test_edit_requires_unique_match(tmp_path):
     f = tmp_path / "a.txt"
     f.write_text("x x", encoding="utf-8")

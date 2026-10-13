@@ -46,6 +46,7 @@ class Settings:
     max_history_messages: int
     timeout: float
     max_steps: int
+    think: str
     permission_mode: str
     log_dir: Path
     show_thinking: bool
@@ -108,6 +109,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         max_history_messages=int(llm.get("max_history_messages", 40)),
         timeout=float(llm.get("timeout", 120)),
         max_steps=int(raw.get("agent", {}).get("max_steps", 15)),
+        think=raw.get("agent", {}).get("think", "auto"),
         permission_mode=raw.get("permissions", {}).get("mode", "normal"),
         log_dir=PROJECT_ROOT / raw.get("logs", {}).get("dir", "logs"),
         show_thinking=bool(raw.get("ui", {}).get("show_thinking", False)),

@@ -9,11 +9,26 @@ from __future__ import annotations
 import inspect
 import re
 from collections.abc import Callable
+from pathlib import Path
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
 MAX_OUTPUT_CHARS = 8000
+
+# Araçların "geçerli klasörü": göreli yollar buna göre çözülür, PowerShell burada başlar.
+# Varsayılan ev klasörü; Gengar açılırken çalışma alanına (data/workspace) ayarlanır.
+_working_dir = Path.home()
+
+
+def working_dir() -> Path:
+    return _working_dir
+
+
+def set_working_dir(path: Path) -> None:
+    global _working_dir
+    path.mkdir(parents=True, exist_ok=True)
+    _working_dir = path
 
 
 class Risk(IntEnum):

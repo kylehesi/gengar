@@ -137,6 +137,9 @@ class PythonSandbox:
             if not script.is_file():
                 raise ToolError(f"dosya yok: {script}")
         else:
+            code, repaired = repair_code(code)
+            note += "note: the code contained literal \\n sequences instead of line breaks; they were fixed.\n" \
+                if repaired else ""
             runs = self.workspace / ".runs"
             runs.mkdir(parents=True, exist_ok=True)
             script = runs / f"run_{datetime.now():%Y%m%d_%H%M%S_%f}.py"
@@ -163,7 +166,52 @@ class PythonSandbox:
         parts = [note + status, stdout or "(no output)"]
         if stderr:
             parts.append(f"--- stderr ---\n{stderr}")
+        hint = error_hint(stderr)
+        if hint:
+            parts.append(f"--- hint ---\n{hint}")
         return "\n".join(parts)
+
+
+def repair_code(code: str) -> tuple[str, bool]:
+    """Model kodu JSON'da çift kaçışla yazınca satır sonları "\\n" metni olarak gelebiliyor.
+
+    Kod olduğu gibi derlenemiyor ama "\\n" → gerçek satır sonu çevrilince derlenebiliyorsa
+    çevrilmiş hâlini döndürür. Derlenebilen koda dokunulmaz.
+    """
+    try:
+        compile(code, "<gengar>", "exec")
+        return code, False
+    except SyntaxError:
+        pass
+    if "\\n" not in code:
+        return code, False
+    fixed = code.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+    try:
+        compile(fixed, "<gengar>", "exec")
+    except SyntaxError:
+        return code, False
+    return fixed, True
+
+
+# Sık görülen hatalar için modele hedefli ipuçları (küçük modeller hata mesajından çözümü çıkaramayabiliyor).
+_HINTS = [
+    (re.compile(r"invalid escape sequence|unicodeescape|\\x0[89a-c]|Errno 22\] Invalid argument: '[A-Za-z]:\\\\",
+                re.I),
+     "Windows paths in Python strings: backslashes start escape sequences (\\b, \\f, \\n, \\t). "
+     "Use a raw string r'C:\\folder\\file.txt' or forward slashes 'C:/folder/file.txt'."),
+    (re.compile(r"ModuleNotFoundError: No module named '([\w.]+)'"),
+     "A package is missing. Run again with packages=[\"<pip package name>\"] to install it first."),
+    (re.compile(r"FileNotFoundError"),
+     "Check the path: relative paths are resolved from the working directory shown in the tool description. "
+     "Use absolute paths or set cwd."),
+    (re.compile(r"UnicodeDecodeError"),
+     "Open text files with encoding='utf-8' (or 'utf-8-sig'); the file may also be UTF-16 if written by "
+     "old PowerShell commands."),
+]
+
+
+def error_hint(stderr: str) -> str:
+    return "\n".join(hint for rx, hint in _HINTS if rx.search(stderr))
 
 
 def make_tools(sandbox: PythonSandbox) -> list[Tool]:
@@ -193,7 +241,7 @@ def make_tools(sandbox: PythonSandbox) -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "pattern": {"type": "string", "description": "Regex or plain text to find."},
-                    "root": {"type": "string", "description": "Folder or file to search (default: home)."},
+                    "root": {"type": "string", "description": "Folder or file to search (default: workspace)."},
                     "glob": {"type": "string", "description": "File name filter, e.g. '*.py' (default all)."},
                     "ignore_case": {"type": "boolean", "description": "Default true."},
                 },

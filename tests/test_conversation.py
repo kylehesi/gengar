@@ -119,8 +119,12 @@ def test_repl_mode_command(tmp_path):
 
 def test_repl_commands(tmp_path):
     repl, out = make_repl([], tmp_path)
-    assert repl.handle_command("/think")
-    assert repl.client.thinking_enabled
+    assert repl.handle_command("/think off")
+    assert repl.agent.think == "off"
+    repl.handle_command("/think")  # off → auto
+    assert repl.agent.think == "auto"
+    repl.handle_command("/think saçma")
+    assert "Kullanım" in out.getvalue() and repl.agent.think == "auto"
     assert repl.handle_command("/model yok")
     assert "profil yok" in out.getvalue()
     assert not repl.handle_command("/exit")

@@ -19,7 +19,7 @@ def build_memory(settings: Settings, client: LLMClient) -> MemorySystem:
 
 
 def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
-                permission_mode: str | None = None) -> Agent:
+                permission_mode: str | None = None, think: str | None = None) -> Agent:
     tools = default_registry(settings)
     memory_system = build_memory(settings, client) if memory else None
     if memory_system:
@@ -31,4 +31,4 @@ def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
     )
     return Agent(client, tools, PermissionPolicy(permission_mode or settings.permission_mode),
                  AuditLog(settings.log_dir), conversation, max_steps=settings.max_steps,
-                 memory=memory_system)
+                 memory=memory_system, think=think or settings.think)

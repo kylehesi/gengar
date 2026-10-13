@@ -14,7 +14,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from .base import Risk, Tool, ToolError
+from .base import Risk, Tool, ToolError, working_dir
 
 DEFAULT_TIMEOUT = 60
 MAX_TIMEOUT = 600
@@ -169,7 +169,7 @@ def _env(path_prepend: list[str]) -> dict[str, str]:
 def run_powershell(command: str, timeout: int = DEFAULT_TIMEOUT, cwd: str | None = None,
                    path_prepend: list[str] | None = None) -> str:
     timeout = max(1, min(int(timeout), MAX_TIMEOUT))
-    workdir = Path(cwd).expanduser() if cwd else Path.home()
+    workdir = Path(cwd).expanduser() if cwd else working_dir()
     if not workdir.is_dir():
         raise ToolError(f"çalışma klasörü yok: {workdir}")
 
@@ -253,7 +253,7 @@ def make_tool(python_dir: Callable[[], str] | None = None) -> Tool:
             "This is PowerShell 5.1; use `cwd` instead of cd. " + note +
             "Do unit conversions inside the command, never by hand: e.g. "
             "Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}. "
-            "The working directory is the user's home folder unless `cwd` is given."
+            "The working directory is Gengar's workspace folder unless `cwd` is given."
         ),
         parameters={
             "type": "object",
