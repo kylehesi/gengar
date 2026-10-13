@@ -29,6 +29,8 @@ RESPONSE_RESERVE_TOKENS = 1500
 DENIED = "The user denied this action. Do not retry it; ask the user how they want to proceed."
 # Aynı başarısız çağrı bu kadar kez engellenirse tur durdurulur.
 MAX_BLOCKED = 3
+# Model boş cevapla biterse en fazla bu kadar kez tekrar istenir.
+MAX_EMPTY_RETRIES = 2
 CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
 FINAL_ANSWER = "[Gengar] Your last reply was empty. Now write your final answer to the user's request."
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
@@ -99,8 +101,26 @@ class Agent:
 
         self.last_turn = self.conversation.history[mark:]
         if self.memory:
+            self._ensure_remembered(user_text, ui)
             self._learn(ui)
         return answer
+
+    def _ensure_remembered(self, user_text: str, ui: AgentUI) -> None:
+        """Kullanıcı açıkça "hatırla" dediyse ve model kaydetmediyse, Gengar kaydeder."""
+        called = {tc["function"]["name"] for m in self.last_turn for tc in (m.get("tool_calls") or [])}
+        fact = self.memory.explicit_fact(user_text)
+        if fact and "remember" not in called:
+            mem, _ = self.memory.store.add("fact", fact[:80], fact)
+            self.audit.record("remember_fallback", fact=fact, memory_id=mem.id)
+            ui.on_delta(Delta("status", f"hafızaya kaydedildi: #{mem.id} \"{fact}\""))
+
+    def _fallback_answer(self) -> str:
+        """Model hiç cevap yazmadığında: son araç çıktısını açıkça etiketleyerek göster."""
+        last_tool = next((m for m in reversed(self.conversation.history) if m["role"] == "tool"), None)
+        if last_tool is None:
+            return "(Model bir cevap üretmedi. İsteği tekrar deneyin ya da farklı ifade edin.)"
+        output = (last_tool.get("content") or "").strip()
+        return f"(Model cevap yazmadı. Son araç çıktısı — {last_tool.get('name')}:)\n{output[:800]}"
 
     def _set_thinking(self, user_text: str) -> None:
         if self.think == "on":
@@ -131,7 +151,7 @@ class Agent:
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
         nudged = False
-        answered_empty = False
+        empty_retries = 0
         blocked = 0
         for _ in range(self.max_steps):
             parts: list[str] = []
@@ -150,15 +170,18 @@ class Agent:
                     nudged = True
                     self.conversation.add_user(CONTINUE)
                     continue
-                # Bazı modeller (örn. qwen3.5 + Ollama) araç sonucundan sonra ara sıra boş cevapla bitiriyor.
-                if not text.strip() and not answered_empty:
-                    answered_empty = True
+                # Bazı modeller (örn. qwen3.5 + Ollama) araç sonucundan sonra ara sıra boş cevapla bitiriyor;
+                # aynı bağlam tekrar oynatılınca cevap geliyor, yani rastlantısal. Birkaç kez tekrar iste.
+                if not text.strip():
                     self.conversation.history.pop()  # boş asistan mesajını geçmişte bırakma
-                    self.conversation.add_user(FINAL_ANSWER)
-                    # Düşünerek cevap verirken bu sorun görülmedi; tekrar denemede düşünmeyi aç.
-                    if self.client.reasoning_override in (None, "none"):
-                        self.client.reasoning_override = "medium"
-                    continue
+                    if empty_retries < MAX_EMPTY_RETRIES:
+                        empty_retries += 1
+                        self.audit.record("empty_answer", retry=empty_retries)
+                        self.conversation.add_user(FINAL_ANSWER)
+                        continue
+                    # Hâlâ boşsa sessiz kalmak yerine son araç çıktısını göster.
+                    text = self._fallback_answer()
+                    self.conversation.add_assistant(text)
                 return text
             failed = False
             for call in calls:

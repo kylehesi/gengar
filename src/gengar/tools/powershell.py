@@ -267,7 +267,8 @@ def make_tool(python_dir: Callable[[], str] | None = None) -> Tool:
         risk=Risk.SYSTEM,
         func=run,
         classify=lambda args: classify(str(args.get("command", ""))),
-        describe=lambda args: str(args.get("command", "")),
+        describe=lambda args: str(args.get("command", ""))
+        + (f"\n(klasör: {args['cwd']})" if args.get("cwd") else ""),
     )
 
 

@@ -194,18 +194,36 @@ def test_rpm_paces_requests(settings, fake_completion, monkeypatch):
     assert deltas[0].kind == "status" and "dakikada 5 istek" in deltas[0].text
 
 
-def test_local_errors_are_not_retried(settings, monkeypatch):
+def test_local_connection_errors_are_not_retried(settings, monkeypatch):
     litellm = _get_litellm()
     attempts = []
 
     def completion(**kwargs):
         attempts.append(1)
-        raise litellm.ServiceUnavailableError("down", "ollama", "x")
+        raise litellm.APIConnectionError("refused", "ollama", "x")
 
     monkeypatch.setattr(litellm, "completion", completion)
-    with pytest.raises(LLMError):
+    with pytest.raises(LLMError, match="Ollama"):
         LLMClient(settings, "local").complete([])
     assert len(attempts) == 1
+
+
+def test_local_server_errors_are_retried(settings, monkeypatch):
+    from gengar.llm import client as client_mod
+
+    monkeypatch.setattr(client_mod, "RETRY_DELAYS", (0, 0))
+    litellm = _get_litellm()
+    attempts = []
+
+    def completion(**kwargs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise litellm.ServiceUnavailableError("model loading", "ollama", "x")
+        return iter([chunk(content="ok")])
+
+    monkeypatch.setattr(litellm, "completion", completion)
+    assert LLMClient(settings, "local").complete([]) == "ok"
+    assert len(attempts) == 2
 
 
 def test_rate_limit_is_translated(settings, fake_completion, monkeypatch):

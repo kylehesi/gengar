@@ -180,16 +180,23 @@ def test_plan_without_action_is_nudged_once(tmp_path):
     assert len(client.requests) == 3
 
 
-def test_empty_final_answer_is_retried_once(tmp_path):
+def test_empty_final_answer_is_retried(tmp_path):
     agent, client = make_agent([
         ("", [call("echo", text="x")]),
-        ("", []),                 # boş cevap → bir kez daha istenir
+        ("", []),                 # boş cevap → tekrar istenir
+        ("", []),                 # yine boş → bir kez daha
         ("Sonuç: x", []),
     ], tmp_path)
     assert agent.run("dene", RecordingUI()).strip() == "Sonuç: x"
     assert "empty" in client.requests[2][-1]["content"]
     assert all(m.get("content") or m.get("tool_calls") or m["role"] != "assistant"
                for m in agent.conversation.history)
+
+
+def test_persistent_empty_answer_falls_back_to_tool_output(tmp_path):
+    agent, _ = make_agent([("", [call("echo", text="Storage")]), ("", []), ("", []), ("", [])], tmp_path)
+    answer = agent.run("hangi modül?", RecordingUI())
+    assert "Model cevap yazmadı" in answer and "echo: Storage" in answer
 
 
 def test_step_limit(tmp_path):

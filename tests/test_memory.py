@@ -220,6 +220,31 @@ def test_agent_learns_after_research_turn(store):
     assert any(e[0] == "delta" and "yeni beceri öğrenildi" in e[1] for e in ui.events)
 
 
+@pytest.mark.parametrize("text, fact", [
+    ("En sevdiğim renk turuncu. Bunu hatırla.", "En sevdiğim renk turuncu"),
+    ("Lütfen unutma, kedimin adı Pamuk", "kedimin adı Pamuk"),
+    ("Projelerim D:\\Projeler klasöründe, aklında tut", "Projelerim D:\\Projeler klasöründe"),
+    ("Masaüstümde kaç dosya var?", None),
+    ("hatırla", None),  # kaydedilecek içerik yok
+])
+def test_explicit_fact(text, fact):
+    assert MemorySystem.explicit_fact(text) == fact
+
+
+def test_agent_saves_explicit_fact_when_model_forgets(store):
+    agent, _ = make_agent(store, [("Tamamdır, kaydediyorum!", [])])  # model remember çağırmıyor
+    ui = RecordingUI()
+    agent.run("En sevdiğim renk turuncu. Bunu hatırla.", ui)
+    assert [f.content for f in store.all("fact")] == ["En sevdiğim renk turuncu"]
+    assert any(e[0] == "delta" and "hafızaya kaydedildi" in e[1] for e in ui.events)
+
+
+def test_no_duplicate_when_model_remembers(store):
+    agent, _ = make_agent(store, [("", [call("remember", "a", fact="Kullanıcının kedisi Pamuk")]), ("Tamam", [])])
+    agent.run("Kedimin adı Pamuk, bunu hatırla", RecordingUI())
+    assert len(store.all("fact")) == 1
+
+
 def test_remember_tool(store):
     agent, _ = make_agent(store, [("", [call("remember", "a", fact="Kullanıcı Ankara'da yaşıyor")]), ("Tamam", [])])
     agent.run("Ankara'da yaşıyorum, bunu hatırla", RecordingUI())

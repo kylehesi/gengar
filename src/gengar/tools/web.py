@@ -267,7 +267,9 @@ TOOLS = [
         name="web_search",
         description=(
             "Search the web. Use it for anything you don't know, recent or changing facts "
-            "(versions, prices, news, how-tos) and errors you can't solve. Returns titles, URLs and snippets."
+            "(versions, prices, news, how-tos) and errors you can't solve. Returns titles, URLs and snippets. "
+            "For software versions prefer official sources (the project's site or its GitHub releases page) "
+            "over blogs, and check the date: pages can be outdated."
         ),
         parameters={
             "type": "object",

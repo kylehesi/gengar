@@ -302,7 +302,11 @@ def _is_transient(e: Exception, profile: Profile) -> bool:
     litellm = _get_litellm()
     inner = _unwrap(e)
     if profile.is_local:
-        return False  # Ollama kapalıysa beklemek işe yaramaz
+        # Ollama kapalıysa (bağlantı hatası) beklemek işe yaramaz; ama model yüklenirken/değişirken
+        # verdiği 5xx hataları geçicidir.
+        server_side = (litellm.ServiceUnavailableError, litellm.InternalServerError)
+        connection = isinstance(e, litellm.APIConnectionError) and not isinstance(e, server_side)
+        return not connection and (isinstance(e, server_side) or isinstance(inner, server_side))
     return isinstance(e, (litellm.ServiceUnavailableError, litellm.InternalServerError, litellm.Timeout)) \
         or isinstance(inner, (litellm.ServiceUnavailableError, litellm.InternalServerError,
                               litellm.Timeout, litellm.RateLimitError))
@@ -315,6 +319,9 @@ def _translate(e: Exception, profile: Profile, settings: Settings) -> LLMError:
     e = _unwrap(e)
 
     if isinstance(e, litellm.ServiceUnavailableError) or isinstance(e, litellm.InternalServerError):
+        if profile.is_local:
+            return LLMError(f"[{name}] Ollama hata verdi (tekrar denendi): {str(e)[:200]}. Model yükleniyor ya da "
+                            f"VRAM yetmiyor olabilir; biraz sonra tekrar deneyin.")
         return LLMError(f"[{name}] Sağlayıcı şu an yoğun ya da hata veriyor (tekrar denendi). "
                         f"Biraz sonra deneyin ya da /model ile başka profile geçin.")
     if isinstance(e, litellm.AuthenticationError):

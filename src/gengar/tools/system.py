@@ -62,8 +62,8 @@ def cpu_info() -> list[str]:
     name = _reg(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
                 "ProcessorNameString") or platform.processor()
     usage = psutil.cpu_percent(interval=0.3)
-    return [f"CPU: {name.strip()} ({psutil.cpu_count(logical=False)} cores / "
-            f"{psutil.cpu_count()} threads), usage {usage:.0f}%"]
+    return [f"CPU: {name.strip()} — {psutil.cpu_count(logical=False)} physical cores, "
+            f"{psutil.cpu_count()} logical processors (threads), usage {usage:.0f}%"]
 
 
 def memory_info() -> list[str]:

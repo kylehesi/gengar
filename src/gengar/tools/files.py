@@ -31,7 +31,9 @@ def _human(size: int) -> str:
     return f"{size:.1f} TB"
 
 
-def read_file(path: str, offset: int = 1, limit: int = 400) -> str:
+def read_file(path: str, offset: int = 1, limit: int = 400, line_numbers: bool = False) -> str:
+    """Dosya içeriği. Satır numaraları varsayılan olarak kapalı: küçük modeller numaraları
+    içeriğin parçası sanıp başka dosyalara kopyalıyordu (ölçümde gözlendi)."""
     p = resolve(path)
     if not p.is_file():
         raise ToolError(f"dosya yok: {p}")
@@ -40,13 +42,16 @@ def read_file(path: str, offset: int = 1, limit: int = 400) -> str:
     data = p.read_bytes()
     if b"\0" in data[:8192]:
         raise ToolError(f"ikili (binary) dosya, metin olarak okunamaz: {p}")
-    lines = data.decode("utf-8", errors="replace").splitlines()
+    lines = data.decode("utf-8-sig", errors="replace").splitlines()
     start = max(1, offset)
     chunk = lines[start - 1: start - 1 + limit]
-    body = "\n".join(f"{n:>5}\t{line}" for n, line in enumerate(chunk, start))
+    if line_numbers:
+        body = "\n".join(f"{n:>5}\t{line}" for n, line in enumerate(chunk, start))
+    else:
+        body = "\n".join(chunk)
     end = start + len(chunk) - 1
-    footer = f"\n[{p} — satır {start}-{end} / {len(lines)}]"
-    return (body or "(boş)") + footer
+    header = f"[{p} — satır {start}-{end} / {len(lines)}]"
+    return f"{header}\n{body if chunk else '(boş)'}"
 
 
 def list_directory(path: str = "~") -> str:
@@ -145,7 +150,8 @@ def _path_arg(desc: str) -> dict:
 TOOLS = [
     Tool(
         name="read_file",
-        description="Read a UTF-8 text file. Returns numbered lines. Use offset/limit for long files.",
+        description="Read a UTF-8 text file. Returns the content after a one-line [path — lines] header "
+                    "(the header is not part of the file). Use offset/limit for long files.",
         parameters={
             "type": "object",
             "properties": {
@@ -153,6 +159,7 @@ TOOLS = [
                                   "workspace folder."),
                 "offset": {"type": "integer", "description": "First line number (1-based)."},
                 "limit": {"type": "integer", "description": "Max lines to return (default 400)."},
+                "line_numbers": {"type": "boolean", "description": "Prefix each line with its number (default false)."},
             },
             "required": ["path"],
         },

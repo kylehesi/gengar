@@ -10,12 +10,18 @@ Akış:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..tools.base import Risk, Tool, ToolError
 from .embeddings import Embedder
 from .learn import Learner, worth_reflecting
 from .store import Memory, MemoryStore
+
+_REMEMBER = re.compile(r"\b(hatırla|hatirla|unutma|aklında tut|aklında bulundur|remember)\b", re.IGNORECASE)
+_REMEMBER_PHRASE = re.compile(
+    r"(lütfen\s+)?(bunu|bunları|şunu)?\s*(hatırla|hatirla|unutma|aklında tut|aklında bulundur|remember( this| that)?)"
+    r"(\s+lütfen)?[.!]*", re.IGNORECASE)
 
 # Bilgi sayısı bunu geçmezse hepsi her mesajda verilir (kullanıcı bilgileri genelde hep ilgilidir).
 ALL_FACTS_LIMIT = 8
@@ -49,6 +55,20 @@ class MemorySystem:
                          "match, adapt them to the request, and still verify the result:\n"
                          + "\n\n".join(format_skill(s) for s in skills))
         return "\n\n".join(parts)
+
+    # --- açık "hatırla" istekleri -------------------------------------------------
+
+    @staticmethod
+    def explicit_fact(user_text: str) -> str | None:
+        """Kullanıcı açıkça "hatırla/unutma" dediyse hafızaya yazılacak cümle; yoksa None.
+
+        Küçük modeller "kaydettim" deyip `remember` aracını çağırmayabiliyor (ölçümde gözlendi);
+        açık isteği kaçırmamak için Gengar bunu kendisi kaydeder.
+        """
+        if not _REMEMBER.search(user_text):
+            return None
+        fact = _REMEMBER_PHRASE.sub("", user_text).strip(" .,!;:-")
+        return fact if len(fact.split()) >= 3 else None
 
     # --- otomatik öğrenme -----------------------------------------------------
 

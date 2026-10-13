@@ -159,8 +159,10 @@ TOOL = Tool(
     name="settings",
     description=(
         "Read or change common Windows settings. action=get: current theme, volume, brightness, wallpaper. "
-        "action=set with setting: theme (dark|light), volume (0-100 or +10/-10), mute (true|false), "
-        "brightness (0-100 or +10/-10, laptop screen), wallpaper (image file path). "
+        "action=set with setting: theme (dark|light; Turkish: tema, koyu/açık mod), "
+        "volume (0-100 or +10/-10; Turkish: ses, ses seviyesi), mute (true|false; Turkish: sessiz, sesi kapat), "
+        "brightness (0-100 or +10/-10, laptop screen; Turkish: parlaklık, ekran ışığı), "
+        "wallpaper (image file path; Turkish: duvar kağıdı, arka plan). "
         "For other settings open the right page with apps(open, 'ms-settings:...') or use PowerShell."
     ),
     parameters={

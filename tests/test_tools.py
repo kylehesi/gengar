@@ -109,7 +109,9 @@ def test_run_powershell_timeout():
 def test_write_read_edit_roundtrip(tmp_path):
     f = tmp_path / "alt" / "not.txt"
     assert "oluşturuldu" in files.write_file(str(f), "bir\niki\nüç\n")
-    assert "2\tiki" in files.read_file(str(f))
+    out = files.read_file(str(f))
+    assert out.splitlines()[1:] == ["bir", "iki", "üç"]  # numarasız içerik, başlık ayrı satırda
+    assert "2\tiki" in files.read_file(str(f), line_numbers=True)
     files.edit_file(str(f), "iki", "İKİ")
     assert f.read_text(encoding="utf-8") == "bir\nİKİ\nüç\n"
 
