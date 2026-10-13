@@ -35,7 +35,20 @@ from gengar.llm import LLMClient  # noqa: E402
 GEN_ROOT = PROJECT_ROOT / "data" / "gen"
 
 
+def keep_awake() -> None:
+    """Betik çalıştıkça Windows uykuya geçmesin (ayar değiştirmez; süreç bitince kendiliğinden kalkar).
+    Not: laptop kapağı kapatılırsa ya da elle "Uyku" seçilirse yine uyur."""
+    try:
+        import ctypes
+
+        ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+    except (AttributeError, OSError):
+        pass
+
+
 def main() -> None:
+    keep_awake()
     ap = argparse.ArgumentParser(description="Gengar eğitim verisi üretici")
     ap.add_argument("profile", nargs="?", default=None)
     ap.add_argument("--per-family", type=int, default=20)
