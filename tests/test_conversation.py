@@ -21,6 +21,16 @@ def test_messages_start_with_system_prompt():
     ]
 
 
+def test_reasoning_is_stored_but_not_sent():
+    c = Conversation("SYS")
+    c.add_user("a")
+    c.add_assistant("cevap", reasoning="önce şunu düşündüm")
+    assert c.history[-1]["_reasoning"] == "önce şunu düşündüm"
+    sent = c.messages()
+    assert all(not any(k.startswith("_") for k in m) for m in sent)
+    assert sent[-1] == {"role": "assistant", "content": "cevap"}
+
+
 def test_trimmed_window_starts_with_user():
     c = Conversation("SYS", max_messages=3)
     for i in range(3):

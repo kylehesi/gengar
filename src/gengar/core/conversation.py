@@ -82,10 +82,13 @@ class Conversation:
     def add_user(self, text: str) -> None:
         self.history.append({"role": "user", "content": text})
 
-    def add_assistant(self, text: str, tool_calls: list[ToolCall] | None = None) -> None:
+    def add_assistant(self, text: str, tool_calls: list[ToolCall] | None = None, reasoning: str = "") -> None:
         msg: dict[str, Any] = {"role": "assistant", "content": text}
         if tool_calls:
             msg["tool_calls"] = [tc.to_message() for tc in tool_calls]
+        if reasoning.strip():
+            # Modelin düşünce metni: modele geri gönderilmez (bkz. messages), döküm ve eğitim verisi için saklanır.
+            msg["_reasoning"] = reasoning.strip()
         self.history.append(msg)
 
     def add_tool_result(self, call: ToolCall, output: str) -> None:
@@ -138,6 +141,8 @@ class Conversation:
             if sum(map(_size, recent)) > budget:
                 recent = _shrink_tool_outputs(recent, budget)
 
+        # "_" ile başlayan alanlar (örn. _reasoning) sadece döküm/eğitim içindir, modele gönderilmez.
+        recent = [{k: v for k, v in m.items() if not k.startswith("_")} for m in recent]
         return [{"role": "system", "content": system}, *recent]
 
 

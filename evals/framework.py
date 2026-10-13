@@ -209,14 +209,14 @@ class Result:
 
 def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path | None,
              meta: dict[str, Any]) -> Result:
-    s = settings
-    if task.memory:
-        s = replace(settings, memory_db=task.root / "memory.db")
+    # Hafıza gerçek kullanımdaki gibi hep açık (araç seti aynı olsun), ama her görevin kendi boş
+    # hafıza dosyası var: görevler birbirini etkilemez. Hafıza görevlerinde oturumlar bu dosyayı paylaşır.
+    s = replace(settings, memory_db=task.root / "memory.db")
     prompts = task.prompt if isinstance(task.prompt, list) else [task.prompt]
     start = time.perf_counter()
     answer, error, calls, steps, tools, sessions = "", "", 0, 0, [], []
     for p in prompts:
-        agent = build_agent(s, client, memory=task.memory,
+        agent = build_agent(s, client, memory=True,
                             permission_mode="trust" if task.approval == "trust" else "normal")
         if agent.memory:
             agent.memory.auto_learn = False  # ölçüm sırasında beceri öğrenme kapalı (görevler birbirini etkilemesin)

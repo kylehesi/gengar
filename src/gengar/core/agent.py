@@ -156,13 +156,16 @@ class Agent:
         blocked = 0
         for _ in range(self.max_steps):
             parts: list[str] = []
+            thinking: list[str] = []
             for delta in self.client.stream_chat(self.conversation.messages(self._max_chars()), schemas):
                 ui.on_delta(delta)
                 if delta.kind == "text":
                     parts.append(delta.text)
+                elif delta.kind == "thinking":
+                    thinking.append(delta.text)
             text = "".join(parts)
             calls = self.client.last_tool_calls
-            self.conversation.add_assistant(text, calls)
+            self.conversation.add_assistant(text, calls, reasoning="".join(thinking))
             ui.on_step_end(self.client.last_stats)
 
             if not calls:

@@ -49,6 +49,35 @@ def test_generation_is_reproducible(tmp_path):
     assert norm(a, "a") != norm(c, "c")
 
 
+def test_export_keeps_clean_sessions_only():
+    from export_sft import clean_session
+
+    tc = {"id": "c1", "type": "function", "function": {"name": "read_file", "arguments": '{"path": "a.txt"}'}}
+    good = {"system": "SYS", "tools": [{"x": 1}], "messages": [
+        {"role": "user", "content": "oku"},
+        {"role": "assistant", "content": "", "tool_calls": [tc]},
+        {"role": "tool", "tool_call_id": "c1", "name": "read_file", "content": "Error: dosya yok"},
+        {"role": "assistant", "content": "", "tool_calls": [tc]},
+        {"role": "tool", "tool_call_id": "c1", "name": "read_file", "content": "merhaba"},
+        {"role": "assistant", "content": "Dosyada 'merhaba' yazıyor."}]}
+    ex = clean_session(good)
+    assert ex["messages"][0] == {"role": "system", "content": "SYS"}
+    assert ex["messages"][2]["tool_calls"][0]["function"]["arguments"] == {"path": "a.txt"}  # nesne olarak
+    assert ex["tools"] == [{"x": 1}]
+
+    nudged = {**good, "messages": good["messages"][:-1] + [
+        {"role": "user", "content": "[Gengar] Your last reply was empty..."},
+        {"role": "assistant", "content": "Tamam"}]}
+    assert clean_session(nudged) is None
+    no_answer = {**good, "messages": good["messages"][:-1]}
+    assert clean_session(no_answer) is None
+
+    thought = {**good, "messages": good["messages"][:-1] + [
+        {"role": "assistant", "content": "Dosyada 'merhaba' yazıyor.", "_reasoning": "dosyayı okudum"}]}
+    assert clean_session(thought)["messages"][-1]["reasoning_content"] == "dosyayı okudum"
+    assert "reasoning_content" not in clean_session(thought, keep_reasoning=False)["messages"][-1]
+
+
 def test_correct_actions_pass(tmp_path):
     """Doğru işi yapınca doğrulama geçmeli (birkaç aile için elle)."""
     t = next(t for t in build_tasks([f for f in files.FAMILIES if f.name == "file_rename_ext"], base=tmp_path)
