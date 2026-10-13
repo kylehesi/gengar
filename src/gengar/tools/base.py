@@ -7,6 +7,7 @@ bu biçimi Ollama, Gemini, Claude vb. için kendi formatlarına çevirir.
 from __future__ import annotations
 
 import inspect
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
@@ -68,6 +69,14 @@ class Tool:
         except TypeError as e:
             raise ToolError(f"geçersiz argümanlar: {e}") from e
         return truncate(self.func(**args))
+
+
+def is_failure(output: str) -> bool:
+    """Araç çıktısı bir başarısızlık mı? (hata, reddedilme, engelleme ya da sıfırdan farklı çıkış kodu)"""
+    if output.startswith(("Error:", "The user denied", "Not executed:")):
+        return True
+    m = re.search(r"exit code: (\S+)", output[:300])
+    return bool(m) and m.group(1) != "0"
 
 
 def truncate(text: str, limit: int = MAX_OUTPUT_CHARS) -> str:

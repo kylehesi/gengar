@@ -51,6 +51,10 @@ class Settings:
     show_thinking: bool
     workspace: Path
     sandbox_venv: Path
+    memory_db: Path
+    embed_model: str
+    auto_learn: bool
+    skill_min_score: float
     raw: dict = field(repr=False)
 
 
@@ -94,6 +98,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         raise ValueError(f"settings.toml: varsayılan profil '{default}' tanımlı değil")
 
     ollama = raw.get("ollama", {})
+    memory = raw.get("memory", {})
     return Settings(
         profiles=profiles,
         default_profile=default,
@@ -108,5 +113,9 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         show_thinking=bool(raw.get("ui", {}).get("show_thinking", False)),
         workspace=PROJECT_ROOT / raw.get("code", {}).get("workspace", "data/workspace"),
         sandbox_venv=PROJECT_ROOT / raw.get("code", {}).get("sandbox_venv", "data/sandbox/.venv"),
+        memory_db=PROJECT_ROOT / memory.get("db", "data/memory.db"),
+        embed_model=memory.get("embed_model", "bge-m3"),
+        auto_learn=bool(memory.get("auto_learn", True)),
+        skill_min_score=float(memory.get("skill_min_score", 0.47)),
         raw=raw,
     )

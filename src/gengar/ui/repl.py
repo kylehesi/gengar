@@ -29,6 +29,9 @@ Komutlar:
   /think          modelin düşünme modunu aç/kapat (daha doğru ama yavaş)
   /thinklog       düşünce metnini göster/gizle
   /mode <mod>     izin modu: normal (varsayılan), strict (her şeyi sor), trust (hiçbir şeyi sorma)
+  /memory         hatırlanan bilgiler        /remember <bilgi>  bilgi ekle
+  /skills         öğrenilmiş beceriler       /skill <no>        beceriyi göster
+  /learn          son işten beceri çıkar     /forget <no>       bilgi/beceri sil
   /clear          yeni sohbet başlat
   /help           bu yardım
   /exit           çık (Ctrl+C de olur)
@@ -65,7 +68,11 @@ class Repl:
         p = self.client.profile
         self.print(f"{BOLD}Gengar {__version__}{RESET} · profil: {CYAN}{p.name}{RESET} ({p.model})"
                    f" · izin modu: {self.agent.policy.mode}")
-        self.print(f"{DIM}{len(self.agent.tools)} araç hazır. Komutlar için /help yazın.{RESET}")
+        memory = ""
+        if self.agent.memory:
+            store = self.agent.memory.store
+            memory = f" Hafıza: {len(store.all('fact'))} bilgi, {len(store.all('skill'))} beceri."
+        self.print(f"{DIM}{len(self.agent.tools)} araç hazır.{memory} Komutlar için /help yazın.{RESET}")
 
     def run(self) -> int:
         if os.name == "nt":
@@ -115,6 +122,8 @@ class Repl:
             self.print(f"Düşünme modu {state}.")
         elif cmd == "/mode":
             self.set_mode(arg)
+        elif cmd in ("/memory", "/remember", "/forget", "/skills", "/skill", "/learn"):
+            self.memory_command(cmd, arg)
         elif cmd == "/thinklog":
             self.show_thinking = not self.show_thinking
             self.print(f"Düşünce metni {'gösterilecek' if self.show_thinking else 'gizlenecek'}.")
@@ -138,6 +147,55 @@ class Repl:
         else:
             self.print(f"İzin modu: {mode}.")
         self.agent.audit.record("mode", mode=mode)
+
+    def memory_command(self, cmd: str, arg: str) -> None:
+        memory = self.agent.memory
+        if memory is None:
+            self.print("Hafıza kapalı.")
+            return
+        store = memory.store
+        if cmd == "/memory":
+            facts = store.all("fact")
+            if not facts:
+                self.print("Henüz hatırlanan bir bilgi yok. Eklemek için: /remember <bilgi>")
+            for f in facts:
+                self.print(f" #{f.id:<4} {f.content}")
+        elif cmd == "/remember":
+            if not arg:
+                self.print("Kullanım: /remember <bilgi>   örn. /remember Projelerim D:\\Projeler klasöründe")
+                return
+            mem, new = store.add("fact", arg[:80], arg)
+            self.print(f"{'Kaydedildi' if new else 'Güncellendi'}: #{mem.id}")
+        elif cmd == "/forget":
+            if not arg.lstrip("#").isdigit():
+                self.print("Kullanım: /forget <numara>   (numaralar /memory ve /skills'te)")
+                return
+            ok = store.delete(int(arg.lstrip("#")))
+            self.print("Silindi." if ok else "Bu numarada bir kayıt yok.")
+        elif cmd == "/skills":
+            skills = store.all("skill")
+            if not skills:
+                self.print("Henüz öğrenilmiş bir beceri yok. Gengar zor bir işi başardığında otomatik öğrenir; "
+                           "ya da son işten öğrenmesi için /learn yazın.")
+            for s in skills:
+                first = s.content.splitlines()[0] if s.content else ""
+                self.print(f" #{s.id:<4} {BOLD}{s.title}{RESET} — {first[:90]}  {DIM}({s.uses} kez kullanıldı){RESET}")
+        elif cmd == "/skill":
+            s = store.get(int(arg.lstrip("#"))) if arg.lstrip("#").isdigit() else None
+            if not s or s.kind != "skill":
+                self.print("Kullanım: /skill <numara>")
+                return
+            from ..memory import format_skill
+
+            self.print(format_skill(s))
+        elif cmd == "/learn":
+            if not self.agent.last_turn:
+                self.print("Öğrenilecek bir iş yok; önce bir istek verin.")
+                return
+            self.print(f"{DIM}Son iş değerlendiriliyor…{RESET}")
+            skill = memory.learn_now(self.agent.last_turn)
+            self.print(f"Beceri kaydedildi: #{skill.id} {skill.title}" if skill
+                       else "Model bu işten tekrar kullanılabilir bir beceri çıkarmadı.")
 
     def list_profiles(self) -> None:
         for p in self.settings.profiles.values():

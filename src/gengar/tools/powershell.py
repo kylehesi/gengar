@@ -76,7 +76,8 @@ def classify(command: str) -> Risk:
             continue
         first = words[0].lower()
         # $değişken, "metin", 'metin', sayı, -parametre: komut değil, ifade.
-        if first[0] in "$\"'-" or first[0].isdigit() or first in ("else", "if"):
+        # "+ ' MB'" gibi operatörle başlayan parça da ifadenin devamıdır (parantezden sonra gelir).
+        if first[0] in "$\"'-+*/,=!<>" or first[0].isdigit() or first in ("else", "if"):
             continue
         if first in SAFE_ALIASES or first in SAFE_CMDLETS:
             continue

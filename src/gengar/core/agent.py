@@ -8,15 +8,17 @@ protokolünü uygular; agent ekrana doğrudan bir şey yazmaz.
 from __future__ import annotations
 
 import json
-import re
 import time
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from ..llm import Delta, LLMClient, LLMError, Stats, ToolCall
-from ..tools.base import Risk, Tool, ToolError, ToolRegistry
+from ..tools.base import Risk, Tool, ToolError, ToolRegistry, is_failure
 from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
 from .permissions import PermissionPolicy
+
+if TYPE_CHECKING:
+    from ..memory import MemorySystem
 
 Answer = Literal["yes", "no", "session"]
 
@@ -38,14 +40,6 @@ def _signature(call: ToolCall) -> tuple[str, str]:
     return call.name, args
 
 
-def _failed(output: str) -> bool:
-    """Araç çıktısı bir başarısızlık mı? (hata, reddedilme ya da sıfırdan farklı çıkış kodu)"""
-    if output.startswith(("Error:", "The user denied", "Not executed:")):
-        return True
-    m = re.search(r"exit code: (\S+)", output[:300])
-    return bool(m) and m.group(1) != "0"
-
-
 class AgentUI(Protocol):
     def on_delta(self, delta: Delta) -> None: ...
     def on_step_end(self, stats: Stats | None) -> None: ...
@@ -56,13 +50,16 @@ class AgentUI(Protocol):
 
 class Agent:
     def __init__(self, client: LLMClient, tools: ToolRegistry, policy: PermissionPolicy,
-                 audit: AuditLog, conversation: Conversation, max_steps: int = 15):
+                 audit: AuditLog, conversation: Conversation, max_steps: int = 15,
+                 memory: MemorySystem | None = None):
         self.client = client
         self.tools = tools
         self.policy = policy
         self.audit = audit
         self.conversation = conversation
         self.max_steps = max_steps
+        self.memory = memory
+        self.last_turn: list[dict] = []  # son tamamlanan turun mesajları (/learn için)
         self._last_failed: tuple[str, str] | None = None
 
     def _max_chars(self) -> int | None:
@@ -79,16 +76,35 @@ class Agent:
         """
         mark = len(self.conversation.history)
         self._last_failed = None
+        if self.memory:
+            self.conversation.context = self.memory.context_for(user_text)
         self.conversation.add_user(user_text)
         self.audit.record("user", text=user_text, profile=self.client.profile.name)
         try:
-            return self._loop(ui)
+            answer = self._loop(ui)
         except (LLMError, KeyboardInterrupt):
             if len(self.conversation.history) == mark + 1:
                 self.conversation.truncate(mark)  # hiçbir şey olmadan bitti: isteği geri al
             else:
                 self.conversation.close_pending_tool_calls()
             raise
+
+        self.last_turn = self.conversation.history[mark:]
+        if self.memory:
+            self._learn(ui)
+        return answer
+
+    def _learn(self, ui: AgentUI) -> None:
+        """Zor bir iş başarıyla bittiyse turdan beceri çıkarmayı dene (hata sohbeti bozmasın)."""
+        try:
+            skill = self.memory.after_turn(self.last_turn)
+        except Exception as e:  # öğrenme isteğe bağlı bir özellik
+            self.audit.record("learn", ok=False, error=f"{type(e).__name__}: {e}")
+            return
+        if skill:
+            self.audit.record("learn", ok=True, skill_id=skill.id, name=skill.title)
+            ui.on_delta(Delta("status", f"yeni beceri öğrenildi: #{skill.id} {skill.title} "
+                                        f"(görmek için /skills)"))
 
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
@@ -120,7 +136,7 @@ class Agent:
                     ui.on_tool_end(call, output, False)
                 else:
                     output = self._execute(call, ui)
-                self._last_failed = sig if _failed(output) else None
+                self._last_failed = sig if is_failure(output) else None
                 self.conversation.add_tool_result(call, output)
 
         note = f"(Adım sınırına ulaşıldı: {self.max_steps}. Devam etmek için 'devam et' yazın.)"

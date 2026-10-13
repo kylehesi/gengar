@@ -69,6 +69,12 @@ class Conversation:
         self.system_prompt = system_prompt
         self.max_messages = max_messages
         self.history: list[dict[str, Any]] = []
+        # O anki isteğe göre hafızadan bulunan bilgiler/beceriler; her kullanıcı mesajında yenilenir.
+        self.context = ""
+
+    @property
+    def system_message(self) -> str:
+        return f"{self.system_prompt}\n\n{self.context}" if self.context else self.system_prompt
 
     def add_user(self, text: str) -> None:
         self.history.append({"role": "user", "content": text})
@@ -107,6 +113,7 @@ class Conversation:
 
     def clear(self) -> None:
         self.history.clear()
+        self.context = ""
 
     def messages(self, max_chars: int | None = None) -> list[dict[str, Any]]:
         """Modele gidecek mesajlar: sistem promptu + sığan en yeni geçmiş.
@@ -120,14 +127,15 @@ class Conversation:
         recent = self.history[-self.max_messages:]
         recent = _from_first_user(recent)
 
+        system = self.system_message
         if max_chars is not None:
-            budget = max_chars - len(self.system_prompt)
+            budget = max_chars - len(system)
             while sum(map(_size, recent)) > budget and _count_users(recent) > 1:
                 recent = _from_first_user(recent[1:])
             if sum(map(_size, recent)) > budget:
                 recent = _shrink_tool_outputs(recent, budget)
 
-        return [{"role": "system", "content": self.system_prompt}, *recent]
+        return [{"role": "system", "content": system}, *recent]
 
 
 def _from_first_user(msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:

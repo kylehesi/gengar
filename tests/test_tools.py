@@ -25,6 +25,8 @@ from gengar.tools.powershell import classify, rewrite_chains, run_powershell
     "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory | ForEach-Object { $_ / 1GB }",
     "ollama --version",
     "git.exe --version",
+    "Get-Process | Sort-Object -Property WS -Descending | Select-Object -First 5 | Select-Object Name, WS | "
+    "ForEach-Object { $_.Name + ' ' + [math]::Round($_.WS / 1MB, 2) + ' MB' }",
 ])
 def test_read_only_commands(cmd):
     assert classify(cmd) == Risk.READ

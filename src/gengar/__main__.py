@@ -32,9 +32,8 @@ def main(argv: list[str] | None = None) -> int:
 
 def run_chat(profile: str | None) -> int:
     from .config import load_env, load_settings
-    from .core import Agent, AuditLog, Conversation, PermissionPolicy, render_system_prompt
+    from .app import build_agent
     from .llm import LLMClient, LLMError, warm_up
-    from .tools import default_registry
     from .ui.repl import Repl
 
     load_env()
@@ -45,20 +44,7 @@ def run_chat(profile: str | None) -> int:
         print(e)
         return 1
     warm_up()
-
-    conversation = Conversation(
-        render_system_prompt(settings.system_prompt_path, workspace=settings.workspace),
-        max_messages=settings.max_history_messages,
-    )
-    agent = Agent(
-        client,
-        default_registry(settings),
-        PermissionPolicy(settings.permission_mode),
-        AuditLog(settings.log_dir),
-        conversation,
-        max_steps=settings.max_steps,
-    )
-    return Repl(settings, agent).run()
+    return Repl(settings, build_agent(settings, client)).run()
 
 
 if __name__ == "__main__":

@@ -60,7 +60,7 @@ uv run gengar chat -p gemini     # belirli bir profille
 
 Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
 `/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/mode` (izin modu),
-`/clear` (yeni sohbet), `/exit`. Windows'ta `gengar.cmd` dosyasına çift tıklayarak da açılır.
+`/memory`, `/remember`, `/skills`, `/skill`, `/learn`, `/forget` (hafıza), `/clear` (yeni sohbet), `/exit`. Windows'ta `gengar.cmd` dosyasına çift tıklayarak da açılır.
 
 Örnek istekler: "C diskinde ne kadar boş yer var?", "Not defterini aç", "Sesi 30 yap",
 "Karanlık moda geç", "Hangi uygulamalar açık?", "Masaüstümde kaç dosya var?",
@@ -109,6 +109,26 @@ Kod görevleri karşılaştırması (`evals/code_tasks.py`, 3 görev):
 Gemini ücretsiz katmanı dakikada 5 istekle sınırlı; profildeki `rpm = 5` ile Gengar istekleri
 aralıklandırır, limit hatasında sağlayıcının önerdiği süre kadar bekleyip tekrar dener.
 
+### Hafıza ve öğrenme (Faz 6)
+
+| | Ne saklanır | Nasıl dolar |
+|---|---|---|
+| **Bilgiler** | Kullanıcı hakkında kalıcı bilgiler ("adım Kyle", "kısa cevap severim") | Model `remember` çağırır ya da `/remember` |
+| **Beceriler** | Başarıyla çözülmüş işlerin tarifi + çalışan komut/kod | Zor bir iş (araştırma yapılan ya da hatadan sonra düzelen) bitince **otomatik** yansıtma, ya da `/learn` |
+
+- Her mesajda ilgili bilgiler ve beceriler anlamsal aramayla bulunup sistem promptuna eklenir.
+- Embedding: Ollama + **bge-m3, CPU'da** (GPU'da Qwen3'ü VRAM'den atıyor; CPU'da sorgu ~0.05 sn).
+- Depolama: SQLite (`data/memory.db`), vektörler tam taramayla karşılaştırılır. Embedding
+  alınamazsa kelime örtüşmesine düşer.
+- Beceri eşleşme eşiği 0.47: `evals/similarity_calibration.py` ölçümünde ilgili istekler ≥ 0.494,
+  alakasızlar ≤ 0.436.
+- Gösterim: `evals/memory_demo.py` — 1. oturumda araştırarak çözülen iş (9 araç çağrısı, 45 sn)
+  beceri olarak öğrenildi; 2. oturumda farklı kelimelerle sorulan aynı iş bu beceriyle 1 çağrıda
+  (8 sn) çözüldü.
+- Sınırlılık: öğrenilen becerinin kalitesi modelin kalitesine bağlı; 8B model kendi hatalı komutunu
+  fark etmeden kaydedebiliyor. Beceriler modele "doğrulayarak kullan" notuyla verilir; kullanıcı
+  `/skills` ile görüp `/forget` ile silebilir.
+
 ### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
 
 - Düşünme kapalı: ~45 token/sn. Hazır araçlarla (Faz 3) basit görevlerde güvenilir;
@@ -131,7 +151,7 @@ bölümü eklemek yeterli; kod değişmez.
 - [x] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
 - [x] **Faz 4** — Araştırma (web arama, sayfa okuma)
 - [x] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
-- [ ] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
+- [x] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
 - [ ] **Faz 7** — Text menü arayüzü
 - [ ] **Faz 8** — Değerlendirme (test görevleri, yerel vs API karşılaştırması)
 

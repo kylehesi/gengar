@@ -186,7 +186,8 @@ class LLMClient:
         n = self.profile.options.get("num_ctx")
         return int(n) if n else None
 
-    def _request_args(self, messages: list[dict], tools: list[dict] | None) -> dict[str, Any]:
+    def _request_args(self, messages: list[dict], tools: list[dict] | None,
+                      json_mode: bool = False) -> dict[str, Any]:
         args: dict[str, Any] = {
             **self.profile.options,
             "model": self.profile.model,
@@ -201,9 +202,12 @@ class LLMClient:
             args["reasoning_effort"] = self.reasoning_effort
         if tools:
             args["tools"] = tools
+        if json_mode:
+            args["response_format"] = {"type": "json_object"}  # Ollama'da format=json olur
         return args
 
-    def stream_chat(self, messages: list[dict], tools: list[dict] | None = None) -> Iterator[Delta]:
+    def stream_chat(self, messages: list[dict], tools: list[dict] | None = None,
+                    json_mode: bool = False) -> Iterator[Delta]:
         """Yanıtı parça parça üretir. Bitince `last_stats` ve `last_tool_calls` dolar."""
         litellm = _get_litellm()
         self.last_stats = None
@@ -217,7 +221,7 @@ class LLMClient:
         for attempt in range(len(RETRY_DELAYS) + 1):
             self._last_request[self.profile.name] = time.monotonic()
             try:
-                for chunk in litellm.completion(**self._request_args(messages, tools)):
+                for chunk in litellm.completion(**self._request_args(messages, tools, json_mode)):
                     usage = getattr(chunk, "usage", None)
                     if usage and getattr(usage, "completion_tokens", None):
                         tokens = usage.completion_tokens
@@ -270,9 +274,9 @@ class LLMClient:
                                   f"{wait:.0f} sn bekleniyor…")
             time.sleep(wait)
 
-    def complete(self, messages: list[dict]) -> str:
+    def complete(self, messages: list[dict], json_mode: bool = False) -> str:
         """Akışsız kısayol: tüm yanıt metnini tek seferde döndürür."""
-        return "".join(d.text for d in self.stream_chat(messages) if d.kind == "text")
+        return "".join(d.text for d in self.stream_chat(messages, json_mode=json_mode) if d.kind == "text")
 
 
 def _unwrap(e: Exception) -> Exception:

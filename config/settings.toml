@@ -84,4 +84,12 @@ mode = "normal"
 dir = "logs"
 
 [memory]
+# Kullanıcı bilgileri ve öğrenilmiş beceriler (SQLite). Proje köküne göre yol.
+db = "data/memory.db"
+# Anlamsal arama modeli (Ollama). CPU'da çalışır; Qwen3'ü GPU'dan atmasın diye.
 embed_model = "bge-m3"
+# Zor bir iş başarıyla bitince turdan otomatik beceri çıkarılsın mı? (fazladan bir model çağrısı)
+auto_learn = true
+# Bir becerinin isteğe "uygun" sayılması için gereken en düşük benzerlik (0-1).
+# evals/similarity_calibration.py ölçümü (bge-m3): ilgili istekler ≥ 0.494, alakasızlar ≤ 0.436.
+skill_min_score = 0.47
