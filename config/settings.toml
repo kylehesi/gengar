@@ -14,6 +14,7 @@ timeout = 120
 # key_env: o sağlayıcının API anahtarının .env içindeki adı (yerel modelde yok).
 # reasoning_effort: "none" düşünmeyi kapatır (hızlı); "low"/"medium"/"high" açar.
 #   Belirtilmezse sağlayıcının varsayılanı kullanılır. Sohbette /think ile değişir.
+# rpm: dakikada en fazla istek (ücretsiz API katmanları için); yoksa sınırsız.
 
 [llm.profiles.local]
 model = "ollama_chat/qwen3:8b"
@@ -26,9 +27,14 @@ num_ctx = 8192        # bağlam penceresi (token). 8 GB VRAM'de model + 8k rahat
 keep_alive = "30m"    # model 30 dk boyunca VRAM'de kalsın; her soruda yeniden yüklenmesin.
 
 [llm.profiles.gemini]
-model = "gemini/gemini-flash-latest"
+# gemini-flash-latest ve en yeni sürümler ücretsiz katmanda sık sık "yoğun" (503) dönüyor;
+# 3.5-flash hızlı ve kararlı. Alternatifler: gemini-3.5-flash-lite, gemini-flash-lite-latest
+model = "gemini/gemini-3.5-flash"
 key_env = "GEMINI_API_KEY"
-description = "Google Gemini Flash — ücretsiz kota ile geliştirme"
+description = "Google Gemini 3.5 Flash — ücretsiz kota ile geliştirme"
+# Ücretsiz katman: dakikada 5 istek. Gengar istekleri buna göre aralıklandırır.
+# Ücretli anahtarda bu satırı silin.
+rpm = 5
 
 [llm.profiles.deepseek]
 model = "deepseek/deepseek-chat"
@@ -55,6 +61,12 @@ required_models = ["qwen3:8b", "bge-m3"]
 [agent]
 # Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.
 max_steps = 15
+
+[code]
+# Model yer belirtilmemiş kod projelerini buraya koyar (proje köküne göre).
+workspace = "data/workspace"
+# run_python'un kullandığı ayrı sanal ortam (Gengar'ın kendi paketlerinden bağımsız).
+sandbox_venv = "data/sandbox/.venv"
 
 [ui]
 # Düşünme modu açıkken modelin düşünce metni ekrana basılsın mı?

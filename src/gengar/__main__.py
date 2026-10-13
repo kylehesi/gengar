@@ -47,12 +47,12 @@ def run_chat(profile: str | None) -> int:
     warm_up()
 
     conversation = Conversation(
-        render_system_prompt(settings.system_prompt_path),
+        render_system_prompt(settings.system_prompt_path, workspace=settings.workspace),
         max_messages=settings.max_history_messages,
     )
     agent = Agent(
         client,
-        default_registry(),
+        default_registry(settings),
         PermissionPolicy(settings.permission_mode),
         AuditLog(settings.log_dir),
         conversation,

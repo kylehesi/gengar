@@ -28,6 +28,7 @@ Komutlar:
   /model <ad>     profili değiştir (örn. /model gemini)
   /think          modelin düşünme modunu aç/kapat (daha doğru ama yavaş)
   /thinklog       düşünce metnini göster/gizle
+  /mode <mod>     izin modu: normal (varsayılan), strict (her şeyi sor), trust (hiçbir şeyi sorma)
   /clear          yeni sohbet başlat
   /help           bu yardım
   /exit           çık (Ctrl+C de olur)
@@ -112,12 +113,31 @@ class Repl:
             self.client.reasoning_override = "none" if self.client.thinking_enabled else "medium"
             state = "açık (daha doğru, daha yavaş)" if self.client.thinking_enabled else "kapalı"
             self.print(f"Düşünme modu {state}.")
+        elif cmd == "/mode":
+            self.set_mode(arg)
         elif cmd == "/thinklog":
             self.show_thinking = not self.show_thinking
             self.print(f"Düşünce metni {'gösterilecek' if self.show_thinking else 'gizlenecek'}.")
         else:
             self.print(f"Bilinmeyen komut: {cmd}. /help yazın.")
         return True
+
+    def set_mode(self, mode: str) -> None:
+        policy = self.agent.policy
+        if not mode:
+            self.print(f"İzin modu: {policy.mode}. Seçenekler: normal, strict, trust")
+            return
+        try:
+            policy.set_mode(mode)
+        except ValueError as e:
+            self.print(f"{RED}{e}{RESET}")
+            return
+        if mode == "trust":
+            self.print(f"{RED}{BOLD}Dikkat:{RESET}{RED} trust modunda Gengar hiçbir şey için onay sormaz "
+                       f"(silme, komut, kod çalıştırma dahil). İşin bitince /mode normal yazın.{RESET}")
+        else:
+            self.print(f"İzin modu: {mode}.")
+        self.agent.audit.record("mode", mode=mode)
 
     def list_profiles(self) -> None:
         for p in self.settings.profiles.values():
@@ -147,6 +167,10 @@ class Repl:
     # --- AgentUI --------------------------------------------------------
 
     def on_delta(self, delta: Delta) -> None:
+        if delta.kind == "status":
+            self._close_line()
+            self.print(f"{YELLOW}({delta.text}){RESET}")
+            return
         if not self._line_open:
             self.print(f"{BOLD}{CYAN}gengar>{RESET} ", end="")
             self._line_open = True

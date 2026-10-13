@@ -43,8 +43,8 @@ def known_folders() -> str:
     return ", ".join(f"{label}: {p}" for label, p in found.items())
 
 
-def render_system_prompt(path: Path, now: datetime | None = None) -> str:
-    """Sistem promptu dosyasını okuyup {date}, {os}, {user}, {home}, {folders} alanlarını doldurur."""
+def render_system_prompt(path: Path, now: datetime | None = None, workspace: Path | None = None) -> str:
+    """Sistem promptu dosyasını okuyup {date}, {os}, {user}, {home}, {folders}, {workspace} alanlarını doldurur."""
     now = now or datetime.now()
     template = path.read_text(encoding="utf-8")
     return template.format(
@@ -53,6 +53,7 @@ def render_system_prompt(path: Path, now: datetime | None = None) -> str:
         user=getpass.getuser(),
         home=Path.home(),
         folders=known_folders(),
+        workspace=workspace or Path.home() / "gengar-workspace",
     ).strip()
 
 

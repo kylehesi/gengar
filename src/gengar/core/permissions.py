@@ -15,11 +15,15 @@ MODES = ("normal", "strict", "trust")
 
 class PermissionPolicy:
     def __init__(self, mode: str = "normal"):
+        self.mode = "normal"
+        self.set_mode(mode)
+        # "Bu oturumda bu araca hep izin ver" denen araçlar.
+        self.session_grants: set[str] = set()
+
+    def set_mode(self, mode: str) -> None:
         if mode not in MODES:
             raise ValueError(f"geçersiz izin modu: {mode} (seçenekler: {', '.join(MODES)})")
         self.mode = mode
-        # "Bu oturumda bu araca hep izin ver" denen araçlar.
-        self.session_grants: set[str] = set()
 
     def needs_confirmation(self, tool_name: str, risk: Risk) -> bool:
         if self.mode == "trust":

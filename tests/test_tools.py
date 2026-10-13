@@ -7,7 +7,7 @@ from gengar.core.permissions import PermissionPolicy
 from gengar.tools import Risk, ToolError, default_registry
 from gengar.tools import files
 from gengar.tools.base import truncate
-from gengar.tools.powershell import classify, run_powershell
+from gengar.tools.powershell import classify, rewrite_chains, run_powershell
 
 
 # --- PowerShell risk sınıflandırma ---------------------------------------
@@ -69,6 +69,32 @@ def test_run_powershell_stderr_is_plain_text():
     assert "Cannot find path" in out or "bulunamıyor" in out
     assert "CLIXML" not in out and "<S " not in out
     assert "At line:" not in out
+
+
+@pytest.mark.parametrize("cmd, expected", [
+    ("cd x && python t.py", "cd x; if ($?) { python t.py }"),
+    ("a && b && c", "a; if ($?) { b; if ($?) { c } }"),
+    ("a || b", "a; if (-not $?) { b }"),
+    ("Write-Output 'a && b'", "Write-Output 'a && b'"),  # tırnak içi değişmez
+    ("Get-Date", "Get-Date"),
+])
+def test_rewrite_chains(cmd, expected):
+    assert rewrite_chains(cmd) == expected
+
+
+def test_chains_actually_work_in_powershell_51():
+    out = run_powershell("Write-Output bir && Write-Output iki")
+    assert "bir" in out and "iki" in out and "exit code: 0" in out
+    out = run_powershell("Get-Item C:\\yok\\yok.txt && Write-Output calismamali")
+    assert "calismamali" not in out.split("--- stderr ---")[0]
+
+
+def test_redirection_writes_utf8(tmp_path):
+    f = tmp_path / "x.csv"
+    run_powershell(f"echo 'Ad,Not' > '{f}'; echo 'Ayşe,90' >> '{f}'")
+    data = f.read_bytes()
+    assert not data.startswith(b"\xff\xfe")  # UTF-16 değil
+    assert "Ayşe,90" in data.decode("utf-8-sig")
 
 
 def test_run_powershell_timeout():

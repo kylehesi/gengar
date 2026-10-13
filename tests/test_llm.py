@@ -119,8 +119,100 @@ def test_connection_error_is_translated(settings, fake_completion):
     assert client.last_stats is None
 
 
-def test_rate_limit_is_translated(settings, fake_completion, monkeypatch):
+def test_transient_api_errors_are_retried(settings, monkeypatch):
+    from gengar.llm import client as client_mod
+
     monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(client_mod, "RETRY_DELAYS", (0, 0))
+    litellm = _get_litellm()
+    attempts = []
+
+    def completion(**kwargs):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise litellm.ServiceUnavailableError("503 high demand", "gemini", "x")
+        return iter([chunk(content="tamam")])
+
+    monkeypatch.setattr(litellm, "completion", completion)
+    assert LLMClient(settings, "gemini").complete([]) == "tamam"
+    assert len(attempts) == 3
+
+
+def test_retries_give_up_with_friendly_message(settings, monkeypatch):
+    from gengar.llm import client as client_mod
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(client_mod, "RETRY_DELAYS", (0, 0))
+    litellm = _get_litellm()
+
+    def completion(**kwargs):
+        raise litellm.ServiceUnavailableError("503", "gemini", "x")
+
+    monkeypatch.setattr(litellm, "completion", completion)
+    with pytest.raises(LLMError, match="yoğun"):
+        LLMClient(settings, "gemini").complete([])
+
+
+def test_rate_limit_waits_for_suggested_delay(settings, monkeypatch):
+    from gengar.llm import client as client_mod
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    slept = []
+    monkeypatch.setattr(client_mod.time, "sleep", slept.append)
+    litellm = _get_litellm()
+    attempts = []
+
+    def completion(**kwargs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise litellm.RateLimitError('quota... Please retry in 51.6s. "retryDelay": "51s"', "gemini", "x")
+        return iter([chunk(content="ok")])
+
+    monkeypatch.setattr(litellm, "completion", completion)
+    deltas = list(LLMClient(settings, "gemini").stream_chat([]))
+    assert slept == [pytest.approx(52.6)]
+    assert deltas[0].kind == "status" and "53 sn" in deltas[0].text
+    assert deltas[-1].text == "ok"
+
+
+def test_rpm_paces_requests(settings, fake_completion, monkeypatch):
+    from gengar.llm import client as client_mod
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    fake_completion([chunk(content="ok")])
+    clock = [1000.0]
+    slept = []
+    monkeypatch.setattr(client_mod.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(client_mod.time, "sleep", lambda s: slept.append(s) or clock.__setitem__(0, clock[0] + s))
+
+    c = LLMClient(settings, "gemini")  # settings.toml: rpm = 5 → 12 sn aralık
+    assert c.profile.rpm == 5
+    list(c.stream_chat([]))
+    clock[0] += 3
+    deltas = list(c.stream_chat([]))
+    assert slept == [pytest.approx(9)]
+    assert deltas[0].kind == "status" and "dakikada 5 istek" in deltas[0].text
+
+
+def test_local_errors_are_not_retried(settings, monkeypatch):
+    litellm = _get_litellm()
+    attempts = []
+
+    def completion(**kwargs):
+        attempts.append(1)
+        raise litellm.ServiceUnavailableError("down", "ollama", "x")
+
+    monkeypatch.setattr(litellm, "completion", completion)
+    with pytest.raises(LLMError):
+        LLMClient(settings, "local").complete([])
+    assert len(attempts) == 1
+
+
+def test_rate_limit_is_translated(settings, fake_completion, monkeypatch):
+    from gengar.llm import client as client_mod
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(client_mod.time, "sleep", lambda s: None)
     litellm = _get_litellm()
     fake_completion(error=litellm.RateLimitError("429", "gemini", "x"))
 

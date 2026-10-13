@@ -105,6 +105,45 @@ def test_tool_errors_and_bad_calls_go_back_to_model(tmp_path):
     assert "not valid JSON" in tool_outputs[2]
 
 
+def test_identical_failed_call_is_not_repeated(tmp_path):
+    agent, _ = make_agent([
+        ("", [call("boom", "a")]),
+        ("", [call("boom", "b")]),     # aynısı, arada başka bir şey yok → engellenir
+        ("", [call("echo", "c", text="x")]),
+        ("", [call("boom", "d")]),     # arada başka çağrı oldu → tekrar çalışır
+        ("Bitti.", []),
+    ], tmp_path)
+    agent.run("dene", RecordingUI())
+    outputs = [m["content"] for m in agent.conversation.history if m["role"] == "tool"]
+    assert outputs[0] == "Error: olmadı"
+    assert outputs[1].startswith("Not executed")
+    assert outputs[3] == "Error: olmadı"
+
+
+def test_successful_call_can_be_repeated(tmp_path):
+    agent, _ = make_agent([
+        ("", [call("echo", "a", text="x")]),
+        ("", [call("echo", "b", text="x")]),
+        ("ok", []),
+    ], tmp_path)
+    agent.run("dene", RecordingUI())
+    outputs = [m["content"] for m in agent.conversation.history if m["role"] == "tool"]
+    assert outputs == ["echo: x", "echo: x"]
+
+
+def test_plan_without_action_is_nudged_once(tmp_path):
+    agent, client = make_agent([
+        ("Şu adımları uygulayacağım:", []),
+        ("", [call("echo", text="x")]),
+        ("Tamam, şunu da yapacağım:", []),   # ikinci kez dürtülmez
+    ], tmp_path)
+    result = agent.run("yap", RecordingUI())
+    assert result.strip().endswith(":")
+    users = [m["content"] for m in agent.conversation.history if m["role"] == "user"]
+    assert len(users) == 2 and users[1].startswith("[Gengar] Do it now")
+    assert len(client.requests) == 3
+
+
 def test_step_limit(tmp_path):
     agent, _ = make_agent([("", [call("echo", f"c{i}", text="x")]) for i in range(5)], tmp_path)
     result = agent.run("sonsuz döngü", RecordingUI())

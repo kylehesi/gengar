@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 from collections.abc import Iterator
@@ -22,6 +23,9 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
 _litellm: Any = None
 _import_lock = threading.Lock()
+
+# API sağlayıcısı geçici hata verirse (yoğunluk, zaman aşımı) bu aralıklarla tekrar dene (sn).
+RETRY_DELAYS = (2.0, 5.0)
 
 
 def _get_litellm() -> Any:
@@ -48,9 +52,10 @@ class LLMError(Exception):
 
 @dataclass(frozen=True)
 class Delta:
-    """Akıştan gelen bir parça: yanıt metni ya da modelin düşünme metni."""
+    """Akıştan gelen bir parça: yanıt metni, modelin düşünme metni ya da durum bilgisi
+    (örn. "sağlayıcı limiti, 20 sn bekleniyor"; modele geri gönderilmez)."""
 
-    kind: Literal["text", "thinking"]
+    kind: Literal["text", "thinking", "status"]
     text: str
 
 
@@ -148,6 +153,7 @@ class LLMClient:
         self.reasoning_override: str | None = None  # /think ile oturum boyunca değişir
         self.last_stats: Stats | None = None
         self.last_tool_calls: list[ToolCall] = []
+        self._last_request: dict[str, float] = {}  # profil → son istek zamanı (rpm için)
 
     def _check(self, name: str) -> Profile:
         profile = self.settings.profiles.get(name)
@@ -202,46 +208,111 @@ class LLMClient:
         litellm = _get_litellm()
         self.last_stats = None
         self.last_tool_calls = []
+        yield from self._pace()
         start = time.perf_counter()
         first: float | None = None
         tokens: int | None = None
         calls = _ToolCallBuffer()
 
-        try:
-            for chunk in litellm.completion(**self._request_args(messages, tools)):
-                usage = getattr(chunk, "usage", None)
-                if usage and getattr(usage, "completion_tokens", None):
-                    tokens = usage.completion_tokens
-                if not chunk.choices:
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            self._last_request[self.profile.name] = time.monotonic()
+            try:
+                for chunk in litellm.completion(**self._request_args(messages, tools)):
+                    usage = getattr(chunk, "usage", None)
+                    if usage and getattr(usage, "completion_tokens", None):
+                        tokens = usage.completion_tokens
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    thinking = getattr(delta, "reasoning_content", None)
+                    text = getattr(delta, "content", None)
+                    tool_calls = getattr(delta, "tool_calls", None) or []
+                    if (thinking or text or tool_calls) and first is None:
+                        first = time.perf_counter() - start
+                    for tc in tool_calls:
+                        calls.add(tc)
+                    if thinking:
+                        yield Delta("thinking", thinking)
+                    if text:
+                        yield Delta("text", text)
+                break
+            except Exception as e:  # LiteLLM sağlayıcıya göre çok çeşitli hatalar fırlatıyor
+                # Henüz hiçbir şey üretilmediyse ve hata geçiciyse (yoğunluk, limit, zaman aşımı) bekle, tekrar dene.
+                if first is None and attempt < len(RETRY_DELAYS) and _is_transient(e, self.profile):
+                    delay = _retry_after(e)
+                    if delay is not None:
+                        yield Delta("status", f"sağlayıcı istek limiti doldu, {delay:.0f} sn bekleniyor…")
+                    else:
+                        delay = RETRY_DELAYS[attempt]
+                        yield Delta("status", f"sağlayıcı yanıt vermedi, {delay:.0f} sn sonra tekrar deneniyor…")
+                    time.sleep(delay)
                     continue
-                delta = chunk.choices[0].delta
-                thinking = getattr(delta, "reasoning_content", None)
-                text = getattr(delta, "content", None)
-                tool_calls = getattr(delta, "tool_calls", None) or []
-                if (thinking or text or tool_calls) and first is None:
-                    first = time.perf_counter() - start
-                for tc in tool_calls:
-                    calls.add(tc)
-                if thinking:
-                    yield Delta("thinking", thinking)
-                if text:
-                    yield Delta("text", text)
-        except Exception as e:  # LiteLLM sağlayıcıya göre çok çeşitli hatalar fırlatıyor
-            raise _translate(e, self.profile, self.settings) from e
+                raise _translate(e, self.profile, self.settings) from e
 
         self.last_tool_calls = calls.finish()
         self.last_stats = Stats(self.profile.name, time.perf_counter() - start, first, tokens)
+
+    def _pace(self) -> Iterator[Delta]:
+        """Profilde `rpm` (dakikada istek) sınırı varsa istekleri aralıklandır.
+
+        Ücretsiz API katmanları dakikada çok az isteğe izin veriyor (örn. Gemini: 5);
+        bir agent görevi kolayca 5-10 istek attığından, hata almak yerine önceden beklemek
+        daha öngörülebilir.
+        """
+        if not self.profile.rpm:
+            return
+        last = self._last_request.get(self.profile.name)
+        if last is None:
+            return
+        wait = last + 60 / self.profile.rpm - time.monotonic()
+        if wait > 0.5:
+            yield Delta("status", f"{self.profile.name} dakikada {self.profile.rpm} istek sınırı: "
+                                  f"{wait:.0f} sn bekleniyor…")
+            time.sleep(wait)
 
     def complete(self, messages: list[dict]) -> str:
         """Akışsız kısayol: tüm yanıt metnini tek seferde döndürür."""
         return "".join(d.text for d in self.stream_chat(messages) if d.kind == "text")
 
 
+def _unwrap(e: Exception) -> Exception:
+    """LiteLLM bazı hataları 'akış ortasında hata' içine sarar; asıl hatayı çıkar."""
+    return getattr(e, "original_exception", None) or e
+
+
+MAX_RETRY_AFTER = 65.0
+
+
+def _retry_after(e: Exception) -> float | None:
+    """Limit hatasında sağlayıcının önerdiği bekleme süresi ("retry in 51.6s" / "retryDelay": "51s")."""
+    litellm = _get_litellm()
+    if not isinstance(_unwrap(e), litellm.RateLimitError) and not isinstance(e, litellm.RateLimitError):
+        return None
+    m = re.search(r"retry in (\d+(?:\.\d+)?)s|\"retryDelay\":\s*\"(\d+(?:\.\d+)?)s\"", str(_unwrap(e)))
+    seconds = float(m.group(1) or m.group(2)) + 1 if m else 20.0
+    return min(seconds, MAX_RETRY_AFTER)
+
+
+def _is_transient(e: Exception, profile: Profile) -> bool:
+    """Tekrar denemeye değer, geçici bir hata mı? (sağlayıcı yoğun, zaman aşımı, 5xx)"""
+    litellm = _get_litellm()
+    inner = _unwrap(e)
+    if profile.is_local:
+        return False  # Ollama kapalıysa beklemek işe yaramaz
+    return isinstance(e, (litellm.ServiceUnavailableError, litellm.InternalServerError, litellm.Timeout)) \
+        or isinstance(inner, (litellm.ServiceUnavailableError, litellm.InternalServerError,
+                              litellm.Timeout, litellm.RateLimitError))
+
+
 def _translate(e: Exception, profile: Profile, settings: Settings) -> LLMError:
     """LiteLLM hatasını kullanıcının anlayacağı bir mesaja çevir."""
     litellm = _get_litellm()
     name = profile.name
+    e = _unwrap(e)
 
+    if isinstance(e, litellm.ServiceUnavailableError) or isinstance(e, litellm.InternalServerError):
+        return LLMError(f"[{name}] Sağlayıcı şu an yoğun ya da hata veriyor (tekrar denendi). "
+                        f"Biraz sonra deneyin ya da /model ile başka profile geçin.")
     if isinstance(e, litellm.AuthenticationError):
         return LLMError(f"[{name}] API anahtarı geçersiz ({profile.key_env}).")
     if isinstance(e, litellm.RateLimitError):

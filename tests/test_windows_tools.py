@@ -159,4 +159,4 @@ def test_registry_order_and_size():
     reg = default_registry()
     names = [t.name for t in reg]
     assert names[0] == "system_info" and names[-1] == "run_powershell"
-    assert len(reg) == 12
+    assert len(reg) == 14

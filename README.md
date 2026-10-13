@@ -59,7 +59,8 @@ uv run gengar chat -p gemini     # belirli bir profille
 ```
 
 Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
-`/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/clear` (yeni sohbet), `/exit`.
+`/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/mode` (izin modu),
+`/clear` (yeni sohbet), `/exit`. Windows'ta `gengar.cmd` dosyasına çift tıklayarak da açılır.
 
 Örnek istekler: "C diskinde ne kadar boş yer var?", "Not defterini aç", "Sesi 30 yap",
 "Karanlık moda geç", "Hangi uygulamalar açık?", "Masaüstümde kaç dosya var?",
@@ -77,6 +78,8 @@ Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
 | `web_search` | okuma | Web araması (DuckDuckGo/Bing, anahtar gerektirmez) |
 | `fetch_page` | okuma · yerel ağ adresi: sistem | Sayfa/PDF okuma; sadece soruyla ilgili parçalar (BM25) döner |
 | `read_file`, `list_directory`, `find_files` | okuma | Dosya okuma, listeleme, arama |
+| `search_text` | okuma | Dosya içeriklerinde regex arama (grep gibi) |
+| `run_python` | sistem | Python kodunu/dosyasını ayrı sanal ortamda (`data/sandbox`) çalıştırma, paket kurma |
 | `write_file`, `edit_file` | değişiklik | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem) |
 | `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
 
@@ -84,6 +87,27 @@ Risk seviyeleri: **okuma** onaysız · **değişiklik** (geri alınabilir) onayl
 izin verilebilir · **sistem** (silme, kapatma, tıklama, keyfi komut) her seferinde onaylı.
 Onay sorusunda: `e` evet, `h` hayır, `o` oturum boyunca izin.
 Her eylem `logs/audit-YYYY-MM-DD.jsonl` dosyasına kaydedilir.
+Kod üzerinde uzun çalışırken `/mode trust` ile onaylar kapatılabilir (iş bitince `/mode normal`).
+
+### Kod ajanı (Faz 5)
+
+- Yer belirtilmeyen projeler `data/workspace` altına yazılır.
+- `run_python` ve PowerShell'deki `python`/`pip` aynı ayrı sanal ortamı kullanır; modelin
+  kurduğu paketler Gengar'ı etkilemez. **Bu bir güvenlik izolasyonu değildir**: kod yine
+  kullanıcının yetkileriyle çalışır, bu yüzden her çalıştırma onay ister.
+- Dayanıklılık önlemleri: PowerShell 5.1'de `&&`/`||` otomatik çevrilir, dosyalar UTF-8 yazılır,
+  aynı başarısız çağrının aynen tekrarı engellenir, "şunu yapacağım:" deyip duran model bir kez dürtülür.
+
+Kod görevleri karşılaştırması (`evals/code_tasks.py`, 3 görev):
+
+| | Qwen3 8B düşünme kapalı | Qwen3 8B düşünme açık | Gemini 3.5 Flash (ücretsiz) |
+|---|---|---|---|
+| A. Asal sayı toplamı | ✅ 17 sn | ✅ 57 sn | ✅ 29 sn |
+| B. Testler geçene kadar hata düzeltme | ❌ | ✅ 104 sn | ✅ 84 sn |
+| C. CSV + pandas | ❌ | ⚠️ sonuç doğru, yanlış klasör | ⚠️ sonuç doğru, son mesajda kota bitti |
+
+Gemini ücretsiz katmanı dakikada 5 istekle sınırlı; profildeki `rpm = 5` ile Gengar istekleri
+aralıklandırır, limit hatasında sağlayıcının önerdiği süre kadar bekleyip tekrar dener.
 
 ### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
 
@@ -106,7 +130,7 @@ bölümü eklemek yeterli; kod değişmez.
 - [x] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
 - [x] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
 - [x] **Faz 4** — Araştırma (web arama, sayfa okuma)
-- [ ] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
+- [x] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
 - [ ] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
 - [ ] **Faz 7** — Text menü arayüzü
 - [ ] **Faz 8** — Değerlendirme (test görevleri, yerel vs API karşılaştırması)

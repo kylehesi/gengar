@@ -21,6 +21,8 @@ class Profile:
     description: str = ""
     key_env: str | None = None
     reasoning_effort: str | None = None
+    # Dakikada en fazla istek (ücretsiz API katmanları için); 0 = sınırsız.
+    rpm: int = 0
     # Sağlayıcıya olduğu gibi iletilen ek parametreler (örn. Ollama num_ctx).
     options: dict = field(default_factory=dict)
 
@@ -47,6 +49,8 @@ class Settings:
     permission_mode: str
     log_dir: Path
     show_thinking: bool
+    workspace: Path
+    sandbox_venv: Path
     raw: dict = field(repr=False)
 
 
@@ -80,6 +84,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
             description=p.get("description", ""),
             key_env=p.get("key_env"),
             reasoning_effort=p.get("reasoning_effort"),
+            rpm=int(p.get("rpm", 0)),
             options=dict(p.get("options", {})),
         )
         for name, p in llm.get("profiles", {}).items()
@@ -101,5 +106,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         permission_mode=raw.get("permissions", {}).get("mode", "normal"),
         log_dir=PROJECT_ROOT / raw.get("logs", {}).get("dir", "logs"),
         show_thinking=bool(raw.get("ui", {}).get("show_thinking", False)),
+        workspace=PROJECT_ROOT / raw.get("code", {}).get("workspace", "data/workspace"),
+        sandbox_venv=PROJECT_ROOT / raw.get("code", {}).get("sandbox_venv", "data/sandbox/.venv"),
         raw=raw,
     )

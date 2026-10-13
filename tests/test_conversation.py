@@ -106,6 +106,17 @@ def test_repl_hides_thinking_by_default(tmp_path):
     assert "görünür düşünce" in out.getvalue()
 
 
+def test_repl_mode_command(tmp_path):
+    repl, out = make_repl([], tmp_path)
+    repl.handle_command("/mode trust")
+    assert repl.agent.policy.mode == "trust"
+    assert "Dikkat" in out.getvalue()
+    repl.handle_command("/mode yolo")
+    assert repl.agent.policy.mode == "trust"  # geçersiz mod değiştirmez
+    repl.handle_command("/mode normal")
+    assert repl.agent.policy.mode == "normal"
+
+
 def test_repl_commands(tmp_path):
     repl, out = make_repl([], tmp_path)
     assert repl.handle_command("/think")

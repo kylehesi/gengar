@@ -1,20 +1,33 @@
 """Araçlar: PowerShell, dosya, Windows, web, kod çalıştırma (Faz 2-5)."""
 
-from . import apps, files, powershell, settings, system, ui, web
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from . import apps, code, files, powershell, settings, system, ui, web
 from .base import Risk, Tool, ToolError, ToolRegistry
 
+if TYPE_CHECKING:
+    from ..config import Settings
 
-def default_registry() -> ToolRegistry:
+
+def default_registry(config: Settings | None = None) -> ToolRegistry:
     """Gengar'ın varsayılan araç seti.
 
     Sıra önemli: küçük modeller listede önce gelen, özel amaçlı araçları
     daha çok tercih ediyor; genel amaçlı PowerShell en sonda.
     """
+    if config is None:
+        from ..config import load_settings
+
+        config = load_settings()
+    sandbox = code.PythonSandbox(config.workspace, config.sandbox_venv)
     return ToolRegistry([
         system.TOOL, apps.TOOL, settings.TOOL, ui.TOOL,
         *web.TOOLS,
         *files.TOOLS,
-        powershell.TOOL,
+        *code.make_tools(sandbox),
+        powershell.make_tool(lambda: str(sandbox.ensure().parent)),
     ])
 
 

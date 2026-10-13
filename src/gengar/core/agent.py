@@ -8,6 +8,7 @@ protokolünü uygular; agent ekrana doğrudan bir şey yazmaz.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Literal, Protocol
 
@@ -23,6 +24,26 @@ Answer = Literal["yes", "no", "session"]
 RESPONSE_RESERVE_TOKENS = 1500
 
 DENIED = "The user denied this action. Do not retry it; ask the user how they want to proceed."
+CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
+REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
+            "Read the previous error and change the command, the arguments, or the approach.")
+
+
+def _signature(call: ToolCall) -> tuple[str, str]:
+    """Aynı çağrıyı tanımak için: araç adı + sıralanmış argümanlar."""
+    try:
+        args = json.dumps(call.parsed_args(), sort_keys=True, ensure_ascii=False)
+    except ValueError:
+        args = call.arguments.strip()
+    return call.name, args
+
+
+def _failed(output: str) -> bool:
+    """Araç çıktısı bir başarısızlık mı? (hata, reddedilme ya da sıfırdan farklı çıkış kodu)"""
+    if output.startswith(("Error:", "The user denied", "Not executed:")):
+        return True
+    m = re.search(r"exit code: (\S+)", output[:300])
+    return bool(m) and m.group(1) != "0"
 
 
 class AgentUI(Protocol):
@@ -42,6 +63,7 @@ class Agent:
         self.audit = audit
         self.conversation = conversation
         self.max_steps = max_steps
+        self._last_failed: tuple[str, str] | None = None
 
     def _max_chars(self) -> int | None:
         ctx = self.client.context_tokens
@@ -56,6 +78,7 @@ class Agent:
         Hata veya Ctrl+C olursa geçmiş geçerli bir duruma getirilir ve hata yukarı iletilir.
         """
         mark = len(self.conversation.history)
+        self._last_failed = None
         self.conversation.add_user(user_text)
         self.audit.record("user", text=user_text, profile=self.client.profile.name)
         try:
@@ -69,6 +92,7 @@ class Agent:
 
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
+        nudged = False
         for _ in range(self.max_steps):
             parts: list[str] = []
             for delta in self.client.stream_chat(self.conversation.messages(self._max_chars()), schemas):
@@ -81,9 +105,23 @@ class Agent:
             ui.on_step_end(self.client.last_stats)
 
             if not calls:
+                # Küçük modeller "şu adımları uygulayacağım:" deyip araç çağırmadan durabiliyor.
+                if text.rstrip().endswith(":") and not nudged:
+                    nudged = True
+                    self.conversation.add_user(CONTINUE)
+                    continue
                 return text
             for call in calls:
-                self.conversation.add_tool_result(call, self._execute(call, ui))
+                sig = _signature(call)
+                if sig == self._last_failed:
+                    # Küçük modeller başarısız çağrıyı aynen tekrarlayıp döngüye girebiliyor.
+                    output = REPEATED
+                    self.audit.record("tool", tool=call.name, ok=False, output="blocked repeat")
+                    ui.on_tool_end(call, output, False)
+                else:
+                    output = self._execute(call, ui)
+                self._last_failed = sig if _failed(output) else None
+                self.conversation.add_tool_result(call, output)
 
         note = f"(Adım sınırına ulaşıldı: {self.max_steps}. Devam etmek için 'devam et' yazın.)"
         self.conversation.add_assistant(note)
