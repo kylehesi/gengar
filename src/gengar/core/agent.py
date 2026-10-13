@@ -8,6 +8,7 @@ protokolünü uygular; agent ekrana doğrudan bir şey yazmaz.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import TYPE_CHECKING, Literal, Protocol
 
@@ -36,6 +37,17 @@ FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you 
                 "final answer to the user's request now. Do not redo the work.")
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
+
+
+# Gelecek zamanlı eylem bildirimi: "listeleyeceğim", "kontrol edeceğim", "yapacağım", "let me", "I'll".
+_FUTURE_ACTION = re.compile(r"\w+(?:ece|aca)ğım\b|\w+(?:eceğiz|acağız)\b|\blet me\b|\bI'll\b|\bI will\b",
+                            re.IGNORECASE)
+
+
+def _announces_action(text: str) -> bool:
+    """Cevap, yapılacak bir işi duyurup bitiyorsa (henüz hiçbir araç çağrılmamışken) True."""
+    tail = text.strip()[-300:]
+    return bool(tail) and bool(_FUTURE_ACTION.search(tail)) and "?" not in tail[-80:]
 
 
 def _signature(call: ToolCall) -> tuple[str, str]:
@@ -152,6 +164,7 @@ class Agent:
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
         nudged = False
+        used_tools = False
         empty_retries = 0
         blocked = 0
         for _ in range(self.max_steps):
@@ -169,8 +182,9 @@ class Agent:
             ui.on_step_end(self.client.last_stats)
 
             if not calls:
-                # Küçük modeller "şu adımları uygulayacağım:" deyip araç çağırmadan durabiliyor.
-                if text.rstrip().endswith(":") and not nudged:
+                # Küçük modeller "şu adımları uygulayacağım:" / "önce dosyaları listeleyeceğim." deyip
+                # araç çağırmadan durabiliyor.
+                if not nudged and (text.rstrip().endswith(":") or (not used_tools and _announces_action(text))):
                     nudged = True
                     self.conversation.add_user(CONTINUE)
                     continue
@@ -188,6 +202,7 @@ class Agent:
                     self.conversation.add_assistant(text)
                 return text
             failed = False
+            used_tools = True
             for call in calls:
                 sig = _signature(call)
                 if sig == self._last_failed:

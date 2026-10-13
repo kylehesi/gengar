@@ -199,6 +199,30 @@ def test_persistent_empty_answer_falls_back_to_tool_output(tmp_path):
     assert "Model cevap yazmadı" in answer and "echo: Storage" in answer
 
 
+@pytest.mark.parametrize("text, expected", [
+    ("Dosya uzantılarını değiştirmek için önce klasördeki dosyaları listeleyip göreceğim.", True),
+    ("Şimdi sistem bilgilerini kontrol edeceğim.", True),
+    ("Let me check the folder first.", True),
+    ("Klasörde 3 dosya var.", False),
+    ("Hangi klasörü listelememi istersiniz? Size yardımcı olacağım.", False),  # soru var
+    ("", False),
+])
+def test_announces_action(text, expected):
+    from gengar.core.agent import _announces_action
+
+    assert _announces_action(text) is expected
+
+
+def test_announced_action_without_tools_is_nudged(tmp_path):
+    agent, client = make_agent([
+        ("Önce dosyaları listeleyeceğim.", []),
+        ("", [call("echo", text="x")]),
+        ("Bitti.", []),
+    ], tmp_path)
+    assert agent.run("dosyaları düzenle", RecordingUI()).strip() == "Bitti."
+    assert client.requests[1][-1]["content"].startswith("[Gengar] Do it now")
+
+
 def test_step_limit(tmp_path):
     agent, _ = make_agent([("", [call("echo", f"c{i}", text="x")]) for i in range(5)], tmp_path)
     result = agent.run("sonsuz döngü", RecordingUI())
