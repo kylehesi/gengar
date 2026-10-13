@@ -48,7 +48,10 @@ def render_system_prompt(path: Path, now: datetime | None = None, workspace: Pat
     now = now or datetime.now()
     template = path.read_text(encoding="utf-8")
     return template.format(
+        # Saat (dakika) sadece promptun sonunda: başta olsaydı her dakika Ollama'nın önbelleği
+        # bozulup tüm araç tanımları yeniden işlenirdi (ölçüm: ~2.3 sn / yeni oturum).
         date=now.strftime("%Y-%m-%d %A %H:%M"),
+        today=now.strftime("%Y-%m-%d"),
         os=f"{platform.system()} {platform.release()} ({platform.version()})",
         user=getpass.getuser(),
         home=Path.home(),
