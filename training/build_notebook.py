@@ -41,6 +41,8 @@ code("""
 !uv pip install -q --system transformers==5.2.0
 !unsloth install-kernels
 !uv pip install -q --system --no-deps --upgrade "torchao>=0.16.0"
+# Kaggle'da hazır gelmeyen bağımlılıklar (Colab'da var; --no-deps kurulum bunları getirmiyor).
+!uv pip install -q --system bitsandbytes peft accelerate datasets
 """)
 
 md("## 2. Ayarlar")
