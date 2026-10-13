@@ -154,7 +154,7 @@ trainer = SFTTrainer(
         learning_rate = LEARNING_RATE,
         lr_scheduler_type = "cosine",
         warmup_steps = 3,
-        logging_steps = 5,
+        logging_steps = 1,       # her adımda çıktı: ilk adım uzun sürdüğünde "takıldı mı" belli olsun
         eval_strategy = "steps",
         eval_steps = 25,
         save_strategy = "steps",
@@ -182,7 +182,12 @@ print(f"Eğitilen token oranı: {sum(l != -100 for l in labels) / len(labels):.0
 print(trained[:800])
 """)
 
-md("## 6. Eğitim\nT4'te örnek başına birkaç saniye; ~700 örnek × 2 epoch için birkaç saat sürebilir.")
+md("""
+## 6. Eğitim
+**İlk adım 10-15 dakika sürebilir:** Qwen3.5'in hibrit mimarisi için GPU çekirdekleri ilk adımda derlenir
+(Unsloth: "özellikle T4'te yavaş"). İlerleme çubuğu bir süre `0/…` durabilir; durdurmayın.
+Sonraki adımlar çok daha hızlıdır. Toplam süre örnek sayısına göre 1-4 saat.
+""")
 code("""
 import time
 start = time.time()
