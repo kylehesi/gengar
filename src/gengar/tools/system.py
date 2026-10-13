@@ -68,7 +68,11 @@ def cpu_info() -> list[str]:
 
 def memory_info() -> list[str]:
     m = psutil.virtual_memory()
-    return [f"RAM: {_gb(m.total)} total, {_gb(m.used)} used ({m.percent:.0f}%), {_gb(m.available)} available"]
+    procs = sorted(psutil.process_iter(["name", "memory_info"]),
+                   key=lambda p: p.info["memory_info"].rss if p.info["memory_info"] else 0, reverse=True)[:5]
+    top = ", ".join(f"{p.info['name']} {p.info['memory_info'].rss / 1024**2:.0f} MB" for p in procs)
+    return [f"RAM: {_gb(m.total)} total, {_gb(m.used)} used ({m.percent:.0f}%), {_gb(m.available)} available",
+            f"Top memory processes: {top}"]
 
 
 def disk_info() -> list[str]:

@@ -32,7 +32,8 @@ MAX_BLOCKED = 3
 # Model boş cevapla biterse en fazla bu kadar kez tekrar istenir.
 MAX_EMPTY_RETRIES = 2
 CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
-FINAL_ANSWER = "[Gengar] Your last reply was empty. Now write your final answer to the user's request."
+FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you already have above, write your "
+                "final answer to the user's request now. Do not redo the work.")
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
 

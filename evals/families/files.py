@@ -155,8 +155,9 @@ def missing_file(rng: random.Random, root: Path) -> Task:
     name = f"{rng.choice(WORDS)}_raporu_{rng.randint(10, 99)}.txt"
     prompt = f"{root}\\{name} dosyasını oku ve bana özetle."
     return Task("", "", "", prompt,
-                lambda a: (any(w in a.lower() for w in ("bulunamadı", "yok", "mevcut değil", "bulamadım", "not found",
-                                                        "bulunmuyor")), "dosya yok demeli, uydurmamalı"))
+                lambda a: (any(w in a.lower() for w in ("bulunam", "yok", "mevcut değil", "bulamadım", "not found",
+                                                        "bulunmuyor", "mevcut olmadığ")),
+                           "dosya yok demeli, uydurmamalı"))
 
 
 # --- değiştirme ---------------------------------------------------------------------
