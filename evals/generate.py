@@ -56,6 +56,8 @@ def main() -> None:
     ap.add_argument("--mode", choices=["off", "on", "auto"], default="on", help="öğretmenin düşünme modu")
     ap.add_argument("--only", default="")
     ap.add_argument("--resume", default="", help="devam edilecek gen_*.jsonl dosyası")
+    ap.add_argument("--resume-latest", action="store_true",
+                    help="aynı profil/mod/tohumla yapılmış en son üretime kaldığı yerden devam et")
     ap.add_argument("--max-hours", type=float, default=0, help="bu süre dolunca dur (0: sınırsız)")
     args = ap.parse_args()
     if args.seed == 1000:
@@ -73,8 +75,15 @@ def main() -> None:
     tasks = build_tasks(families, seed=args.seed, base=GEN_ROOT, instances=args.per_family)
 
     TRAJ_ROOT.mkdir(parents=True, exist_ok=True)
-    out = Path(args.resume) if args.resume else \
-        TRAJ_ROOT / f"gen_{datetime.now():%Y%m%d_%H%M%S}_{profile}_think-{args.mode}_seed{args.seed}.jsonl"
+    suffix = f"_{profile}_think-{args.mode}_seed{args.seed}.jsonl"
+    previous = sorted(TRAJ_ROOT.glob(f"gen_*{suffix}"))
+    if args.resume:
+        out = Path(args.resume)
+    elif args.resume_latest and previous:
+        out = previous[-1]
+        print(f"Kaldığı yerden devam: {out.name}")
+    else:
+        out = TRAJ_ROOT / f"gen_{datetime.now():%Y%m%d_%H%M%S}{suffix}"
     done = set()
     if out.exists():
         done = {json.loads(line)["task_id"] for line in out.read_text(encoding="utf-8").splitlines() if line}
