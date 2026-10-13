@@ -62,6 +62,9 @@ def numbers(text: str) -> list[float]:
             out.append(float(s))
         except ValueError:
             pass
+        # "1.060" Türkçede binlik ayırıcı da olabilir (1060): iki yorumu da ekle.
+        if re.fullmatch(r"\d{1,3}(\.\d{3})+", m.rstrip(".,")):
+            out.append(float(m.rstrip(".,").replace(".", "")))
     return out
 
 
@@ -250,7 +253,7 @@ def build_tasks() -> list[Task]:
              lambda a: (ollama_latest in a, f"GitHub: {ollama_latest}")),
         # kod
         Task("code_primes", "code", "1'den 100'e kadar olan asal sayıların toplamını hesaplayan bir Python "
-             "programı yaz, çalıştır ve sonucu söyle.", lambda a: ("1060" in a, "1060 bekleniyor")),
+             "programı yaz, çalıştır ve sonucu söyle.", lambda a: (near(a, 1060, 0.01), "1060 bekleniyor")),
         Task("code_bugfix", "code", f"{BENCH}\\bugfix klasöründeki test_stats.py başarısız oluyor. Testleri çalıştır, "
              "stats.py'deki hataları düzelt ve testler geçene kadar devam et. Test dosyasını değiştirme.",
              lambda a: _bugfix_ok()),

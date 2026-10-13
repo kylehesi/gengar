@@ -180,6 +180,18 @@ def test_plan_without_action_is_nudged_once(tmp_path):
     assert len(client.requests) == 3
 
 
+def test_empty_final_answer_is_retried_once(tmp_path):
+    agent, client = make_agent([
+        ("", [call("echo", text="x")]),
+        ("", []),                 # boş cevap → bir kez daha istenir
+        ("Sonuç: x", []),
+    ], tmp_path)
+    assert agent.run("dene", RecordingUI()).strip() == "Sonuç: x"
+    assert "empty" in client.requests[2][-1]["content"]
+    assert all(m.get("content") or m.get("tool_calls") or m["role"] != "assistant"
+               for m in agent.conversation.history)
+
+
 def test_step_limit(tmp_path):
     agent, _ = make_agent([("", [call("echo", f"c{i}", text="x")]) for i in range(5)], tmp_path)
     result = agent.run("sonsuz döngü", RecordingUI())

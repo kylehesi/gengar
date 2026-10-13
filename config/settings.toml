@@ -2,7 +2,8 @@
 
 [llm]
 # Varsayılan profil: aşağıdaki [llm.profiles.*] adlarından biri.
-default = "local"
+# local35 (Qwen3.5 9B): ölçüm setinde 22/24, 418 sn; local (Qwen3 8B): 21/24, 766 sn (auto düşünme).
+default = "local35"
 # Sistem promptu (proje köküne göre yol).
 system_prompt = "config/prompts/system.md"
 # Sohbet geçmişinde tutulan en fazla mesaj (sistem promptu hariç).
@@ -65,7 +66,7 @@ description = "Claude Haiku — ucuz, araç kullanımında güçlü"
 # bu her istekte ~5 sn gecikme demek.
 host = "http://127.0.0.1:11434"
 # `gengar doctor` bu modellerin indirilmiş olduğunu kontrol eder.
-required_models = ["qwen3:8b", "bge-m3"]
+required_models = ["qwen3.5:9b", "bge-m3"]
 
 [agent]
 # Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.

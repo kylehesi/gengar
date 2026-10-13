@@ -29,7 +29,8 @@ RESPONSE_RESERVE_TOKENS = 1500
 DENIED = "The user denied this action. Do not retry it; ask the user how they want to proceed."
 # Aynı başarısız çağrı bu kadar kez engellenirse tur durdurulur.
 MAX_BLOCKED = 3
-CONTINUE ="[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
+CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
+FINAL_ANSWER = "[Gengar] Your last reply was empty. Now write your final answer to the user's request."
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
 
@@ -130,6 +131,7 @@ class Agent:
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
         nudged = False
+        answered_empty = False
         blocked = 0
         for _ in range(self.max_steps):
             parts: list[str] = []
@@ -147,6 +149,15 @@ class Agent:
                 if text.rstrip().endswith(":") and not nudged:
                     nudged = True
                     self.conversation.add_user(CONTINUE)
+                    continue
+                # Bazı modeller (örn. qwen3.5 + Ollama) araç sonucundan sonra ara sıra boş cevapla bitiriyor.
+                if not text.strip() and not answered_empty:
+                    answered_empty = True
+                    self.conversation.history.pop()  # boş asistan mesajını geçmişte bırakma
+                    self.conversation.add_user(FINAL_ANSWER)
+                    # Düşünerek cevap verirken bu sorun görülmedi; tekrar denemede düşünmeyi aç.
+                    if self.client.reasoning_override in (None, "none"):
+                        self.client.reasoning_override = "medium"
                     continue
                 return text
             failed = False
