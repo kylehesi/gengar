@@ -46,6 +46,8 @@ code("""
 md("## 2. Ayarlar")
 code("""
 import glob, json, os
+# Kaggle "T4 x2" iki GPU gösterir; Unsloth tek GPU ile çalışır. torch yüklenmeden önce ayarlanmalı.
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 MODEL = "unsloth/Qwen3.5-4B"
 MAX_LEN = 8192          # Bellek yetmezse 6144'e düşürün (daha uzun örnekler eğitimden çıkarılır)
