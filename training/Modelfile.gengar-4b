@@ -1,0 +1,15 @@
+# Eğitilmiş Gengar öğrenci modelini Ollama'ya tanıtır.
+# Kullanım (C:\gengar klasöründe):
+#   ollama create gengar-4b -f training\Modelfile.gengar-4b
+# GGUF dosya adı Kaggle çıktısındakiyle aynı olmalı (gerekirse aşağıdaki satırı düzeltin).
+FROM ..\data\models\gengar-qwen35-4b.Q4_K_M.gguf
+
+# Qwen3.5'in Ollama'daki resmi ayarları (ollama show qwen3.5:9b --modelfile):
+# sohbet şablonu ve araç çağrısı ayrıştırıcısı Ollama'nın içinde yerleşik.
+TEMPLATE {{ .Prompt }}
+RENDERER qwen3.5
+PARSER qwen3.5
+PARAMETER presence_penalty 1.5
+PARAMETER temperature 1
+PARAMETER top_k 20
+PARAMETER top_p 0.95

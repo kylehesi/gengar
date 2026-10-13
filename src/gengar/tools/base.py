@@ -83,7 +83,8 @@ class Tool:
             inspect.signature(self.func).bind(**args)
         except TypeError as e:
             raise ToolError(f"geçersiz argümanlar: {e}") from e
-        return truncate(self.func(**args))
+        # Windows satır sonları (\r\n) modele boş satırlar gibi görünüyor ve token harcıyor.
+        return truncate(self.func(**args).replace("\r\n", "\n").replace("\r", "\n"))
 
 
 def is_failure(output: str) -> bool:

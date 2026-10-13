@@ -38,6 +38,26 @@ reasoning_effort = "none"
 num_ctx = 16384
 keep_alive = "30m"
 
+# Öğrenci modeller (training/README.md). base4b: eğitimsiz Qwen3.5 4B (karşılaştırma için),
+# student: Gengar verileriyle eğitilmiş 4B (ollama create gengar-4b ...).
+[llm.profiles.base4b]
+model = "ollama_chat/qwen3.5:4b"
+description = "Eğitimsiz Qwen3.5 4B (karşılaştırma)"
+reasoning_effort = "none"
+
+[llm.profiles.base4b.options]
+num_ctx = 16384
+keep_alive = "30m"
+
+[llm.profiles.student]
+model = "ollama_chat/gengar-4b"
+description = "Gengar verileriyle eğitilmiş Qwen3.5 4B (öğrenci)"
+reasoning_effort = "none"
+
+[llm.profiles.student.options]
+num_ctx = 16384
+keep_alive = "30m"
+
 [llm.profiles.gemini]
 # gemini-flash-latest ve en yeni sürümler ücretsiz katmanda sık sık "yoğun" (503) dönüyor;
 # 3.5-flash hızlı ve kararlı. Alternatifler: gemini-3.5-flash-lite, gemini-flash-lite-latest

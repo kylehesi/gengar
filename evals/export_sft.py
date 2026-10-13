@@ -65,7 +65,8 @@ def clean_session(session: dict, keep_reasoning: bool = True) -> dict | None:
         return None  # son cevap yoksa örnek eksik
     out = [{"role": "system", "content": session["system"]}]
     for m in messages:
-        msg = {"role": m["role"], "content": m.get("content") or ""}
+        # Eski dökümlerde Windows satır sonları kalmış olabilir (araç çıktıları artık normalleştiriliyor).
+        msg = {"role": m["role"], "content": (m.get("content") or "").replace("\r\n", "\n").replace("\r", "\n")}
         if m.get("_reasoning") and keep_reasoning:
             # Qwen sohbet şablonu bunu <think>...</think> olarak yazar. Unsloth: Qwen3.5'in düşünme
             # yeteneğini korumak için örneklerin en az %75'i düşünce içermeli.
