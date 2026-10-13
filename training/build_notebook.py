@@ -48,11 +48,13 @@ code("""
 md("## 2. Ayarlar")
 code("""
 import glob, json, os
-# Kaggle "T4 x2" iki GPU gösterir; Unsloth tek GPU ile çalışır. torch yüklenmeden önce ayarlanmalı.
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# Bellek parçalanmasını azaltır; torch yüklenmeden önce ayarlanmalı.
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 MODEL = "unsloth/Qwen3.5-4B"
-MAX_LEN = 8192          # Bellek yetmezse 6144'e düşürün (daha uzun örnekler eğitimden çıkarılır)
+# Qwen3.5'in sözlüğü çok büyük (~248k token): uzun örneklerde çıktı olasılık tablosu GB'larca yer tutuyor.
+# Kaggle T4 x2'de 8192 bellek hatası verdi (deneme turu, 2026-10-13); 6144 örneklerin ~%93'ünü kapsıyor.
+MAX_LEN = 6144
 EPOCHS = 2
 LEARNING_RATE = 2e-4
 LORA_R = 16
@@ -151,7 +153,7 @@ trainer = SFTTrainer(
         num_train_epochs = EPOCHS,
         learning_rate = LEARNING_RATE,
         lr_scheduler_type = "cosine",
-        warmup_ratio = 0.05,
+        warmup_steps = 3,
         logging_steps = 5,
         eval_strategy = "steps",
         eval_steps = 25,
