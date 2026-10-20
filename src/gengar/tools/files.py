@@ -137,6 +137,11 @@ def unescape_if_flat(content: str) -> str:
 def write_file(path: str, content: str) -> str:
     content = unescape_if_flat(content)
     p = resolve(path)
+    if p.is_dir():
+        # Windows burada anlaşılmaz bir "Permission denied" veriyor; model "izin yok" sanıp klasörün
+        # YANINA "X.md" yazıyordu. Yönlendirme yapılmaz (kullanıcı bilerek yanına isteyebilir), açıkça söylenir.
+        raise ToolError(f"{p} bir klasör, dosya değil. Klasörün içine yazmak için dosya adını ekleyin, "
+                        f"örn. {p / 'kayit.md'}")
     existed = p.exists()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8", newline="")

@@ -66,7 +66,62 @@ def save_previous(rng: random.Random, root: Path) -> Task:
                 require_tools=("save_answer",), approval="task_only")
 
 
+# --- yeni içeriği, adı verilmemiş bir dosya olarak bir klasöre kaydetme -----------------------------
+# Model "X klasörüne kaydet" denince dosyayı X'in YANINA ("X.md") ya da X'in kendi yoluna yazmaya
+# çalışıyordu (2026-10-20, save_answer_md ölçümlerinde 5+ kez). Hedef klasör görev klasörünün içinde bir
+# alt klasör: hatalı "X.md" de görev klasöründe kalır, task_only onayı onu reddetmez; böylece modelin
+# ilk tercihi ölçülür, ret sonrası düzeltmesi değil.
+
+CONTENT = [
+    "Haftalık bir alışveriş listesi oluştur",
+    "Yarınki toplantı için 5 maddelik bir gündem hazırla",
+    "Python'da liste ile sözlük farkını anlatan kısa bir not yaz",
+    "Bu hafta için bir yapılacaklar listesi hazırla",
+    "Kısa bir teşekkür e-postası taslağı yaz",
+    "Sabah rutini için 6 adımlık bir plan oluştur",
+    "Kitap okuma alışkanlığı için 5 öneri yaz",
+    "Bir proje için kısa bir README taslağı hazırla",
+    "Evde yapılabilecek 5 egzersizi listele",
+    "Bir doğum günü davetiyesi metni yaz",
+]
+FOLDERS = ["Notlar", "Çalışma Planı", "Proje Dosyaları", "Belgelerim", "Yapılacaklar", "Raporlar"]
+INTO_FOLDER = [
+    "{c} ve {t} klasörüne kaydet.",
+    "{c}, sonra bunu {t} klasörüne kaydet.",
+    "{c}. Dosyayı {t} klasörüne koy.",
+    "{c} ve {t} içine kaydet.",
+    "{c}; {t} klasörüne bir dosya olarak yaz.",
+    "{c} and save it in the {t} folder.",
+    "{c}, {t} klasörüne kaydeder misin?",
+    "{c} ve sonucu {t} klasöründe sakla.",
+    "{t} klasörüne kaydetmek üzere: {c}.",
+    "{c}. Bunu {t} klasörüne bir dosya olarak kaydet lütfen.",
+    "{c} ve dosyayı {t} klasörüne at.",
+    "{c}, then save it to {t}.",
+]
+
+
+def write_into_folder(rng: random.Random, root: Path) -> Task:
+    target = root / rng.choice(FOLDERS)
+    target.mkdir()
+    content = variant(rng, split_pool(rng, CONTENT))
+    prompt = rng.choice(split_pool(rng, INTO_FOLDER)).format(c=content, t=target)
+
+    def check(answer: str) -> tuple[bool, str]:
+        inside = [p for p in target.rglob("*") if p.is_file()]
+        beside = [p.name for p in root.iterdir() if p.is_file()]
+        if beside:
+            return False, f"klasörün yanına yazıldı: {beside}"
+        if not inside:
+            return False, "klasörde dosya yok"
+        size = len(read(inside[0]) or "")
+        return size >= 50, f"{target.name}\\{inside[0].name}, {size} karakter"
+
+    return Task("", "", "", prompt, check, difficulty=2, approval="task_only")
+
+
 FAMILIES = [
     # 10 görev: dev'de ~5 görev olsun (3 görevle tek bir rastlantı sonucu %33 oynatır).
     Family("save_answer_md", "files", save_previous, 10),
+    Family("write_to_folder", "files", write_into_folder, 10),
 ]

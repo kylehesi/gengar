@@ -96,7 +96,11 @@ def split_pool(rng: random.Random, items: list) -> list:
         return int(hashlib.sha1(key.encode("utf-8")).hexdigest(), 16) % 3 == 0
 
     want_eval = getattr(rng, "purpose", "bench") == "bench"
-    return [x for x in items if is_eval(x) == want_eval]
+    pool = [x for x in items if is_eval(x) == want_eval]
+    if not pool:  # kısa listede bir taraf boş kalabilir (algoritma değişirse eski ölçümler bozulur)
+        raise ValueError(f"split_pool: {len(items)} öğelik listenin {'ölçüm' if want_eval else 'eğitim'} "
+                         f"tarafı boş; listeye öğe ekleyin")
+    return pool
 
 
 def split_for(task_id: str) -> str:
@@ -206,7 +210,9 @@ class QuietRepl(Repl):
         if self.approval == "task_only":
             # Yalnızca görev klasörü içindeki eylemler: model kullanıcının klasörlerine (Masaüstü, Belgeler)
             # yazamasın (2026-10-20: save_answer_md ölçümünde iki kez istenmeden yazdı).
-            inside = self.root and str(self.root).lower().replace("/", "\\") in summary.lower().replace("/", "\\")
+            # Ayraçla birlikte: "…\gorev.md" (klasörün YANI) "…\gorev" metnini içerir ama içeride değildir.
+            root = str(self.root).lower().replace("/", "\\").rstrip("\\") + "\\" if self.root else None
+            inside = root and root in summary.lower().replace("/", "\\")
             return "yes" if inside else "no"
         return "no" if DANGEROUS.search(f"{tool.name} {summary}") else "yes"
 

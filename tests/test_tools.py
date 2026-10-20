@@ -195,3 +195,22 @@ def test_audit_log(tmp_path):
     assert entry["tool"] == "run_powershell"
     assert entry["session"] == log.session
     assert len(entry["output"]) < 2100
+
+
+# --- klasör yoluna yazma ----------------------------------------------------------------------------
+# Not: "X.md" → "X\X.md" yönlendirmesi bilerek YOK: write_to_folder ölçümünde (gerçekçi klasör adları)
+# model 9/9 doğru yazdı; "klasörün yanına" hatası save_answer_md'nin dosya adı gibi görünen görev
+# klasörlerinden (save_answer_md_7) kaynaklanan bir ölçüm artefaktıydı.
+
+def test_write_to_folder_path_gives_clear_error(tmp_path):
+    folder = tmp_path / "Çalışma Planı"
+    folder.mkdir()
+    with pytest.raises(ToolError, match="bir klasör, dosya değil"):
+        files.write_file(str(folder), "içerik")
+    assert list(folder.iterdir()) == []
+
+
+def test_sibling_file_is_written_where_asked(tmp_path):
+    (tmp_path / "Notlar").mkdir()
+    files.write_file(str(tmp_path / "Notlar.md"), "yeni")      # kullanıcı yanına istemiş olabilir
+    assert (tmp_path / "Notlar.md").read_text(encoding="utf-8") == "yeni"

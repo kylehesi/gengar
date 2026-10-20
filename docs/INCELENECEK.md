@@ -82,8 +82,17 @@ sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. O
       `tests/test_router.py`'deki (ölçümde olmayan) örneklerle sınanıyor.
 - [ ] Sonraki veri üretimine `save_answer_md` (eğitim cümleleri) ve ipucu açık öğretmen; ipucu geçmişe
       yazılmadığı için öğrenci örnekleri ipuçsuz olur.
-- [ ] **"Klasöre kaydet" → dosyayı klasörün yanına yazma** (bugün 5+ kez, write_file ile de). save_answer'da
-      koruma var; write_file için de düşünülebilir.
+- [x] **"Klasöre kaydet" → dosyayı klasörün yanına yazma — ölçüm artefaktı çıktı (2026-10-20).** Yeni aile
+      `write_to_folder` (gerçekçi, boşluklu/Türkçe klasör adları: "Çalışma Planı", "Proje Dosyaları"; adı
+      verilmemiş dosya): düzeltme ÖNCESİ dev 4/5, test **5/5**; klasörün yanına yazma **hiç yok** (9/9 doğru
+      yer). Hata yalnızca `save_answer_md`'de görülmüştü: oradaki hedef klasör görev klasörünün kendisiydi
+      (`save_answer_md_7`), dosya adı gibi görünüyordu, model ".md" ekledi. Bu yüzden write_file için
+      "X.md → X\X.md" yönlendirmesi YAPILMADI (fayda kanıtlanmadı; kullanıcı bilerek yanına isteyebilir).
+      Yapılan: write_file'a klasör yolu verilince Windows'un "Permission denied"ı yerine açık hata.
+- [ ] `save_answer_md` ailesinde de hedef, gerçekçi adlı bir alt klasör olmalı (şu anki klasör adı
+      artefakt üretiyor). Değişirse ailenin başlangıç/son ölçümleri yenilenmeli.
+- [ ] **Aşırı onay sorma:** "…metni yaz, X klasörüne kaydeder misin?" isteğinde 9B metni yazıp "kaydedelim mi?"
+      diye sordu, kaydetmedi (write_to_folder_7, dev, 1/10). Kibar soru kalıbını onay sorusu sanıyor.
 - [ ] **İstenmeyen yan etki:** "8 maddelik plan yaz" isteğinde 9B planı sohbete yazmak yerine kendi
       kararıyla kullanıcının masaüstüne dosya olarak kaydetti (save_answer_md_4, 2026-10-20 17:32; ölçüm
       onayları otomatik olduğu için gerçekten yazıldı, sonra geri dönüşüm kutusuna atıldı). Gerçek

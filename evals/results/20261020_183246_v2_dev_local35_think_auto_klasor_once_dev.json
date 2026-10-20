@@ -1,0 +1,102 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "dev",
+  "seed": 1000,
+  "commit": "a6d1be3",
+  "date": "2026-10-20T18:31:12",
+  "num_ctx": 16384,
+  "turn_hints": true,
+  "label": "v2 dev local35 think=auto klasor_once_dev",
+  "passed": 4,
+  "total": 5,
+  "seconds": 94.2,
+  "results": [
+    {
+      "id": "write_to_folder_0",
+      "family": "write_to_folder",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "Proje Dosyaları\\sabah-rutini.txt, 307 karakter",
+      "seconds": 27.3,
+      "tool_calls": 1,
+      "steps": 2,
+      "error": "",
+      "answer": "✅ Sabah rutini için 6 adımlık plan oluşturdum ve `C:\\gengar\\data\\bench2\\write_to_folder_0\\Proje Dosyaları\\sabah-rutini.txt` klasörüne kaydettim.\n\nPlan şu adımları içeriyor:\n1. Yataktan kalkmak ve güneş ışığı almak\n2. Yüzü yıkamak ve su içmek\n3. Esneme hareketleri yapmak\n4. Temizlenip kıyafet değiştirmek\n5. Sağlıklı bir şeyler içmek\n6. Hedef belirlemek",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "write_to_folder_1",
+      "family": "write_to_folder",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "Proje Dosyaları\\dogumgunu_davetiyesi.txt, 484 karakter",
+      "seconds": 19.6,
+      "tool_calls": 2,
+      "steps": 3,
+      "error": "",
+      "answer": "Hazır! Doğum günü davetiyesi metnini `C:\\gengar\\data\\bench2\\write_to_folder_1\\Proje Dosyaları\\dogumgunu_davetiyesi.txt` dosyasına kaydettim.\n\nDaha kişiselleştirilmiş olması için adres, tarih ve saat gibi alanları doldurabilir misiniz?",
+      "tools": [
+        "list_directory",
+        "write_file"
+      ]
+    },
+    {
+      "id": "write_to_folder_3",
+      "family": "write_to_folder",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "Yapılacaklar\\dogumgunu_davetiyesi.txt, 496 karakter",
+      "seconds": 18.5,
+      "tool_calls": 2,
+      "steps": 3,
+      "error": "",
+      "answer": "✅ Doğum günü davetiye metni oluşturuldu ve `C:\\gengar\\data\\bench2\\write_to_folder_3\\Yapılacaklar\\dogumgunu_davetiyesi.txt` dosyasına kaydedildi.",
+      "tools": [
+        "list_directory",
+        "write_file"
+      ]
+    },
+    {
+      "id": "write_to_folder_7",
+      "family": "write_to_folder",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "klasörde dosya yok",
+      "seconds": 7.2,
+      "tool_calls": 0,
+      "steps": 1,
+      "error": "",
+      "answer": "Elbette! İşte bir doğum günü davetiyesi metni:\n\n---\n\n**🎉 Doğum Günü Davetiyesi 🎂**\n\nSayın Konuklarımız,\n\nBu mutlu günde, [Doğum Günü Töreni] adlı eğlenceli etkinliğimize sizinle birlikte olmaktan onur duyarız!\n\n📅 **Tarih:** [Tarihi Giriniz]\n⏰ **Saat:** [Saati Giriniz]\n📍 **Adres:** [Adresi Giriniz]\n\nLütfen bu coşkulu geceye katılsanız, sevdiğiniz dostlar ve aile bireyleriyle birlikte güzel vakit ge",
+      "tools": []
+    },
+    {
+      "id": "write_to_folder_9",
+      "family": "write_to_folder",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "Raporlar\\dogum_gunu_davetisi.txt, 473 karakter",
+      "seconds": 21.6,
+      "tool_calls": 1,
+      "steps": 2,
+      "error": "",
+      "answer": "Doğum günü davetiyesi metnini C:\\gengar\\data\\bench2\\write_to_folder_9\\Raporlar klasöründeki \"dogum_gunu_davetisi.txt\" dosyasına kaydettim. İsterseniz adres, saat ve isim gibi alanları düzenleyebilirim.",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}
