@@ -58,7 +58,7 @@ MAX_LEN = 6144
 # Yedek plan: iki GPU'ya bölmeye rağmen bellek yetmezse True yapın (4-bit QLoRA; Unsloth Qwen3.5 için
 # önermiyor, kalite biraz düşebilir ama ~6 GB yer açar).
 LOAD_IN_4BIT = False
-EPOCHS = 2
+EPOCHS = 1          # 2 epoch T4'te float32 ile ~7 saat sürüyor; doğrulama loss'u 25. adımda 0.40 (iyi)
 LEARNING_RATE = 2e-4
 LORA_R = 16
 BATCH = 1
@@ -77,12 +77,19 @@ md("""
 16-bit LoRA (Unsloth: Qwen3.5'te 4-bit QLoRA önerilmiyor). T4'te bf16 yok; otomatik fp16 kullanılır.
 
 **İki GPU:** 16-bit 4B model tek T4'te (~15 GB) ~9 GB tutuyor; uzun örneklerde eğitim belleği yetmedi
-(deneme turu, 2026-10-13). `device_map="balanced"` modelin katmanlarını iki T4'e böler (Unsloth'un
-belgelenmiş yöntemi); her kartta ~4.5 GB model kalır, gerisi eğitime.
+(deneme turu, 2026-10-13). Model iki T4'e bölünür. Eşit bölmede (`"balanced"`) GPU 1, son katmanlar ve
+248k'lık çıktı tablosu yüzünden 45. adımda doldu (2026-10-20); bu yüzden GPU 0'a daha çok katman verilir
+(`max_memory`: GPU 0 en fazla 6 GB, GPU 1 en fazla 5 GB model).
 """)
 code("""
 import torch
 from unsloth import FastLanguageModel, is_bf16_supported
+
+split = {}
+if torch.cuda.device_count() > 1:
+    # Eşit bölme ("balanced") yetmedi: son katmanlar ve 248k'lık çıktı tablosu (6k token'da float32 ~6 GB)
+    # GPU 1'de; 45. adımda GPU 1'in belleği bitti (2026-10-20). GPU 1'e daha az model koy, tabloya yer kalsın.
+    split = dict(device_map = "auto", max_memory = {0: "6GiB", 1: "5GiB"})
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = MODEL,
@@ -90,7 +97,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_4bit = LOAD_IN_4BIT,
     load_in_16bit = not LOAD_IN_4BIT,
     full_finetuning = False,
-    device_map = "balanced" if torch.cuda.device_count() > 1 else None,
+    **split,
 )
 model = FastLanguageModel.get_peft_model(
     model,
@@ -107,6 +114,7 @@ tok = getattr(tokenizer, "tokenizer", tokenizer)
 print("GPU:", torch.cuda.device_count(), "x", torch.cuda.get_device_name(0), "| bf16:", is_bf16_supported())
 for i in range(torch.cuda.device_count()):
     print(f"  GPU {i}: {torch.cuda.memory_allocated(i) / 1e9:.1f} GB model")
+# Beklenen: GPU 0 ~6 GB, GPU 1 ~3 GB. İkisi de ~4.5 GB ise max_memory dikkate alınmamıştır.
 """)
 
 md("""
@@ -171,8 +179,8 @@ trainer = SFTTrainer(
         eval_strategy = "steps",
         eval_steps = 25,
         save_strategy = "steps",
-        save_steps = 50,
-        save_total_limit = 2,
+        save_steps = 10,          # 46. adımda çöktü, 50'de kaydedildiği için hiçbir şey kalmadı
+        save_total_limit = 3,
         optim = "adamw_8bit",
         weight_decay = 0.01,
         fp16 = not is_bf16_supported(),
