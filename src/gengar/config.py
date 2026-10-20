@@ -58,6 +58,8 @@ class Settings:
     auto_learn: bool
     skill_min_score: float
     raw: dict = field(repr=False)
+    # Tur ipuçları (örn. "önceki cevabı kaydet" → save_answer). Ölçümde etkisini görmek için kapatılabilir.
+    turn_hints: bool = True
     chats_dir: Path = PROJECT_ROOT / "data" / "chats"
     recent_chats: int = 5
 

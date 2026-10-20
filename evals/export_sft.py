@@ -66,6 +66,8 @@ def clean_session(session: dict, keep_reasoning: bool = True) -> dict | None:
     messages, salvaged = salvage(session["messages"])
     if not messages or messages[-1]["role"] != "assistant" or not (messages[-1].get("content") or "").strip():
         return None  # son cevap yoksa örnek eksik
+    # Not: tur ipuçları (örn. "save_answer kullan", Conversation.turn_note) geçmişe yazılmadığı için
+    # buraya hiç gelmez; öğrenci aynı davranışı ipucusuz öğrenir.
     out = [{"role": "system", "content": session["system"]}]
     for m in messages:
         # Eski dökümlerde Windows satır sonları kalmış olabilir (araç çıktıları artık normalleştiriliyor).

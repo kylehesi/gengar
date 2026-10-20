@@ -62,3 +62,44 @@ def test_truncated_reply_is_explained_not_retried(tmp_path):
     answer = agent.run("bunu dosyaya yaz", RecordingUI())
     assert answer == TRUNCATED and len(client.requests) == 1  # boşuna tekrar denenmedi
     assert agent.conversation.history[-1]["content"] == TRUNCATED
+
+
+def test_save_hint_only_when_there_is_something_to_save(tmp_path):
+    from gengar.core.agent import SAVE_HINT
+
+    conversation = Conversation("SYS")
+    registry = ToolRegistry([files.make_save_answer(lambda: conversation.history)])
+    client = ScriptedClient([("Tamam.", []), (LIST, []), ("Tamam.", []), ("Tamam.", [])])
+    agent = Agent(client, registry, PermissionPolicy("trust"), AuditLog(tmp_path), conversation)
+
+    def last_user_sent():
+        return [m for m in client.requests[-1] if m["role"] == "user"][-1]["content"]
+
+    agent.run("bunu .md dosyası olarak kaydet", RecordingUI())     # kaydedilecek önceki cevap yok
+    assert SAVE_HINT not in last_user_sent()
+    agent.run("12 proje fikri öner", RecordingUI())
+    agent.run("bunları .md dosyası olarak kaydet", RecordingUI())   # artık var → ipucu
+    assert last_user_sent().endswith(SAVE_HINT)                     # kullanıcı mesajının sonunda
+    assert SAVE_HINT not in client.requests[-1][0]["content"]       # sistem mesajında değil
+    agent.run("teşekkürler", RecordingUI())                          # ipucu kalıcı değil
+    assert all(SAVE_HINT not in (m.get("content") or "") for m in client.requests[-1])
+    # geçmişe hiç yazılmadı → eğitim verisine de girmez
+    assert all(SAVE_HINT not in (m.get("content") or "") for m in conversation.history)
+
+
+def test_save_answer_into_folder_path(tmp_path):
+    history = [{"role": "user", "content": "a"}, {"role": "assistant", "content": LIST},
+               {"role": "user", "content": "bu klasöre kaydet"}]
+    tool = files.make_save_answer(lambda: history)
+    tool.run({"path": str(tmp_path)})          # model sadece klasör yolunu verdi
+    tool.run({"path": str(tmp_path) + "\\"})
+    assert (tmp_path / "kayit.md").read_text(encoding="utf-8").startswith("# 12 proje")
+    assert (tmp_path / "kayit_2.md").exists()  # üzerine yazmadı
+
+
+def test_save_answer_next_to_folder_goes_inside(tmp_path):
+    (tmp_path / "gorev").mkdir()
+    history = [{"role": "user", "content": "a"}, {"role": "assistant", "content": LIST},
+               {"role": "user", "content": "gorev klasörüne kaydet"}]
+    files.make_save_answer(lambda: history).run({"path": str(tmp_path / "gorev.md")})
+    assert (tmp_path / "gorev" / "kayit.md").exists() and not (tmp_path / "gorev.md").exists()

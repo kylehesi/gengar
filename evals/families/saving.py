@@ -33,16 +33,24 @@ TOPICS: list[tuple[str, str]] = [
     ("Yeni bir dizüstü bilgisayar alırken dikkat edilmesi gereken 8 şeyi yaz.", "islemci"),
 ]
 
+# Ölçüm ve eğitim için ikiye bölünür (split_pool): eğitim verisi ölçümdeki cümleleri hiç görmez.
 SAVE_REQUESTS = [
     "bunu bir .md dosyası olarak {root} klasörüne kaydet",
     "Az önce yazdıklarını {root} klasörüne markdown dosyası olarak kaydeder misin?",
     "Bu listeyi {root}\\liste.md olarak kaydet.",
+    "Bunları {root} içine bir txt dosyası olarak kaydet.",
+    "Yazdığın planı {root} klasörüne dosya olarak kaydedebilir misin?",
+    "Son cevabını {root}\\notlar.md dosyasına kaydet.",
+    "Bunu {root} klasörüne bir dosyaya aktar.",
+    "{root} klasörüne bu metni markdown olarak kaydeder misin lütfen?",
+    "Hepsini {root}\\kayit.md olarak sakla.",
+    "Save this to a markdown file in {root}.",
 ]
 
 
 def save_previous(rng: random.Random, root: Path) -> Task:
     content, keyword = variant(rng, split_pool(rng, TOPICS))
-    save = rng.choice(SAVE_REQUESTS).format(root=root)
+    save = rng.choice(split_pool(rng, SAVE_REQUESTS)).format(root=root)
 
     def check(answer: str) -> tuple[bool, str]:
         files = [p for p in root.rglob("*") if p.is_file()]
@@ -53,8 +61,9 @@ def save_previous(rng: random.Random, root: Path) -> Task:
             return False, f"dosya içeriği eksik ({len(text)} karakter, '{keyword}' bekleniyor)"
         return True, f"{files[0].name}, {len(text)} karakter"
 
+    # task_only: yalnızca görev klasörüne yazılabilir; model kullanıcının klasörlerine yazmasın.
     return Task("", "", "", [content, save], check, difficulty=2, same_chat=True,
-                require_tools=("save_answer",))
+                require_tools=("save_answer",), approval="task_only")
 
 
 FAMILIES = [

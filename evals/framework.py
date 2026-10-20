@@ -29,6 +29,7 @@ from typing import Any
 from gengar.app import build_agent
 from gengar.config import PROJECT_ROOT, Settings
 from gengar.llm import LLMClient, LLMError
+from gengar.tools.base import is_failure
 from gengar.ui.repl import Repl
 
 BENCH_ROOT = PROJECT_ROOT / "data" / "bench2"
@@ -53,7 +54,8 @@ class Task:
     split: str = "dev"
     difficulty: int = 1              # 1 kolay, 2 orta, 3 zor (çok adımlı)
     # Onay politikası: "auto" (tehlikeli görünen hayır), "trust" (hepsi evet),
-    # "deny" (hepsi hayır), ya da görev klasörü içindeki silmelere izin veren "sandbox".
+    # "deny" (hepsi hayır), görev klasörü içindeki silmelere izin veren "sandbox",
+    # ya da yalnızca görev klasörü içindeki eylemlere izin veren "task_only".
     approval: str = "auto"
     memory: bool = False
     cleanup: Callable[[], None] | None = None
@@ -201,6 +203,11 @@ class QuietRepl(Repl):
             return "no"
         if self.approval == "sandbox" and self.root and str(self.root).lower() in summary.lower():
             return "yes"  # görev klasörüyle sınırlı silme vb.
+        if self.approval == "task_only":
+            # Yalnızca görev klasörü içindeki eylemler: model kullanıcının klasörlerine (Masaüstü, Belgeler)
+            # yazamasın (2026-10-20: save_answer_md ölçümünde iki kez istenmeden yazdı).
+            inside = self.root and str(self.root).lower().replace("/", "\\") in summary.lower().replace("/", "\\")
+            return "yes" if inside else "no"
         return "no" if DANGEROUS.search(f"{tool.name} {summary}") else "yes"
 
     def on_delta(self, delta):
@@ -244,6 +251,7 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
     prompts = task.prompt if isinstance(task.prompt, list) else [task.prompt]
     start = time.perf_counter()
     answer, error, calls, steps, tools, sessions = "", "", 0, 0, [], []
+    worked: list[str] = []  # başarıyla sonuçlanan araç çağrıları (require_tools bunlara bakar)
     agent = None
     for i, p in enumerate(prompts):
         if agent is None or not task.same_chat:
@@ -264,6 +272,9 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         calls += sum(len(m.get("tool_calls") or []) for m in hist)
         steps += sum(1 for m in hist if m["role"] == "assistant")
         tools += [tc["function"]["name"] for m in hist for tc in (m.get("tool_calls") or [])]
+        results = {m.get("tool_call_id"): m.get("content") or "" for m in hist if m["role"] == "tool"}
+        worked += [tc["function"]["name"] for m in hist for tc in (m.get("tool_calls") or [])
+                   if not is_failure(results.get(tc["id"], "Error: sonuç yok"))]
         sessions.append({"system": agent.conversation.system_message, "tools": agent.tools.schemas(),
                          "messages": hist})
     elapsed = time.perf_counter() - start
@@ -271,7 +282,7 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         ok, note = task.check(answer)
     except Exception as e:
         ok, note = False, f"doğrulama hatası: {type(e).__name__}: {e}"
-    ok, note = apply_tool_limit(task, bool(ok), str(note), tools)
+    ok, note = apply_tool_limit(task, bool(ok), str(note), tools, worked)
     if error:
         ok = False
     if task.cleanup:
@@ -290,11 +301,13 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
     return result
 
 
-def apply_tool_limit(task: Task, ok: bool, note: str, tools: list[str]) -> tuple[bool, str]:
-    """Görevin araç sınırı aşıldıysa (örn. araç gerekmeyen soruda araç çağrıldıysa) başarısız say."""
+def apply_tool_limit(task: Task, ok: bool, note: str, tools: list[str],
+                     worked: list[str] | None = None) -> tuple[bool, str]:
+    """Görevin araç sınırı aşıldıysa (örn. araç gerekmeyen soruda araç çağrıldıysa) ya da zorunlu araç
+    BAŞARIYLA kullanılmadıysa başarısız say. worked: hatasız sonuçlanan çağrılar (verilmezse tools)."""
     if task.max_tools is not None and len(tools) > task.max_tools:
         return False, f"gereksiz araç ({len(tools)} > {task.max_tools}): {', '.join(tools)} | {note}"
-    missing = [t for t in task.require_tools if t not in tools]
+    missing = [t for t in task.require_tools if t not in (tools if worked is None else worked)]
     if missing:
         return False, f"beklenen araç kullanılmadı: {', '.join(missing)} (kullanılan: {', '.join(tools) or '-'}) | {note}"
     return ok, note

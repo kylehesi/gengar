@@ -18,7 +18,8 @@ from ..tools.base import Risk, Tool, ToolError, ToolRegistry, is_failure
 from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
 from .permissions import PermissionPolicy
-from .router import needs_thinking
+from ..tools.files import previous_answers
+from .router import is_save_request, needs_thinking
 
 if TYPE_CHECKING:
     from ..memory import MemorySystem
@@ -41,6 +42,11 @@ FAILED_NOTE = "(Gengar: Bu isteğe yanıt üretilemedi, iş yapılmadı. Hata:"
 TRUNCATED = ("(Gengar: Model yanıtı bağlam sınırına takılıp yarıda kesildi; iş tamamlanmadı. Daha önce yazılmış "
              "uzun bir cevabı kaydetmek için \"önceki cevabını kaydet\" deyin (save_answer, yeniden yazmadan kopyalar); "
              "sohbet çok uzadıysa /new ile yeni sohbet açın ya da isteği parçalara bölün.)")
+# Kullanıcı önceki bir cevabı kaydetmek isteyince (router.is_save_request) o turun kullanıcı mesajına
+# eklenir (Conversation.turn_note); geçmişe yazılmadığı için eğitim verisine girmez: öğrenci ipucusuz öğrenir.
+SAVE_HINT = ("[Gengar] Note for this request: the user wants to save something you already wrote in an "
+             "earlier answer. Call save_answer with just the file path (answers=N to include several earlier answers); it "
+             "copies your answer exactly. Do not retype it with write_file.")
 # Kayıt dosyasına yazılan cevabın en fazla uzunluğu (karakter).
 MAX_LOGGED_ANSWER = 4000
 CLAIMED = ("[Gengar] Your answer says something was created, saved, changed or deleted, but nothing was "
@@ -105,8 +111,9 @@ class AgentUI(Protocol):
 class Agent:
     def __init__(self, client: LLMClient, tools: ToolRegistry, policy: PermissionPolicy,
                  audit: AuditLog, conversation: Conversation, max_steps: int = 15,
-                 memory: MemorySystem | None = None, think: str = "auto"):
+                 memory: MemorySystem | None = None, think: str = "auto", hints: bool = True):
         self.client = client
+        self.hints = hints  # tur ipuçları (SAVE_HINT); ablasyon ölçümünde kapatılır
         self.tools = tools
         self.policy = policy
         self.audit = audit
@@ -136,10 +143,16 @@ class Agent:
         self._last_failed = None
         self._changed = False
         self._set_thinking(user_text)
-        if self.memory:
-            self.conversation.context = self.memory.context_for(user_text)
+        context = self.memory.context_for(user_text) if self.memory else ""
         self.conversation.add_user(user_text)
         self.audit.record("user", text=user_text, profile=self.client.profile.name)
+        self.conversation.context = context
+        # Bu tur için ipucu (geçmişe yazılmaz, sonraki turda kalkar): "önceki cevabı kaydet" isteği.
+        self.conversation.turn_note = ""
+        if (self.hints and self.tools.get("save_answer") and is_save_request(user_text)
+                and previous_answers(self.conversation.history, 1)):
+            self.conversation.turn_note = SAVE_HINT
+            self.audit.record("hint", name="save_answer")
         try:
             answer = self._loop(ui)
         except LLMError as e:

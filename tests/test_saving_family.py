@@ -38,3 +38,20 @@ def test_check_needs_file_with_topic(tmp_path):
     keyword = next(k for p, k in saving.TOPICS if p == task.prompt[0])
     (task.root / "liste.md").write_text(f"# Plan\n{keyword}\n" + "madde açıklaması\n" * 40, encoding="utf-8")
     assert task.check("kaydettim")[0]
+
+
+def test_failed_call_does_not_count_as_used():
+    task = Task("x", "f", "c", ["yaz", "kaydet"], lambda a: (True, "tamam"), require_tools=("save_answer",))
+    ok, _ = apply_tool_limit(task, True, "tamam", ["save_answer", "run_powershell"], worked=["run_powershell"])
+    assert not ok  # save_answer çağrıldı ama hata verdi; dosyayı PowerShell yazdı
+
+
+def test_task_only_approval_blocks_writes_outside(tmp_path):
+    from framework import QuietRepl
+    from gengar.config import load_settings
+
+    repl = QuietRepl.__new__(QuietRepl)  # yalnızca confirm() test ediliyor
+    repl.approval, repl.root = "task_only", tmp_path / "gorev"
+    assert repl.confirm(None, str(tmp_path / "gorev" / "liste.md"), None, False) == "yes"
+    assert repl.confirm(None, str(tmp_path / "gorev").replace("\\", "/") + "/a.md", None, False) == "yes"
+    assert repl.confirm(None, r"C:\Users\kyle\Documents\plan.md", None, False) == "no"

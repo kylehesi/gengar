@@ -282,6 +282,17 @@ def make_save_answer(history: Callable[[], list[dict]]) -> Tool:
         if not texts:
             raise ToolError("bu sohbette kaydedilecek önceki bir cevap yok")
         p = resolve(path)
+        if not p.exists() and p.suffix and p.with_suffix("").is_dir():
+            # "X klasörüne kaydet" → model "X.md" yazıyor (X klasörünün YANINA); niyet X'in içi.
+            p = p.with_suffix("")
+        if p.is_dir() or path.rstrip().endswith(("\\", "/")):
+            # "X klasörüne kaydet" denince model sık sık sadece klasör yolunu veriyor: içine kayit.md yaz.
+            p.mkdir(parents=True, exist_ok=True)
+            p = p / "kayit.md"
+            n = 2
+            while p.exists():
+                p = p.with_name(f"kayit_{n}.md")
+                n += 1
         existed = p.exists()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("\n\n---\n\n".join(texts) + "\n", encoding="utf-8")

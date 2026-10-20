@@ -1,0 +1,105 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "test",
+  "seed": 1000,
+  "commit": "52dc15a",
+  "date": "2026-10-20T18:11:08",
+  "num_ctx": 16384,
+  "turn_hints": true,
+  "label": "v2 test local35 think=auto save_son_test",
+  "passed": 4,
+  "total": 5,
+  "seconds": 197.4,
+  "results": [
+    {
+      "id": "save_answer_md_1",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": true,
+      "note": "kayit.md, 871 karakter",
+      "seconds": 21.9,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Yazdığım ipucularını `C:\\gengar\\data\\bench2\\save_answer_md_1\\kayit.md` dosyasına kaydettim. İçerik tam olarak orijinal cevap olarak kopyalandı.",
+      "tools": [
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_2",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": true,
+      "note": "sleep_tips.md, 1472 karakter",
+      "seconds": 52.5,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "Başarıyla kaydettim! Önceki uyku tavsiyelerini **`C:\\gengar\\data\\bench2\\save_answer_md_2\\sleep_tips.md`** dosyasına kaydettim.\n\nİçerik birebir kopyalandı (2 KB).",
+      "tools": [
+        "run_powershell",
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_5",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": true,
+      "note": "kayit.md, 1268 karakter",
+      "seconds": 18.4,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Tamam! İstenen metin `C:\\gengar\\data\\bench2\\save_answer_md_5` klasörüne `.md` dosyası olarak kaydedildi.",
+      "tools": [
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_8",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": true,
+      "note": "kayit.md, 1702 karakter",
+      "seconds": 55.9,
+      "tool_calls": 3,
+      "steps": 5,
+      "error": "",
+      "answer": "Plan başarıyla kaydedildi! \n\nDosya yolu: `C:/gengar/data/bench2/save_answer_md_8/kayit.md`\n\nEğer klasörün ismini veya içeriğini değiştirmek isterseniz lütfen belirtin. 😊",
+      "tools": [
+        "write_file",
+        "save_answer",
+        "list_directory"
+      ]
+    },
+    {
+      "id": "save_answer_md_9",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | ipucu.md, 1804 karakter",
+      "seconds": 48.7,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Dosya başarıyla oluşturuldu! ✅ \n\nİşte dosyanın yolu: `C:\\gengar\\data\\bench2\\save_answer_md_9\\ipucu.md`",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}

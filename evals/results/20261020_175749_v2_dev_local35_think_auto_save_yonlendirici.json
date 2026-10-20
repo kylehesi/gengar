@@ -1,0 +1,106 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "dev",
+  "seed": 1000,
+  "commit": "52dc15a",
+  "date": "2026-10-20T17:51:54",
+  "num_ctx": 16384,
+  "label": "v2 dev local35 think=auto save_yonlendirici",
+  "passed": 1,
+  "total": 5,
+  "seconds": 355.4,
+  "results": [
+    {
+      "id": "save_answer_md_0",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file, list_directory) | dosya oluşmadı",
+      "seconds": 61.5,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "`bench2` klasöründe `save_answer_md_0` adında zaten bir klasör var, dosya değil. İki çözümünüz var:\n\n**Çözüm 1:** Klasör adına biraz ekleyin (örneğin `_md_0`) ve içine `.md` dosyası koyun.\n**Çözüm 2:** Başka bir klasör belirleyin veya `bench2` dışında kaydedin.\n\nHangisini tercih ediyorsunuz?",
+      "tools": [
+        "write_file",
+        "list_directory"
+      ]
+    },
+    {
+      "id": "save_answer_md_3",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | birthdays_party.md, 2401 karakter",
+      "seconds": 76.2,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "✅ Hazırlık ve alışveriş listesi başarıyla kaydedildi!\n\nDosya: **C:\\gengar\\data\\bench2\\save_answer_md_3\\birthdays_party.md**\n\nİçindekiler:\n- ✅ Gıda & İçecekler (pasta, sandviçler, atıştırmalıklar, meyve, içecekler)\n- ✅ Dekorasyon & Malzemeler (balonlar, süsler, aksesuarlar)\n- ✅ Kağıt eşyalar ve diğer malzemeler\n- ✅ Zaman planı önerileri\n- ✅ Kontroller ve son hazırlıklar\n\nDosyayı görüntülemek ister ",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_4",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | Python_Ogrenme_Calisma_Plani.md, 1722 karakter",
+      "seconds": 60.5,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Tamam! Python öğrenme çalışma planını `C:\\gengar\\data\\bench2\\save_answer_md_4` klasörüne markdown dosyası olarak kaydettim. Dosya adı: `Python_Ogrenme_Calisma_Plani.md`.",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_6",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "better_sleep_tips.md, 1156 karakter",
+      "seconds": 111.4,
+      "tool_calls": 5,
+      "steps": 7,
+      "error": "",
+      "answer": "Tamam! İçerik başarıyla kaydedildi: `C:\\gengar\\data\\bench2\\save_answer_md_6\\better_sleep_tips.md` dosyasına.",
+      "tools": [
+        "save_answer",
+        "list_directory",
+        "run_powershell",
+        "run_powershell",
+        "run_powershell"
+      ]
+    },
+    {
+      "id": "save_answer_md_7",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | doğum_günü_partisi_hazırlık.md, 1416 karakter",
+      "seconds": 45.8,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Harika! 🎉 Alışveriş ve hazırlık listesi `C:\\gengar\\data\\bench2\\save_answer_md_7\\doğum_günü_partisi_hazırlık.md` dosyasına başarıyla kaydedildi (1 KB). Dosya hazır, ihtiyaç duyarsan içeriğini düzenleyebilir veya genişletebilirsin. 🚀",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}

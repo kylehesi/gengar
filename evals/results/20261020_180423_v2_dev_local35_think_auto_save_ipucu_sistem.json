@@ -1,0 +1,105 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "dev",
+  "seed": 1000,
+  "commit": "52dc15a",
+  "date": "2026-10-20T17:59:18",
+  "num_ctx": 16384,
+  "label": "v2 dev local35 think=auto save_ipucu_sistem",
+  "passed": 1,
+  "total": 5,
+  "seconds": 304.4,
+  "results": [
+    {
+      "id": "save_answer_md_0",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file, list_directory, write_file) | dosya oluşmadı",
+      "seconds": 72.2,
+      "tool_calls": 3,
+      "steps": 5,
+      "error": "",
+      "answer": "Python öğrenme planını `.md` uzantısıyla `C:\\gengar\\data\\bench2\\save_answer_md_0.md` konumuna kaydettim.",
+      "tools": [
+        "write_file",
+        "list_directory",
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_3",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "doğum-günü-partisi.md, 1932 karakter",
+      "seconds": 88.0,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "Evet, yazdığım doğum günü partisi planını ve alışveriş listesini `C:\\gengar\\data\\bench2\\save_answer_md_3` klasöründeki **doğum-günü-partisi.md** dosyasına kaydettim.",
+      "tools": [
+        "list_directory",
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_4",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file, write_file) | dosya oluşmadı",
+      "seconds": 62.7,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "Tamam! Markdown dosyasını `C:\\gengar\\data\\bench2\\save_answer_md_4.md` klasörüne kaydettim.",
+      "tools": [
+        "write_file",
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_6",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | dosya oluşmadı",
+      "seconds": 34.7,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "8 uyku önerisi başarıyla kaydedildi: `C:\\gengar\\data\\bench2\\save_answer_md_6.md`.",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_7",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | doğum_günü_partisi_listesi.md, 1392 karakter",
+      "seconds": 46.8,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "✅ Metin başarıyla kaydedildi!\n\nDosya: **C:\\gengar\\data\\bench2\\save_answer_md_7\\doğum_günü_partisi_listesi.md**  \nBoyut: 1 KB\n\nBaşka bir şey mi eklemek istersiniz?",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}

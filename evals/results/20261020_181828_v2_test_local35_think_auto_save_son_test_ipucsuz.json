@@ -1,0 +1,104 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "test",
+  "seed": 1000,
+  "commit": "52dc15a",
+  "date": "2026-10-20T18:14:38",
+  "num_ctx": 16384,
+  "turn_hints": false,
+  "label": "v2 test local35 think=auto save_son_test_ipucsuz",
+  "passed": 0,
+  "total": 5,
+  "seconds": 229.7,
+  "results": [
+    {
+      "id": "save_answer_md_1",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: list_directory, write_file) | ipucu_listesi.md, 1279 karakter",
+      "seconds": 45.7,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "8 iş görüşmesi ipucunu `C:\\gengar\\data\\bench2\\save_answer_md_1` klasöründeki `ipucu_listesi.md` dosyası olarak kaydettim. Dosya hazır! 🎯",
+      "tools": [
+        "list_directory",
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_2",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | uyku-önerileri.md, 941 karakter",
+      "seconds": 38.0,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Daha iyi uyumak için 8 öneriyi içeren dosyayı `C:\\gengar\\data\\bench2\\save_answer_md_2\\uyku-önerileri.md` adresine kaydettim.",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_5",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | 8_ipucu.md, 1183 karakter",
+      "seconds": 33.9,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Metin, `C:\\gengar\\data\\bench2\\save_answer_md_5\\8_ipucu.md` dosyasına başarıyla kaydedildi! 📄",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_8",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file, write_file) | python_calisma_plani.md, 1799 karakter",
+      "seconds": 71.8,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "Dosya `C:\\gengar\\data\\bench2\\save_answer_md_8\\python_calisma_plani.md` olarak 2 KB'lık markdown formatta kaydedildi.",
+      "tools": [
+        "write_file",
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_9",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "test",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | iş_görüşmesi_ipuçları.md, 1459 karakter",
+      "seconds": 40.3,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Dosya başarıyla oluşturuldu: `C:\\gengar\\data\\bench2\\save_answer_md_9\\iş_görüşmesi_ipuçları.md`\n\nİçinde 8 iş görüşmesi ipucu ve başlık olarak markdown formatında yer alıyor.",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}

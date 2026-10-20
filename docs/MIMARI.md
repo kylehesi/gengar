@@ -459,6 +459,16 @@ token sayısı ve süre **3–6 kat** artıyor.
 - Kararı bir model değil **kelime kuralları** veriyor, çünkü karar için ayrıca model çağırmak her isteğe
   saniyeler ekler. Basit ama ucuz.
 
+### Aynı fikrin ikinci kullanımı: tur ipuçları
+
+`router.is_save_request()` "önceki cevabını dosyaya kaydet" isteklerini tanır. Gengar o tur için
+modele "save_answer kullan, yeniden yazma" ipucu verir (`Conversation.turn_note`).
+- İpucu **son kullanıcı mesajının sonuna** eklenir ve geçmişe yazılmaz. Bu yüzden eğitim verisine de girmez:
+  öğretmen ipucuyla doğru örnek üretir, öğrenci aynı davranışı ipucusuz öğrenir.
+- **Ölçülen ders:** Aynı ipucu sistem mesajının sonundayken araç seçimi 1/5, kullanıcı mesajının sonundayken
+  4/5 oldu (dev). Test setinde ipucuyla 4/5, ipucu kapatılınca (ablasyon, `bench2.py --no-hints`) 0/5.
+  Küçük modelde talimatın **nerede** durduğu, **ne** dediği kadar önemli.
+
 ---
 
 ## 8. Araştırma: web ve sürüm bilgisi

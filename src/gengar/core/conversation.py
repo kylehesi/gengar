@@ -74,6 +74,11 @@ class Conversation:
         self.history: list[dict[str, Any]] = []
         # O anki isteğe göre hafızadan bulunan bilgiler/beceriler; her kullanıcı mesajında yenilenir.
         self.context = ""
+        # Bu tur için ipucu: modele giden son kullanıcı mesajının sonuna eklenir, geçmişe YAZILMAZ
+        # (bu yüzden eğitim verisine de girmez). Sistem mesajının sonundaki not, ~4k tokenlık kuralların
+        # ardında gözden kaçıyordu (ölçüm: save_answer ipucu sistem mesajındayken 5 görevde tetiklendi,
+        # model 4'ünde yine write_file seçti).
+        self.turn_note = ""
 
     @property
     def system_message(self) -> str:
@@ -120,6 +125,7 @@ class Conversation:
     def clear(self) -> None:
         self.history.clear()
         self.context = ""
+        self.turn_note = ""
 
     def messages(self, max_chars: int | None = None) -> list[dict[str, Any]]:
         """Modele gidecek mesajlar: sistem promptu + sığan en yeni geçmiş.
@@ -150,6 +156,10 @@ class Conversation:
 
         # "_" ile başlayan alanlar (örn. _reasoning) sadece döküm/eğitim içindir, modele gönderilmez.
         recent = [{k: v for k, v in m.items() if not k.startswith("_")} for m in recent]
+        if self.turn_note:
+            last_user = max((i for i, m in enumerate(recent) if m["role"] == "user"), default=None)
+            if last_user is not None:
+                recent[last_user]["content"] = f"{recent[last_user]['content']}\n\n{self.turn_note}"
         return [{"role": "system", "content": system}, *recent]
 
 

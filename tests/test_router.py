@@ -1,6 +1,6 @@
 import pytest
 
-from gengar.core.router import needs_thinking
+from gengar.core.router import is_save_request, needs_thinking
 
 
 @pytest.mark.parametrize("text", [
@@ -24,3 +24,31 @@ def test_complex_requests_think(text):
 ])
 def test_simple_requests_are_fast(text):
     assert not needs_thinking(text)
+
+
+# Ölçüm görevlerinde (evals/families/saving.py) OLMAYAN cümleler: yönlendirici ölçüme göre değil,
+# genel kullanıma göre yazıldı.
+@pytest.mark.parametrize("text", [
+    "bunları bir .md dosyası olarak masaüstüne kaydet",
+    "tamam bunu txt olarak kaydeder misin",
+    "şu cevabı belgelerim klasörüne kaydet",
+    "Bu tabloyu dosyaya aktarabilir misin?",
+    "can you save that as a markdown file on my desktop",
+    "export this to a file",
+    "Yukarıdaki kodu C:\\proje\\main.py dosyasına kaydet",
+])
+def test_save_requests(text):
+    assert is_save_request(text)
+
+
+@pytest.mark.parametrize("text", [
+    "Python için 8 maddelik bir plan yaz ve masaüstüne kaydet",  # yeni içerik isteniyor
+    "bana bir şiir yaz ve dosyaya kaydet",
+    "C:\\notlar\\a.txt dosyasını oku",                               # kaydetme yok
+    "bunu hafızana kaydet",                                          # dosya değil, hafıza
+    "notlar.txt dosyasına 'merhaba' yaz",                            # yeni içerik
+    "masaüstündeki dosyaları listele",
+    "Ayarlarımı kaydet",
+])
+def test_not_save_requests(text):
+    assert not is_save_request(text)

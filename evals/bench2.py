@@ -36,12 +36,16 @@ def main() -> None:
     ap.add_argument("--tag", default="")
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--list", action="store_true", help="görevleri listele, çalıştırma")
+    ap.add_argument("--no-hints", action="store_true",
+                    help="tur ipuçlarını kapat (ablasyon: ipucunun etkisini ölçmek için)")
     args = ap.parse_args()
 
     load_env()
     settings = load_settings()
     if args.mode:
         settings = replace(settings, think=args.mode)
+    if args.no_hints:
+        settings = replace(settings, turn_hints=False)
     profile = args.profile or settings.default_profile
 
     tasks = build_tasks(all_families(), seed=args.seed)
@@ -60,7 +64,7 @@ def main() -> None:
     label = f"v2 {args.split} {profile} think={settings.think}{' ' + args.tag if args.tag else ''}"
     meta = {"profile": profile, "model": client.profile.model, "think": settings.think, "split": args.split,
             "seed": args.seed, "commit": gengar_commit(), "date": datetime.now().isoformat(timespec="seconds"),
-            "num_ctx": client.profile.options.get("num_ctx")}
+            "num_ctx": client.profile.options.get("num_ctx"), "turn_hints": settings.turn_hints}
     TRAJ_ROOT.mkdir(parents=True, exist_ok=True)
     traj = TRAJ_ROOT / f"{datetime.now():%Y%m%d_%H%M%S}_{args.split}_{profile}{'_' + args.tag if args.tag else ''}.jsonl"
     print(f"Ölçüm v2: {label} — {len(tasks)} görev, model {client.profile.model}\nDöküm: {traj}\n")

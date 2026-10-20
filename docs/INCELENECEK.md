@@ -62,12 +62,28 @@ sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. O
       mesajına "N önceki tur gizli, son gizli cevap şöyle başlıyor…, save_answer kaydedebilir" notu ekleniyor.
 
 **Açık kalanlar:**
-- [ ] 9B, "bunları .md kaydet" denince `save_answer` yerine `write_file` ile yeniden yazmayı seçiyor.
-      Ölçüm ailesi `save_answer_md` (iki turlu, aynı sohbet, `require_tools`), dev 5 görev:
-      başlangıç (araç en sonda) **0/5** → araç write_file'ın önünde **1/5** (gürültü sınırı; tutuldu)
-      → + somut prompt kuralı **1/5** (etkisiz; geri alındı). `save_answer` seçildiğinde kayıt ~20 sn,
-      write_file ile 37–76 sn. Sıradaki adaylar: kural tabanlı yönlendirme (kullanıcı "kaydet" deyip yeni
-      içerik istemiyorsa Gengar modele ipucu verir), sonraki veri üretiminde öğretmen örnekleri.
+- [x] **save_answer seçtirme — çözüldü (2026-10-20).** Ölçüm ailesi `save_answer_md` (iki turlu, aynı
+      sohbet, araç *başarıyla* kullanılmalı, `task_only` onay). Dev 5 görev, her satırda tek değişiklik:
+
+      | Değişiklik | Dev | Not |
+      |---|---|---|
+      | başlangıç (araç listenin sonunda) | 0/5 | eski 3 cümle |
+      | araç write_file'ın önünde | 1/5 | gürültü sınırı; tutuldu |
+      | + somut sistem promptu kuralı | 1/5 | etkisiz → geri alındı |
+      | başlangıç, yeni 10 cümle (ölçüm/eğitim ayrık) | 0/5 | karşılaştırma noktası yenilendi |
+      | + yönlendirici, ipucu **sistem mesajının sonunda** | 1/5 | ipucu 5/5 tetiklendi, model görmezden geldi |
+      | ipucu **kullanıcı mesajının sonunda** (`turn_note`) | 3/5 (araç seçimi 4/5) | 304 → 127 sn |
+      | + klasör yolu / "klasörün yanı" koruması | **5/5** | |
+      | **Test** (hiç bakılmamış görevler) | **4/5**; ipuçsuz (ablasyon `--no-hints`) **0/5** | |
+
+      Ders: aynı talimat, aynı kelimeler; sadece **konumu** değişince seçim 1/5 → 4/5. Küçük model ~4k
+      tokenlık sistem mesajının sonundaki notu kaçırıyor, cevaptan hemen önce gördüğüne güçlü tepki veriyor.
+      Sınırlama: dev ve test aynı 5 ölçüm cümlesini paylaşıyor; yeni cümle biçimlerine genelleme
+      `tests/test_router.py`'deki (ölçümde olmayan) örneklerle sınanıyor.
+- [ ] Sonraki veri üretimine `save_answer_md` (eğitim cümleleri) ve ipucu açık öğretmen; ipucu geçmişe
+      yazılmadığı için öğrenci örnekleri ipuçsuz olur.
+- [ ] **"Klasöre kaydet" → dosyayı klasörün yanına yazma** (bugün 5+ kez, write_file ile de). save_answer'da
+      koruma var; write_file için de düşünülebilir.
 - [ ] **İstenmeyen yan etki:** "8 maddelik plan yaz" isteğinde 9B planı sohbete yazmak yerine kendi
       kararıyla kullanıcının masaüstüne dosya olarak kaydetti (save_answer_md_4, 2026-10-20 17:32; ölçüm
       onayları otomatik olduğu için gerçekten yazıldı, sonra geri dönüşüm kutusuna atıldı). Gerçek
