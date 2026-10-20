@@ -57,6 +57,8 @@ class Settings:
     auto_learn: bool
     skill_min_score: float
     raw: dict = field(repr=False)
+    chats_dir: Path = PROJECT_ROOT / "data" / "chats"
+    recent_chats: int = 5
 
 
 def load_env(path: Path = ENV_PATH) -> None:
@@ -120,4 +122,6 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         auto_learn=bool(memory.get("auto_learn", True)),
         skill_min_score=float(memory.get("skill_min_score", 0.47)),
         raw=raw,
+        chats_dir=PROJECT_ROOT / raw.get("chats", {}).get("dir", "data/chats"),
+        recent_chats=int(raw.get("chats", {}).get("recent", 5)),
     )

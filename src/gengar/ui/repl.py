@@ -14,6 +14,7 @@ from typing import TextIO
 from .. import __version__
 from ..config import Settings
 from ..core.agent import Agent, Answer
+from ..core.chats import ChatInfo, ChatStore
 from ..llm import Delta, LLMError, Stats, ToolCall
 from ..tools.base import Risk, Tool
 
@@ -32,7 +33,10 @@ Komutlar:
   /memory         hatırlanan bilgiler        /remember <bilgi>  bilgi ekle
   /skills         öğrenilmiş beceriler       /skill <no>        beceriyi göster
   /learn          son işten beceri çıkar     /forget <no>       bilgi/beceri sil
-  /clear          yeni sohbet başlat
+  /new            yeni sohbet başlat (/clear de olur; önceki sohbet kayıtlı kalır)
+  /chats          sabitlenen ve son sohbetler     /open <no>   sohbeti aç, kaldığın yerden devam et
+  /pin <no>       sohbeti sabitle                 /unpin <no>  sabitlemeyi kaldır
+  /export [no]    sohbeti Markdown'a aktar (numarasız: şu anki sohbet)
   /help           bu yardım
   /exit           çık (Ctrl+C de olur)
 
@@ -49,8 +53,12 @@ def _preview(text: str, lines: int = 4, width: int = 160) -> str:
 
 class Repl:
     def __init__(self, settings: Settings, agent: Agent, out: TextIO = sys.stdout,
-                 read: Callable[[str], str] = input):
+                 read: Callable[[str], str] = input, chats: ChatStore | None = None):
         self.settings = settings
+        # Sohbet kaydı: None ise kaydedilmez (ölçüm ve testler; görevler sohbet listesini doldurmasın).
+        self.chats = chats
+        self.chat_id: str | None = None      # ilk cevaptan sonra atanır
+        self._listing: list[ChatInfo] = []   # son /chats çıktısı: /open 2 → bu listenin 2. öğesi
         self.agent = agent
         self.client = agent.client
         self.out = out
@@ -73,6 +81,8 @@ class Repl:
             store = self.agent.memory.store
             memory = f" Hafıza: {len(store.all('fact'))} bilgi, {len(store.all('skill'))} beceri."
         self.print(f"{DIM}{len(self.agent.tools)} araç hazır.{memory} Komutlar için /help yazın.{RESET}")
+        if self.chats and self.chats.all():
+            self.print(f"{DIM}Geçmiş sohbetler: /chats{RESET}")
 
     def run(self) -> int:
         if os.name == "nt":
@@ -104,9 +114,12 @@ class Repl:
             return False
         if cmd == "/help":
             self.print(HELP)
-        elif cmd == "/clear":
+        elif cmd in ("/clear", "/new"):
             self.agent.conversation.clear()
-            self.print("Yeni sohbet başladı.")
+            self.chat_id = None
+            self.print("Yeni sohbet başladı." + (" Önceki sohbet kayıtlı (/chats)." if self.chats else ""))
+        elif cmd in ("/chats", "/open", "/pin", "/unpin", "/export"):
+            self.chat_command(cmd, arg)
         elif cmd == "/model":
             if arg:
                 try:
@@ -223,6 +236,72 @@ class Repl:
         except LLMError as e:
             self._close_line()
             self.print(f"{RED}{e}{RESET}")
+        self.save_chat()
+
+    # --- sohbet geçmişi ---------------------------------------------------
+
+    def save_chat(self) -> None:
+        """Her cevaptan sonra (hata ya da Ctrl+C olsa bile) sohbeti kaydeder."""
+        history = self.agent.conversation.history
+        if not self.chats or not history:
+            return
+        if self.chat_id is None:
+            self.chat_id = self.chats.new_id()
+        try:
+            self.chats.save(self.chat_id, history, self.client.profile.name)
+        except OSError as e:  # kayıt hatası sohbeti durdurmasın
+            self.print(f"{YELLOW}Sohbet kaydedilemedi: {e}{RESET}")
+
+    def _pick(self, arg: str) -> ChatInfo | None:
+        """'/open 2' → son /chats listesindeki 2. sohbet."""
+        if not self._listing:
+            self._listing = self.chats.listing(self.settings.recent_chats)
+        if arg.isdigit() and 1 <= int(arg) <= len(self._listing):
+            return self._listing[int(arg) - 1]
+        self.print(f"Geçersiz numara: {arg or '(yok)'}. Önce /chats yazıp listeden numara seçin.")
+        return None
+
+    def chat_command(self, cmd: str, arg: str) -> None:
+        if not self.chats:
+            self.print("Sohbet kaydı bu oturumda kapalı.")
+            return
+        if cmd == "/chats":
+            self._listing = self.chats.listing(self.settings.recent_chats)
+            if not self._listing:
+                self.print("Henüz kayıtlı sohbet yok.")
+                return
+            for i, c in enumerate(self._listing, 1):
+                pin = f"{YELLOW}★{RESET}" if c.pinned else " "
+                here = f" {CYAN}(şu anki){RESET}" if c.id == self.chat_id else ""
+                self.print(f"{pin} {BOLD}{i}{RESET}. {c.title}  {DIM}{c.updated:%d.%m %H:%M} · "
+                           f"{c.messages} mesaj{RESET}{here}")
+            self.print(f"{DIM}/open <no> aç · /pin <no> sabitle · /export <no> Markdown'a aktar{RESET}")
+            return
+        if cmd == "/export" and not arg:
+            if not self.chat_id:
+                self.print("Bu sohbet henüz kaydedilmedi (önce bir şey sorun).")
+                return
+            self.print(f"Kaydedildi: {self.chats.export_markdown(self.chat_id)}")
+            return
+        chat = self._pick(arg)
+        if chat is None:
+            return
+        if cmd == "/open":
+            data = self.chats.load(chat.id)
+            self.agent.conversation.clear()
+            self.agent.conversation.history.extend(data["messages"])
+            self.chat_id = chat.id
+            self.print(f"Açıldı: {BOLD}{chat.title}{RESET} ({chat.messages} mesaj). Kaldığınız yerden devam edin.")
+            last = next((m for m in reversed(data["messages"])
+                         if m["role"] == "assistant" and (m.get("content") or "").strip()), None)
+            if last:
+                self.print(f"{DIM}Son cevap: {_preview(last['content'], lines=3)}{RESET}")
+        elif cmd in ("/pin", "/unpin"):
+            self.chats.set_pinned(chat.id, cmd == "/pin")
+            self._listing = []  # sıra değişti; sonraki numara yeni listeye göre
+            self.print(f"{'Sabitlendi' if cmd == '/pin' else 'Sabitleme kaldırıldı'}: {chat.title}")
+        elif cmd == "/export":
+            self.print(f"Kaydedildi: {self.chats.export_markdown(chat.id)}")
 
     def _close_line(self) -> None:
         if self._thinking_open:

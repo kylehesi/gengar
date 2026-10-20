@@ -108,6 +108,12 @@ sandbox_venv = "data/sandbox/.venv"
 # false: sadece "[düşünüyor…]" göstergesi (sohbette /thinklog ile değişir).
 show_thinking = false
 
+[chats]
+# Sohbetler her cevaptan sonra buraya kaydedilir (JSON); /chats ile listelenir, /open ile açılır.
+dir = "data/chats"
+# /chats listesinde sabitlenenlerin altında gösterilecek son sohbet sayısı.
+recent = 5
+
 [permissions]
 # normal: okuma serbest, yazma/sistem eylemleri sorulur
 # strict: her şey sorulur

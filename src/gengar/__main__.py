@@ -33,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
 def run_chat(profile: str | None) -> int:
     from .config import load_env, load_settings
     from .app import build_agent
+    from .core.chats import ChatStore
     from .llm import LLMClient, LLMError, warm_up
     from .ui.repl import Repl
 
@@ -44,7 +45,7 @@ def run_chat(profile: str | None) -> int:
         print(e)
         return 1
     warm_up()
-    return Repl(settings, build_agent(settings, client)).run()
+    return Repl(settings, build_agent(settings, client), chats=ChatStore(settings.chats_dir)).run()
 
 
 if __name__ == "__main__":

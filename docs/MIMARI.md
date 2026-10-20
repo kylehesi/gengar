@@ -64,6 +64,7 @@ gerçek sonucu söyler.
 | [`src/gengar/tools/`](../src/gengar/tools/) | Araçlar: PowerShell, dosyalar, sistem, uygulamalar, ayarlar, web, Python, koruma |
 | [`src/gengar/memory/`](../src/gengar/memory/) | Hafıza: bilgiler, beceriler, otomatik öğrenme |
 | [`src/gengar/ui/repl.py`](../src/gengar/ui/repl.py) | Terminal arayüzü (komutlar, onay soruları) |
+| [`src/gengar/core/chats.py`](../src/gengar/core/chats.py) | Sohbet geçmişi: her cevaptan sonra `data/chats/*.json`; `/chats`, `/open`, `/pin`, `/export`. Saklama JSON (geri açınca model araç çağrılarıyla birlikte kaldığı yerden devam eder), paylaşma Markdown. Yazma atomik: önce `.tmp`, sonra tek adımda yer değiştirme. Çökme olsa bile dosya yarım kalmaz. |
 | [`src/gengar/app.py`](../src/gengar/app.py) | Parçaları birleştirip bir `Agent` kurar |
 | [`config/settings.toml`](../config/settings.toml) | Tüm ayarlar (model profilleri, izin modu, hafıza…) |
 | [`config/prompts/system.md`](../config/prompts/system.md) | Sistem promptu: modele verilen "çalışma kuralları" |
