@@ -16,27 +16,19 @@ Kurallar
 from __future__ import annotations
 
 import getpass
-import hashlib
 import random
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from framework import Family, Task, numbers, variant
+from framework import Family, Task, numbers, split_pool, variant
 from gengar.core.conversation import known_folders
 from gengar.tools.apps import fold
 
 Groups = list[list[str]]
 
 
-def _pool(rng: random.Random, items: list) -> list:
-    """Listenin ölçüme ya da eğitime ayrılmış kısmı (sorunun metnine göre kararlı: her üç sorudan ~biri ölçüm)."""
-    def is_eval(item) -> bool:
-        key = item[0] if isinstance(item, tuple) else item
-        return int(hashlib.sha1(key.encode("utf-8")).hexdigest(), 16) % 3 == 0
-
-    want_eval = getattr(rng, "purpose", "bench") == "bench"
-    return [x for x in items if is_eval(x) == want_eval]
+_pool = split_pool
 
 
 def _keywords(groups: Groups):

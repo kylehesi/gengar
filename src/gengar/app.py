@@ -30,7 +30,7 @@ def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
         max_messages=settings.max_history_messages,
     )
     # Önceki cevabı yeniden yazdırmadan dosyaya kaydeder; sohbet geçmişine eriştiği için burada kurulur.
-    tools.register(files.make_save_answer(lambda: conversation.history))
+    tools.register(files.make_save_answer(lambda: conversation.history), before="write_file")
     return Agent(client, tools, PermissionPolicy(permission_mode or settings.permission_mode),
                  AuditLog(settings.log_dir), conversation, max_steps=settings.max_steps,
                  memory=memory_system, think=think or settings.think)

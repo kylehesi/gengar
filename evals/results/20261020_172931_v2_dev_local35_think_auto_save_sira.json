@@ -1,0 +1,102 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "dev",
+  "seed": 1000,
+  "commit": "f8c185c",
+  "date": "2026-10-20T17:25:29",
+  "num_ctx": 16384,
+  "label": "v2 dev local35 think=auto save_sira",
+  "passed": 1,
+  "total": 5,
+  "seconds": 242.8,
+  "results": [
+    {
+      "id": "save_answer_md_0",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | liste.md, 1173 karakter",
+      "seconds": 45.6,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Python öğrenme planı 8 madde halinde dosyaya kaydedildi.",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_3",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | natural_dogumgunu_parti_plani.md, 2348 karakter",
+      "seconds": 64.0,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Harika! Doğum günü partisi hazırlık ve alışveriş listesini `C:\\gengar\\data\\bench2\\save_answer_md_3\\natural_dogumgunu_parti_plani.md` dosyasına kaydetmiş oldum. Dosya oluşturuldu (2 KB). \n\nBaşka bir şey eklemek veya düzenlemek ister misin? 😊",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_4",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | python_calisma_plani.md, 1307 karakter",
+      "seconds": 36.6,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Python çalışma planını `C:\\gengar\\data\\bench2\\save_answer_md_4\\python_calisma_plani.md` dosyası olarak başarıyla kaydettim. 🎯",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_6",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "liste.md, 1404 karakter",
+      "seconds": 20.5,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Liste başarıyla kaydedildi! 📄",
+      "tools": [
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_7",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: list_directory, write_file) | dosya içeriği eksik (2592 karakter, 'dogum gunu' bekleniyor)",
+      "seconds": 76.1,
+      "tool_calls": 2,
+      "steps": 4,
+      "error": "",
+      "answer": "Dosya başarıyla kaydedildi! 📝\n\n**Kayıt Bilgileri:**\n- **Konum:** `C:\\gengar\\data\\bench2\\save_answer_md_7\\dogumgunlu_partisi.md`\n- **Boyut:** 3 KB\n- **Durum:** Oluştu ✅\n\nMarkdown formatında bir parti hazırlık ve alışveriş listesi kaydedildi. İstersen dosyayı düzenleyebilir veya başka bilgiler ekleyebilirsiniz! 🎈",
+      "tools": [
+        "list_directory",
+        "write_file"
+      ]
+    }
+  ]
+}

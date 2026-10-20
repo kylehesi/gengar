@@ -61,6 +61,11 @@ class Task:
     # En fazla kaç araç çağrısına izin var? None: sınır yok. 0: araç gerekmeyen görev (notool ailesi);
     # cevap doğru olsa bile araç çağrıldıysa başarısız sayılır.
     max_tools: int | None = None
+    # Bu araçlar kullanılmadıysa başarısız (örn. önceki cevabı yeniden yazmak yerine save_answer).
+    require_tools: tuple[str, ...] = ()
+    # prompt bir listeyse: True → hepsi AYNI sohbette sırayla (çok turlu sohbet);
+    # False → her biri yeni sohbet, ortak hafızayla (memory_fact ailesi).
+    same_chat: bool = False
 
 
 @dataclass
@@ -75,6 +80,21 @@ class Family:
 def variant(rng: random.Random, options: list | tuple):
     """Ailenin ana varyantını örnek sırasına göre seçer (aynı soru tekrar etmesin diye)."""
     return options[getattr(rng, "instance", 0) % len(options)]
+
+
+def split_pool(rng: random.Random, items: list) -> list:
+    """Sabit bir soru listesinin ölçüme ya da eğitime ayrılmış kısmı (rng.purpose'a göre).
+
+    Rastgele dosyalarla kurulan görevlerde ölçüm ve eğitim görevleri kendiliğinden farklıdır; listeden
+    seçilen sorularda aynı soru iki tarafa da düşebilir (sızıntı). Bölünme sorunun metnine göre
+    kararlıdır: her üç sorudan ~biri ölçüm, gerisi eğitim; iki taraf hiç kesişmez.
+    """
+    def is_eval(item) -> bool:
+        key = item[0] if isinstance(item, tuple) else item
+        return int(hashlib.sha1(key.encode("utf-8")).hexdigest(), 16) % 3 == 0
+
+    want_eval = getattr(rng, "purpose", "bench") == "bench"
+    return [x for x in items if is_eval(x) == want_eval]
 
 
 def split_for(task_id: str) -> str:
@@ -224,18 +244,22 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
     prompts = task.prompt if isinstance(task.prompt, list) else [task.prompt]
     start = time.perf_counter()
     answer, error, calls, steps, tools, sessions = "", "", 0, 0, [], []
-    for p in prompts:
-        agent = build_agent(s, client, memory=True,
-                            permission_mode="trust" if task.approval == "trust" else "normal")
-        if agent.memory:
-            agent.memory.auto_learn = False  # ölçüm sırasında beceri öğrenme kapalı (görevler birbirini etkilemesin)
-        repl = QuietRepl(s, agent, approval=task.approval, root=task.root)
+    agent = None
+    for i, p in enumerate(prompts):
+        if agent is None or not task.same_chat:
+            agent = build_agent(s, client, memory=True,
+                                permission_mode="trust" if task.approval == "trust" else "normal")
+            if agent.memory:
+                agent.memory.auto_learn = False  # ölçüm sırasında beceri öğrenme kapalı (görevler birbirini etkilemesin)
+            repl = QuietRepl(s, agent, approval=task.approval, root=task.root)
         try:
             answer = agent.run(p, repl) or ""
         except LLMError as e:
             error = str(e)
         except Exception as e:  # ölçüm devam etsin
             error = f"{type(e).__name__}: {e}"
+        if task.same_chat and i < len(prompts) - 1:
+            continue  # aynı sohbet sürüyor: istatistik ve döküm sohbet bitince bir kez
         hist = agent.conversation.history
         calls += sum(len(m.get("tool_calls") or []) for m in hist)
         steps += sum(1 for m in hist if m["role"] == "assistant")
@@ -270,6 +294,9 @@ def apply_tool_limit(task: Task, ok: bool, note: str, tools: list[str]) -> tuple
     """Görevin araç sınırı aşıldıysa (örn. araç gerekmeyen soruda araç çağrıldıysa) başarısız say."""
     if task.max_tools is not None and len(tools) > task.max_tools:
         return False, f"gereksiz araç ({len(tools)} > {task.max_tools}): {', '.join(tools)} | {note}"
+    missing = [t for t in task.require_tools if t not in tools]
+    if missing:
+        return False, f"beklenen araç kullanılmadı: {', '.join(missing)} (kullanılan: {', '.join(tools) or '-'}) | {note}"
     return ok, note
 
 

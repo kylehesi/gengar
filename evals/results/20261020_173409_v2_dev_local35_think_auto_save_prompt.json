@@ -1,0 +1,103 @@
+{
+  "profile": "local35",
+  "model": "ollama_chat/qwen3.5:9b",
+  "think": "auto",
+  "split": "dev",
+  "seed": 1000,
+  "commit": "f8c185c",
+  "date": "2026-10-20T17:30:06",
+  "num_ctx": 16384,
+  "label": "v2 dev local35 think=auto save_prompt",
+  "passed": 1,
+  "total": 5,
+  "seconds": 243.0,
+  "results": [
+    {
+      "id": "save_answer_md_0",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | liste.md, 1570 karakter",
+      "seconds": 54.4,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Liste dosyası başarıyla kaydedildi: `C:\\gengar\\data\\bench2\\save_answer_md_0\\liste.md`",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_3",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | duogun_gunu_partisi.md, 2274 karakter",
+      "seconds": 71.1,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Tamam! 📝 Doğum günü partisi hazırlık ve alışveriş listesi `C:\\gengar\\data\\bench2\\save_answer_md_3\\` klasörüne `duogun_gunu_partisi.md` dosyası olarak kaydedildi.",
+      "tools": [
+        "write_file"
+      ]
+    },
+    {
+      "id": "save_answer_md_4",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "dosya içeriği eksik (270 karakter, 'python' bekleniyor)",
+      "seconds": 51.0,
+      "tool_calls": 3,
+      "steps": 5,
+      "error": "",
+      "answer": "Tamam! ✅ Python çalışma planını **Markdown formatında** `C:\\gengar\\data\\bench2\\save_answer_md_4\\python-calisma-plani.md` dosyasına kaydettim. \n\nDaha önce oluşturduğum txt versiyonunu da silmek ister misin yoksa ikisini de tutup mu? 🐍",
+      "tools": [
+        "write_file",
+        "list_directory",
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_6",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": true,
+      "note": "liste.md, 1252 karakter",
+      "seconds": 18.8,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Liste C:\\gengar\\data\\bench2\\save_answer_md_6\\liste.md dosyasına başarıyla kaydedildi.",
+      "tools": [
+        "save_answer"
+      ]
+    },
+    {
+      "id": "save_answer_md_7",
+      "family": "save_answer_md",
+      "category": "files",
+      "split": "dev",
+      "difficulty": 2,
+      "ok": false,
+      "note": "beklenen araç kullanılmadı: save_answer (kullanılan: write_file) | nagular_parti_yonlendirme.md, 1408 karakter",
+      "seconds": 47.7,
+      "tool_calls": 1,
+      "steps": 3,
+      "error": "",
+      "answer": "Tamam! İçerik C:\\gengar\\data\\bench2\\save_answer_md_7 klasörüne `nagular_parti_yonlendirme.md` dosyası olarak kaydedildi. \n\n**Kayıt bilgisi:** 1 KB boyutunda bir Markdown dosyası oluşturuldu.",
+      "tools": [
+        "write_file"
+      ]
+    }
+  ]
+}

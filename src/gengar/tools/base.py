@@ -110,10 +110,17 @@ class ToolRegistry:
         for t in tools or []:
             self.register(t)
 
-    def register(self, tool: Tool) -> None:
+    def register(self, tool: Tool, before: str | None = None) -> None:
+        """Aracı ekler. `before` verilirse o aracın hemen önüne: küçük modeller listede önce gelen
+        araçları tercih ediyor, sıra davranışı değiştiriyor (ölçüm: save_answer en sonda 0/5)."""
         if tool.name in self._tools:
             raise ValueError(f"araç zaten kayıtlı: {tool.name}")
-        self._tools[tool.name] = tool
+        if before is None or before not in self._tools:
+            self._tools[tool.name] = tool
+            return
+        items = list(self._tools.items())
+        i = next(i for i, (name, _) in enumerate(items) if name == before)
+        self._tools = dict(items[:i] + [(tool.name, tool)] + items[i:])
 
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)

@@ -62,10 +62,16 @@ sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. O
       mesajına "N önceki tur gizli, son gizli cevap şöyle başlıyor…, save_answer kaydedebilir" notu ekleniyor.
 
 **Açık kalanlar:**
-- [ ] 9B, "bunları .md kaydet" denince `save_answer` yerine yine `write_file` ile yeniden yazmayı seçti
-      (4.099 token, 135 sn; sığdığı için başarılı). Olası nedenler: araç listede en sonda (küçük modeller
-      öndeki araçları tercih ediyor), eğitim alışkanlığı. Denenebilir: aracı write_file'ın hemen yanına
-      almak; "önceki cevabı kaydet" ölçüm ailesi; bir sonraki veri üretiminde öğretmen örnekleri.
+- [ ] 9B, "bunları .md kaydet" denince `save_answer` yerine `write_file` ile yeniden yazmayı seçiyor.
+      Ölçüm ailesi `save_answer_md` (iki turlu, aynı sohbet, `require_tools`), dev 5 görev:
+      başlangıç (araç en sonda) **0/5** → araç write_file'ın önünde **1/5** (gürültü sınırı; tutuldu)
+      → + somut prompt kuralı **1/5** (etkisiz; geri alındı). `save_answer` seçildiğinde kayıt ~20 sn,
+      write_file ile 37–76 sn. Sıradaki adaylar: kural tabanlı yönlendirme (kullanıcı "kaydet" deyip yeni
+      içerik istemiyorsa Gengar modele ipucu verir), sonraki veri üretiminde öğretmen örnekleri.
+- [ ] **İstenmeyen yan etki:** "8 maddelik plan yaz" isteğinde 9B planı sohbete yazmak yerine kendi
+      kararıyla kullanıcının masaüstüne dosya olarak kaydetti (save_answer_md_4, 2026-10-20 17:32; ölçüm
+      onayları otomatik olduğu için gerçekten yazıldı, sonra geri dönüşüm kutusuna atıldı). Gerçek
+      kullanımda onay sorulurdu, ama model istenmeyen eyleme girişiyor. Dev'de benzerini ara.
 - [ ] Bağlam kırpma stratejisi: şu an önce en eski tur *bütünüyle* atılıyor, araç çıktıları ancak tek tur
       kalınca kısaltılıyor. Önce eski turların araç çıktılarını (web sayfaları en büyükleri) kısaltmak daha
       az bilgi kaybettirir.
