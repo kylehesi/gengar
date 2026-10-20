@@ -36,6 +36,10 @@ MAX_EMPTY_RETRIES = 2
 CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
 FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you already have above, write your "
                 "final answer to the user's request now. Do not redo the work.")
+# Model hata verince isteğin yanına geçmişe yazılır; "tekrar dene" denince model neyin yarım kaldığını görür.
+FAILED_NOTE = "(Gengar: Bu isteğe yanıt üretilemedi, iş yapılmadı. Hata:"
+# Kayıt dosyasına yazılan cevabın en fazla uzunluğu (karakter).
+MAX_LOGGED_ANSWER = 4000
 CLAIMED = ("[Gengar] Your answer says something was created, saved, changed or deleted, but nothing was "
            "changed in this turn: no tool that writes or deletes succeeded. If the task needs it, do it now "
            "with the tools (e.g. write_file); otherwise correct your answer and say plainly what was and was "
@@ -135,13 +139,23 @@ class Agent:
         self.audit.record("user", text=user_text, profile=self.client.profile.name)
         try:
             answer = self._loop(ui)
-        except (LLMError, KeyboardInterrupt):
+        except LLMError as e:
+            # İstek geçmişte KALIR, yanına hata notu düşülür. Eskiden hiçbir şey yapılmadan biten istek
+            # siliniyordu; kullanıcı "tekrar dene" deyince model bir ÖNCEKİ isteği tekrar ediyordu
+            # (2026-10-20: ".md kaydet" zaman aşımına uğradı, "tekrar dene" fikirleri yeniden yazdırdı).
+            self.conversation.close_pending_tool_calls()
+            self.conversation.add_assistant(f"{FAILED_NOTE} {e})")
+            self.audit.record("llm_error", error=str(e), cause=type(e.__cause__).__name__)
+            raise
+        except KeyboardInterrupt:
             if len(self.conversation.history) == mark + 1:
-                self.conversation.truncate(mark)  # hiçbir şey olmadan bitti: isteği geri al
+                self.conversation.truncate(mark)  # kullanıcı vazgeçti, hiçbir şey olmadı: isteği geri al
             else:
                 self.conversation.close_pending_tool_calls()
+            self.audit.record("interrupted")
             raise
 
+        self.audit.record("answer", text=answer[:MAX_LOGGED_ANSWER])
         self.last_turn = self.conversation.history[mark:]
         if self.memory:
             self._ensure_remembered(user_text, ui)

@@ -81,10 +81,10 @@ def test_repl_ask_records_reply(tmp_path):
     assert "Merhaba" in out.getvalue()
 
 
-def test_repl_error_drops_user_message(tmp_path):
+def test_repl_error_keeps_user_message_with_note(tmp_path):
     repl, out = make_repl([LLMError("bağlanılamadı")], tmp_path)
     repl.ask("selam")
-    assert repl.agent.conversation.history == []
+    assert [m["role"] for m in repl.agent.conversation.history] == ["user", "assistant"]
     assert "bağlanılamadı" in out.getvalue()
 
 

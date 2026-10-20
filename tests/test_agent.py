@@ -73,7 +73,7 @@ def test_denied_action_is_reported_to_model(tmp_path):
     assert agent.conversation.history[2]["content"] == DENIED
     assert ("confirm", "system", Risk.SYSTEM, False) in ui.events
     assert not any(e[0] == "start" for e in ui.events)
-    assert audit_entries(agent)[-1]["decision"] == "denied"
+    assert [e for e in audit_entries(agent) if e["event"] == "tool"][-1]["decision"] == "denied"
 
 
 def test_session_grant_skips_next_confirmation(tmp_path):
@@ -246,11 +246,25 @@ def test_step_limit(tmp_path):
     assert "Adım sınırına" in result
 
 
-def test_llm_error_on_first_step_rolls_back(tmp_path):
-    agent, _ = make_agent([LLMError("bağlantı yok")], tmp_path)
+def test_llm_error_keeps_request_with_note(tmp_path):
+    # İstek silinmez: "tekrar dene" denince model yarım kalan isteği görmeli (2026-10-20 olayı).
+    agent, client = make_agent([LLMError("Yanıt 120 sn içinde gelmedi."), ("Tamam.", [])], tmp_path)
     with pytest.raises(LLMError):
-        agent.run("selam", RecordingUI())
-    assert agent.conversation.history == []
+        agent.run("bunu .md olarak kaydet", RecordingUI())
+    assert roles(agent) == ["user", "assistant"]
+    assert "yanıt üretilemedi" in agent.conversation.history[1]["content"]
+    assert [e["event"] for e in audit_entries(agent)][-1] == "llm_error"
+
+    agent.run("tekrar dene", RecordingUI())
+    sent = [m["content"] for m in client.requests[-1] if m["role"] == "user"]
+    assert sent == ["bunu .md olarak kaydet", "tekrar dene"]
+
+
+def test_answer_is_logged(tmp_path):
+    agent, _ = make_agent([("Merhaba!", [])], tmp_path)
+    agent.run("selam", RecordingUI())
+    last = audit_entries(agent)[-1]
+    assert last["event"] == "answer" and last["text"].strip() == "Merhaba!"
 
 
 def test_interrupt_mid_run_keeps_history_valid(tmp_path):
