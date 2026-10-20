@@ -39,15 +39,36 @@ fikri için ayrı, ayrıntılı bir yapı kurmaya** başladı.
 **Kayıt eksikliği:** Kayıt dosyası asistanın *cevaplarını* ve model hatalarını tutmuyor; sohbet de yeni
 sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. Olayı tam yeniden kuramıyoruz.
 
-**Nasıl inceleriz:**
-- [ ] Kayıt dosyasına asistan cevaplarını ve model hatalarını (`LLMError` türü + mesajı) ekle; bu olayın
-      bir daha "kanıtsız" kalmaması için ilk iş bu.
-- [ ] Tekrar üret: uzun bir cevaptan sonra "bunu masaüstüne .md kaydet" (dev senaryosu olarak). Hata
-      türünü gör: zaman aşımı mı, bağlantı mı?
-- [ ] Zaman aşımı nedeniyse: toplam süre yerine "token gelmeyen süre" sınırı (akış devam ettikçe kesme),
-      ve zaman aşımı mesajını bağlantı hatasından ayır.
-- [ ] Not: artık `/export` komutu sohbeti modelsiz, anında Markdown'a döküyor; ama "kaydet" isteği
-      modelle de çalışmalı.
+**İnceleme (2026-10-20) — çözüldü:**
+- [x] Kayda asistan cevapları (`answer`) ve model hataları (`llm_error`, neden türüyle) eklendi.
+- [x] **Yeniden üretildi, mekanizma ölçüldü.** Ollama araç çağrısını bitene kadar biriktirip tek seferde
+      gönderiyor: 1.383 tokenlık `write_file` = **45 sn hiç veri gelmedi** (düz metin yazarken en uzun
+      sessizlik ~7 sn). Sınır *toplam* süre değil *sessizlik* süresi: sınır 20 sn'ye indirilince 104 sn
+      süren metin cevabı kesilmedi, `write_file` tam 20. sn'de kesildi (`litellm.Timeout`).
+- [x] **Niyet kayması bizim hatamızdı:** hata veren istek geçmişten siliniyordu (`Agent.run →
+      truncate`); "tekrar dene" bir önceki isteği tekrar ettirdi. Artık istek "(yanıt üretilemedi, hata:
+      …)" notuyla geçmişte kalıyor.
+- [x] Yerel modellerde sessizlik sınırı 600 sn (`[llm] local_timeout`); API'lerde 120 sn. Hata mesajı ne
+      olduğunu ve ne yapılacağını söylüyor.
+- [x] Terminal 15 sn sessizlikte "model çalışıyor… uzun bir dosya yazıyor olabilir" uyarısı veriyor
+      (onay sorusunda kullanıcıyı beklerken susuyor).
+- Not: `/export` sohbeti modelsiz, anında Markdown'a döküyor.
+- [x] **İkinci kök neden: bağlam sınırı.** Uzun cevabı `write_file` ile yeniden yazmak 16k pencereye
+      sığmadı (11.8k girdi + ~4.9k çıktı); üretim yarıda kesildi (`finish_reason=length`), yarım araç
+      çağrısı hiç gelmedi, Gengar "boş cevap" sanıp 2 kez daha denedi (3 × 165 sn). Artık kesilme tanınıyor,
+      tekrar denenmiyor, ne olduğu söyleniyor (`TRUNCATED`).
+- [x] `save_answer` aracı: önceki cevap(lar)ı yeniden yazdırmadan, tam geçmişten birebir kopyalar.
+- [x] Bağlam kırpılınca model gizlenen turlardan habersizdi ("veri yok, neyi kaydedeyim?"). Artık sistem
+      mesajına "N önceki tur gizli, son gizli cevap şöyle başlıyor…, save_answer kaydedebilir" notu ekleniyor.
+
+**Açık kalanlar:**
+- [ ] 9B, "bunları .md kaydet" denince `save_answer` yerine yine `write_file` ile yeniden yazmayı seçti
+      (4.099 token, 135 sn; sığdığı için başarılı). Olası nedenler: araç listede en sonda (küçük modeller
+      öndeki araçları tercih ediyor), eğitim alışkanlığı. Denenebilir: aracı write_file'ın hemen yanına
+      almak; "önceki cevabı kaydet" ölçüm ailesi; bir sonraki veri üretiminde öğretmen örnekleri.
+- [ ] Bağlam kırpma stratejisi: şu an önce en eski tur *bütünüyle* atılıyor, araç çıktıları ancak tek tur
+      kalınca kısaltılıyor. Önce eski turların araç çıktılarını (web sayfaları en büyükleri) kısaltmak daha
+      az bilgi kaybettirir.
 
 ## 2. Reddedilen silmeyi aynen tekrar deneme + uzun düşünme zaman aşımı (dev)
 

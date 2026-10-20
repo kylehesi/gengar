@@ -138,3 +138,63 @@ def test_repl_commands(tmp_path):
     assert repl.handle_command("/model yok")
     assert "profil yok" in out.getvalue()
     assert not repl.handle_command("/exit")
+
+
+def test_repl_warns_during_long_silence(tmp_path, monkeypatch):
+    # Ollama araç çağrısını bitene kadar biriktiriyor: uzun dosya yazılırken ekrana hiçbir şey gelmez.
+    import time
+
+    from gengar.ui import repl as repl_module
+
+    monkeypatch.setattr(repl_module, "SILENCE_NOTICE", 1)
+
+    class SlowClient(ScriptedClient):
+        def stream_chat(self, messages, tools=None):
+            time.sleep(2.5)
+            yield from super().stream_chat(messages, tools)
+
+    out = io.StringIO()
+    agent = Agent(SlowClient([("Bitti.", [])]), default_registry(), PermissionPolicy("normal"),
+                  AuditLog(tmp_path), Conversation("SYS"))
+    Repl(load_settings(), agent, out=out, read=lambda _: "").ask("uzun bir dosya yaz")
+    text = out.getvalue()
+    assert "model çalışıyor" in text and text.index("model çalışıyor") < text.index("Bitti.")
+
+
+def test_repl_no_warning_while_waiting_for_user(tmp_path, monkeypatch):
+    import time
+
+    from gengar.ui import repl as repl_module
+
+    monkeypatch.setattr(repl_module, "SILENCE_NOTICE", 1)
+    answers = ["h"]
+
+    def slow_read(_):
+        time.sleep(2.5)  # kullanıcı onay sorusunu düşünüyor
+        return answers.pop(0)
+
+    out = io.StringIO()
+    steps = [("", [call("run_powershell", command="Stop-Process -Name notepad")]), ("Peki.", [])]
+    agent = Agent(ScriptedClient(steps), default_registry(), PermissionPolicy("normal"),
+                  AuditLog(tmp_path), Conversation("SYS"))
+    Repl(load_settings(), agent, out=out, read=slow_read).ask("not defterini kapat")
+    assert "model çalışıyor" not in out.getvalue()
+
+
+def test_hidden_turns_are_announced():
+    conv = Conversation("SYS", max_messages=40)
+    conv.add_user("12 proje fikri öner")
+    conv.add_assistant("# Nörobilim proje fikirleri\n" + "uzun açıklama " * 3000)
+    conv.add_user("bunları .md olarak kaydet")
+    msgs = conv.messages(max_chars=5000)
+    assert [m["role"] for m in msgs] == ["system", "user"]  # önceki tur sığmadı
+    assert "1 earlier turn(s)" in msgs[0]["content"] and "# Nörobilim proje fikirleri" in msgs[0]["content"]
+    assert "save_answer" in msgs[0]["content"]
+
+
+def test_no_note_when_everything_fits():
+    conv = Conversation("SYS")
+    conv.add_user("selam")
+    conv.add_assistant("merhaba")
+    conv.add_user("nasılsın")
+    assert conv.messages(max_chars=50_000)[0]["content"] == "SYS"

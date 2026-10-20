@@ -9,7 +9,7 @@ from .config import Settings
 from .core import Agent, AuditLog, Conversation, PermissionPolicy, render_system_prompt
 from .llm import LLMClient
 from .memory import Embedder, Learner, MemoryStore, MemorySystem
-from .tools import default_registry
+from .tools import default_registry, files
 
 
 def build_memory(settings: Settings, client: LLMClient) -> MemorySystem:
@@ -29,6 +29,8 @@ def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
         render_system_prompt(settings.system_prompt_path, workspace=settings.workspace),
         max_messages=settings.max_history_messages,
     )
+    # Önceki cevabı yeniden yazdırmadan dosyaya kaydeder; sohbet geçmişine eriştiği için burada kurulur.
+    tools.register(files.make_save_answer(lambda: conversation.history))
     return Agent(client, tools, PermissionPolicy(permission_mode or settings.permission_mode),
                  AuditLog(settings.log_dir), conversation, max_steps=settings.max_steps,
                  memory=memory_system, think=think or settings.think)

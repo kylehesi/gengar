@@ -135,15 +135,38 @@ class Conversation:
 
         system = self.system_message
         if max_chars is not None:
-            budget = max_chars - len(system)
-            while sum(map(_size, recent)) > budget and _count_users(recent) > 1:
-                recent = _from_first_user(recent[1:])
-            if sum(map(_size, recent)) > budget:
-                recent = _shrink_tool_outputs(recent, budget)
+            budget = max_chars - len(system) - HIDDEN_NOTE_RESERVE
+            kept = recent
+            while sum(map(_size, kept)) > budget and _count_users(kept) > 1:
+                kept = _from_first_user(kept[1:])
+            if sum(map(_size, kept)) > budget:
+                kept = _shrink_tool_outputs(kept, budget)
+            hidden = recent[:len(recent) - len(kept)] if len(kept) < len(recent) else []
+            if hidden:
+                # Model gizlenen turlardan habersiz kalmasın: "bunları kaydet" denince "veri yok" diyordu
+                # (2026-10-20: 9.300 tokenlık cevap sonraki turda sığmadı, tur bütünüyle atıldı).
+                system = f"{system}\n\n{_hidden_note(hidden)}"
+            recent = kept
 
         # "_" ile başlayan alanlar (örn. _reasoning) sadece döküm/eğitim içindir, modele gönderilmez.
         recent = [{k: v for k, v in m.items() if not k.startswith("_")} for m in recent]
         return [{"role": "system", "content": system}, *recent]
+
+
+HIDDEN_NOTE_RESERVE = 600  # gizlenen turlar notu için bütçeden ayrılan pay (karakter)
+
+
+def _hidden_note(hidden: list[dict[str, Any]]) -> str:
+    turns = _count_users(hidden)
+    last = next((m["content"].strip() for m in reversed(hidden) if m["role"] == "assistant"
+                 and not m.get("tool_calls") and (m.get("content") or "").strip()), "")
+    start = " ".join(last.split())[:200]
+    note = (f"Note: {turns} earlier turn(s) of this conversation are hidden to fit the context window; the user "
+            "may still refer to them.")
+    if start:
+        note += (f" Your last hidden answer started with: \"{start}…\". To save hidden answers to a file, call "
+                 "save_answer: it copies them from the full history.")
+    return note
 
 
 def _from_first_user(msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:

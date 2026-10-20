@@ -45,6 +45,7 @@ class Settings:
     system_prompt_path: Path
     max_history_messages: int
     timeout: float
+    local_timeout: float
     max_steps: int
     think: str
     permission_mode: str
@@ -110,6 +111,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         system_prompt_path=PROJECT_ROOT / llm.get("system_prompt", "config/prompts/system.md"),
         max_history_messages=int(llm.get("max_history_messages", 40)),
         timeout=float(llm.get("timeout", 120)),
+        local_timeout=float(llm.get("local_timeout", 600)),
         max_steps=int(raw.get("agent", {}).get("max_steps", 15)),
         think=raw.get("agent", {}).get("think", "auto"),
         permission_mode=raw.get("permissions", {}).get("mode", "normal"),

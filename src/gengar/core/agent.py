@@ -38,6 +38,9 @@ FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you 
                 "final answer to the user's request now. Do not redo the work.")
 # Model hata verince isteğin yanına geçmişe yazılır; "tekrar dene" denince model neyin yarım kaldığını görür.
 FAILED_NOTE = "(Gengar: Bu isteğe yanıt üretilemedi, iş yapılmadı. Hata:"
+TRUNCATED = ("(Gengar: Model yanıtı bağlam sınırına takılıp yarıda kesildi; iş tamamlanmadı. Daha önce yazılmış "
+             "uzun bir cevabı kaydetmek için \"önceki cevabını kaydet\" deyin (save_answer, yeniden yazmadan kopyalar); "
+             "sohbet çok uzadıysa /new ile yeni sohbet açın ya da isteği parçalara bölün.)")
 # Kayıt dosyasına yazılan cevabın en fazla uzunluğu (karakter).
 MAX_LOGGED_ANSWER = 4000
 CLAIMED = ("[Gengar] Your answer says something was created, saved, changed or deleted, but nothing was "
@@ -241,6 +244,14 @@ class Agent:
                 # Düşünme açıkken qwen3.5 bu sorunu çok daha sık yaşıyor (veri üretiminde oturumların
                 # yarısından fazlası); cevap düşünce kısmında kalıyor. İlk tekrar: aynı adım, düşünme
                 # kapalı, uyarı mesajı eklemeden (döküm temiz kalsın). Sonra: açık uyarıyla.
+                # Bağlam sınırında kesildi: yarım araç çağrısı hiç gelmez, cevap boş görünür. Tekrar denemek
+                # aynı yere takılır (2026-10-20: 3 × 165 sn boşa gitti), açıkça söyle ve bitir.
+                if getattr(self.client, "last_finish_reason", None) == "length":
+                    self.audit.record("truncated", chars=len(text))
+                    self.conversation.history.pop()
+                    text = (text.rstrip() + "\n\n" if text.strip() else "") + TRUNCATED
+                    self.conversation.add_assistant(text)
+                    return text
                 if not text.strip():
                     self.conversation.history.pop()  # boş asistan mesajını geçmişte bırakma
                     if empty_retries < MAX_EMPTY_RETRIES:

@@ -153,6 +153,7 @@ class LLMClient:
         self.reasoning_override: str | None = None  # /think ile oturum boyunca değişir
         self.last_stats: Stats | None = None
         self.last_tool_calls: list[ToolCall] = []
+        self.last_finish_reason: str | None = None
         self._last_request: dict[str, float] = {}  # profil → son istek zamanı (rpm için)
 
     def _check(self, name: str) -> Profile:
@@ -186,6 +187,11 @@ class LLMClient:
         n = self.profile.options.get("num_ctx")
         return int(n) if n else None
 
+    @property
+    def timeout(self) -> float:
+        """Modelden hiç veri gelmeden beklenecek en uzun süre (yerel modelde daha uzun, bkz. settings.toml)."""
+        return self.settings.local_timeout if self.profile.is_local else self.settings.timeout
+
     def _request_args(self, messages: list[dict], tools: list[dict] | None,
                       json_mode: bool = False) -> dict[str, Any]:
         args: dict[str, Any] = {
@@ -194,7 +200,7 @@ class LLMClient:
             "messages": messages,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "timeout": self.settings.timeout,
+            "timeout": self.timeout,
         }
         if self.profile.is_local:
             args["api_base"] = self.settings.ollama_host
@@ -212,6 +218,8 @@ class LLMClient:
         litellm = _get_litellm()
         self.last_stats = None
         self.last_tool_calls = []
+        # "length": yanıt bağlam/uzunluk sınırında kesildi (yarım araç çağrısı hiç gelmez, cevap boş görünür).
+        self.last_finish_reason: str | None = None
         yield from self._pace()
         start = time.perf_counter()
         first: float | None = None
@@ -227,6 +235,9 @@ class LLMClient:
                         tokens = usage.completion_tokens
                     if not chunk.choices:
                         continue
+                    finish = getattr(chunk.choices[0], "finish_reason", None)  # her parçada/sağlayıcıda olmayabilir
+                    if finish:
+                        self.last_finish_reason = finish
                     delta = chunk.choices[0].delta
                     thinking = getattr(delta, "reasoning_content", None)
                     text = getattr(delta, "content", None)
@@ -336,7 +347,11 @@ def _translate(e: Exception, profile: Profile, settings: Settings) -> LLMError:
             return LLMError(f"[{name}] Model indirilmemiş. Çalıştırın: ollama pull {model}")
         return LLMError(f"[{name}] Model bulunamadı: {profile.model} (settings.toml'u kontrol edin)")
     if isinstance(e, litellm.Timeout):
-        return LLMError(f"[{name}] Yanıt {settings.timeout:.0f} sn içinde gelmedi.")
+        limit = settings.local_timeout if profile.is_local else settings.timeout
+        return LLMError(f"[{name}] Model {limit:.0f} sn boyunca hiç veri göndermedi, istek kesildi. Çok uzun bir "
+                        f"cevap ya da dosya içeriği yazıyor olabilir: isteği bölün (örn. önce ilk yarısını "
+                        f"kaydet) ya da settings.toml'daki {'local_timeout' if profile.is_local else 'timeout'} "
+                        f"değerini artırın. İstek sohbette duruyor; 'tekrar dene' diyebilirsiniz.")
     if isinstance(e, litellm.APIConnectionError):
         if profile.is_local:
             return LLMError(f"[{name}] Ollama'ya bağlanılamadı ({settings.ollama_host}). Ollama açık mı?")

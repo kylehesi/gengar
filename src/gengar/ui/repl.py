@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+import time
+import threading
+import time
 from collections.abc import Callable
 from typing import TextIO
 
@@ -43,6 +47,12 @@ Komutlar:
 Ctrl+C yanıt ya da komut sürerken basılırsa yalnızca o işlemi durdurur."""
 
 
+# Model bu kadar saniye hiç veri göndermezse kullanıcıya "çalışıyor" uyarısı (sonra her SILENCE_REPEAT'te bir).
+# Ollama araç çağrısını bitene kadar biriktiriyor: uzun bir dosya yazılırken dakikalarca sessizlik olabilir.
+SILENCE_NOTICE = 15
+SILENCE_REPEAT = 60
+
+
 def _preview(text: str, lines: int = 4, width: int = 160) -> str:
     rows = text.strip().splitlines()
     shown = [r if len(r) <= width else r[:width] + "…" for r in rows[:lines]]
@@ -67,10 +77,34 @@ class Repl:
         self._thinking_open = False
         self._thinking_chars = 0
         self._line_open = False
+        # Sessizlik bekçisi: Gengar çalışırken (ask) uzun süre ekrana bir şey yazılmazsa haber verir.
+        self._lock = threading.Lock()
+        self._busy = False
+        self._last_activity = time.monotonic()
+        self._watcher: threading.Thread | None = None
 
     def print(self, text: str = "", end: str = "\n") -> None:
-        self.out.write(text + end)
-        self.out.flush()
+        with self._lock:
+            self.out.write(text + end)
+            self.out.flush()
+            self._last_activity = time.monotonic()
+
+    def _watch_silence(self) -> None:
+        notices = 0
+        while True:
+            time.sleep(1)
+            quiet = time.monotonic() - self._last_activity
+            if not self._busy or quiet < SILENCE_NOTICE:
+                notices = 0
+                continue
+            if quiet >= SILENCE_NOTICE + notices * SILENCE_REPEAT:
+                notices += 1
+                with self._lock:
+                    newline = "\n" if self._line_open else ""
+                    self._line_open = False
+                    self.out.write(f"{newline}{DIM}(model çalışıyor: {quiet:.0f} sn'dir veri gelmedi. Uzun bir "
+                                   f"cevap ya da dosya içeriği yazıyor olabilir; durdurmak için Ctrl+C){RESET}\n")
+                    self.out.flush()  # _last_activity güncellenmez: bu uyarı bir etkinlik değil
 
     def banner(self) -> None:
         p = self.client.profile
@@ -228,6 +262,11 @@ class Repl:
     # --- sohbet ---------------------------------------------------------
 
     def ask(self, text: str) -> None:
+        if self._watcher is None:
+            self._watcher = threading.Thread(target=self._watch_silence, daemon=True)
+            self._watcher.start()
+        self._last_activity = time.monotonic()
+        self._busy = True
         try:
             self.agent.run(text, self)
         except KeyboardInterrupt:
@@ -236,6 +275,8 @@ class Repl:
         except LLMError as e:
             self._close_line()
             self.print(f"{RED}{e}{RESET}")
+        finally:
+            self._busy = False
         self.save_chat()
 
     # --- sohbet geçmişi ---------------------------------------------------
@@ -355,6 +396,14 @@ class Repl:
         self.print(f"{color}{_preview(output)}{RESET}")
 
     def confirm(self, tool: Tool, summary: str, risk: Risk, can_grant: bool) -> Answer:
+        busy, self._busy = self._busy, False  # kullanıcının cevabını beklerken bekçi susar
+        try:
+            return self._confirm(tool, summary, risk, can_grant)
+        finally:
+            self._busy = busy
+            self._last_activity = time.monotonic()
+
+    def _confirm(self, tool: Tool, summary: str, risk: Risk, can_grant: bool) -> Answer:
         color = RISK_COLOR[risk]
         self.print(f"{color}{BOLD}Onay gerekiyor ({risk.label}){RESET} — {tool.name}:")
         for row in summary.strip().splitlines() or [""]:

@@ -420,6 +420,12 @@ Kullanıcı "çalışma programı içindeki Türkçe dosyaları sil" dedi. Kaste
 - **Bir tuzak öğrendik:** Ollama'yı yeniden başlatırken eski `llama-server` süreçleri arkada kalırsa VRAM'i
   tutuyorlar ve hız 32'den 7 token/sn'ye düşüyor. İlk KV testi bu yüzden geçersizdi; temiz ortamda tekrarladık.
   *Ölçerken ortamın temiz olduğundan emin ol.*
+- **Sessizlik sınırı (2026-10-20 olayı).** Akışlı yanıtta zaman aşımı *toplam süre* değil, *hiç veri gelmeyen
+  süre*: cevap aktıkça kesilmez. Ama Ollama araç çağrısını bitene kadar biriktiriyor. Model uzun bir dosya
+  içeriğini `write_file` ile yazarken dakikalarca hiçbir şey gelmiyor (ölçüm: 1.383 token = 45 sn sessizlik).
+  120 sn'lik sınır ~3.600 tokenlık dosyada istek kesiyordu. Çözüm: yerel modelde 600 sn (`local_timeout`) ve
+  15 sn sessizlikte kullanıcıya "model çalışıyor" uyarısı. Ollama kapalıysa bağlantı anında reddedilir, uzun
+  sınırı beklemek gerekmez.
 
 ---
 

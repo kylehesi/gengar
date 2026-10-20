@@ -8,8 +8,14 @@ default = "local35"
 system_prompt = "config/prompts/system.md"
 # Sohbet geçmişinde tutulan en fazla mesaj (sistem promptu hariç).
 max_history_messages = 40
-# Yanıt bekleme süresi (saniye).
+# Modelden hiç veri gelmeden beklenecek en uzun süre (saniye). Toplam süre değil, SESSİZLİK süresi:
+# yanıt akarken kesilmez. API modelleri için:
 timeout = 120
+# Yerel modeller (Ollama) için daha uzun: Ollama araç çağrısını bitene kadar biriktirip tek seferde
+# gönderiyor; model uzun bir dosya içeriği yazarken dakikalarca hiç veri gelmeyebilir (ölçüm,
+# 2026-10-20: 1.383 tokenlık write_file = 45 sn sessizlik; ~30 tok/sn'de 120 sn ≈ 3.600 token).
+# Ollama kapalıysa bağlantı anında reddedilir, bu süre beklenmez.
+local_timeout = 600
 
 # Her profil bir modeldir. "model" alanı LiteLLM formatındadır: "<sağlayıcı>/<model>".
 # key_env: o sağlayıcının API anahtarının .env içindeki adı (yerel modelde yok).

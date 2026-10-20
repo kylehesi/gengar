@@ -8,6 +8,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -258,3 +259,52 @@ TOOLS = [
         describe=lambda a: a.get("path", ""),
     ),
 ]
+
+
+# --- önceki cevabı kaydetme ----------------------------------------------------------
+# Neden ayrı araç: "bunu .md olarak kaydet" denince model önceki cevabını write_file ile token token
+# yeniden yazıyordu. Bu hem yavaş (7.680 tokenlık cevap ≈ 4 dk) hem riskli: 16k bağlam doluyor, üretim
+# yarıda kesiliyor ve hiçbir şey kaydedilmiyor (2026-10-20 ölçümü). Cevap zaten sohbet geçmişinde
+# harfi harfine duruyor; kopyayı model değil Gengar yapar: anında ve birebir.
+
+def previous_answers(history: list[dict], count: int) -> list[str]:
+    """Bu turdan ÖNCEKİ turların son `count` cevabı (Gengar'ın hata/uyarı notları hariç)."""
+    last_user = max((i for i, m in enumerate(history) if m["role"] == "user"), default=len(history))
+    answers = [m["content"].strip() for m in history[:last_user]
+               if m["role"] == "assistant" and not m.get("tool_calls")
+               and (m.get("content") or "").strip() and not m["content"].lstrip().startswith("(")]
+    return answers[-count:] if count > 0 else []
+
+
+def make_save_answer(history: Callable[[], list[dict]]) -> Tool:
+    def save_answer(path: str, answers: int = 1) -> str:
+        texts = previous_answers(history(), max(1, int(answers)))
+        if not texts:
+            raise ToolError("bu sohbette kaydedilecek önceki bir cevap yok")
+        p = resolve(path)
+        existed = p.exists()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("\n\n---\n\n".join(texts) + "\n", encoding="utf-8")
+        verb = "üzerine yazıldı" if existed else "oluşturuldu"
+        return f"{p} {verb} ({len(texts)} cevap, {_human(p.stat().st_size)}); içerik birebir kopyalandı"
+
+    return Tool(
+        name="save_answer",
+        description="Save your previous answer(s) in this conversation to a file exactly as written, without "
+                    "retyping them. Use this whenever the user asks to save or export something you already "
+                    "wrote (e.g. 'bunu .md olarak kaydet'); it is instant and never truncated. Use write_file "
+                    "only for new content.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": _path_arg("File path (absolute for the user's folders, e.g. on their Desktop)."),
+                "answers": {"type": "integer",
+                            "description": "How many of your latest answers to include, oldest first (default 1)."},
+            },
+            "required": ["path"],
+        },
+        risk=Risk.WRITE,
+        func=save_answer,
+        classify=write_risk,
+        describe=lambda a: f"{a.get('path', '')} (son {a.get('answers', 1)} cevap)",
+    )
