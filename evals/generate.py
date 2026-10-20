@@ -72,7 +72,8 @@ def main() -> None:
     only = [x for x in args.only.split(",") if x]
     if only:
         families = [f for f in families if f.name in only or f.category in only]
-    tasks = build_tasks(families, seed=args.seed, base=GEN_ROOT, instances=args.per_family)
+    tasks = build_tasks(families, seed=args.seed, base=GEN_ROOT, instances=args.per_family,
+                        purpose="train")
 
     TRAJ_ROOT.mkdir(parents=True, exist_ok=True)
     suffix = f"_{profile}_think-{args.mode}_seed{args.seed}.jsonl"

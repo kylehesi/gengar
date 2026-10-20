@@ -58,6 +58,9 @@ class Task:
     memory: bool = False
     cleanup: Callable[[], None] | None = None
     root: Path | None = None
+    # En fazla kaç araç çağrısına izin var? None: sınır yok. 0: araç gerekmeyen görev (notool ailesi);
+    # cevap doğru olsa bile araç çağrıldıysa başarısız sayılır.
+    max_tools: int | None = None
 
 
 @dataclass
@@ -80,8 +83,12 @@ def split_for(task_id: str) -> str:
 
 
 def build_tasks(families: list[Family], seed: int = 1000, base: Path = BENCH_ROOT,
-                instances: int | None = None) -> list[Task]:
-    """Ailelerden görevleri üretir. `instances` verilirse her aileden o kadar örnek (veri üretimi için)."""
+                instances: int | None = None, purpose: str = "bench") -> list[Task]:
+    """Ailelerden görevleri üretir. `instances` verilirse her aileden o kadar örnek (veri üretimi için).
+
+    purpose: "bench" (ölçüm) ya da "train" (eğitim verisi üretimi). Sabit soru listesinden seçen
+    aileler (örn. notool) bununla listeyi ikiye ayırır: ölçüm soruları asla eğitim verisine girmez.
+    """
     if base.exists():
         shutil.rmtree(base, ignore_errors=True)
     base.mkdir(parents=True)
@@ -91,6 +98,7 @@ def build_tasks(families: list[Family], seed: int = 1000, base: Path = BENCH_ROO
             task_id = f"{fam.name}_{i}"
             rng = random.Random(f"{seed}:{task_id}")
             rng.instance = i + seed  # variant() için; farklı tohumlar farklı varyant sırası verir
+            rng.purpose = purpose
             root = base / task_id
             root.mkdir(parents=True)
             t = fam.make(rng, root)
@@ -239,6 +247,7 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         ok, note = task.check(answer)
     except Exception as e:
         ok, note = False, f"doğrulama hatası: {type(e).__name__}: {e}"
+    ok, note = apply_tool_limit(task, bool(ok), str(note), tools)
     if error:
         ok = False
     if task.cleanup:
@@ -255,6 +264,13 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         with traj_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
     return result
+
+
+def apply_tool_limit(task: Task, ok: bool, note: str, tools: list[str]) -> tuple[bool, str]:
+    """Görevin araç sınırı aşıldıysa (örn. araç gerekmeyen soruda araç çağrıldıysa) başarısız say."""
+    if task.max_tools is not None and len(tools) > task.max_tools:
+        return False, f"gereksiz araç ({len(tools)} > {task.max_tools}): {', '.join(tools)} | {note}"
+    return ok, note
 
 
 def summarize(results: list[Result], label: str) -> dict[str, Any]:
