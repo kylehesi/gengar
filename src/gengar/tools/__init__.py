@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from . import apps, code, files, guard, powershell, settings, system, ui, versions, web
+from . import apps, code, files, guard, powershell, recycle, settings, system, ui, versions, web
 from .base import Risk, Tool, ToolError, ToolRegistry, set_working_dir
 
 if TYPE_CHECKING:
@@ -32,6 +32,7 @@ def default_registry(config: Settings | None = None) -> ToolRegistry:
         versions.TOOL,
         *web.TOOLS,
         *files.TOOLS,
+        *recycle.TOOLS,
         *code.make_tools(sandbox),
         powershell.make_tool(lambda: str(sandbox.ensure().parent)),
     ])

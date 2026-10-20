@@ -96,6 +96,12 @@ def check(tool_name: str, args: dict) -> str | None:
         if not _PS_DESTRUCTIVE.search(command):
             return None
         return _hit(command + "\n" + str(args.get("cwd") or ""))
+    if tool_name == "delete_files":
+        for p in args.get("paths") or []:
+            cand = _normalize(str(p))
+            if is_protected(Path(cand)):
+                return cand
+        return None
     if tool_name == "run_python":
         code = str(args.get("code") or "")
         file = str(args.get("file") or "")
