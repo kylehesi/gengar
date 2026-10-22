@@ -1,184 +1,137 @@
 # Gengar
 
-Windows için masaüstü asistanı (bitirme projesi, çalışma adı). İstenirse
-**yerel** bir dil modeliyle (Ollama), istenirse **API** üzerinden bulut
-modelleriyle çalışır. Bilgisayarda komut çalıştırabilir, dosya ve ayarları
-yönetebilir, bilmediğini web'de araştırıp öğrenebilir.
+**A Windows desktop assistant that actually does things on your computer — powered by a small local language
+model.**
 
-## Mimari
+Gengar runs a local LLM (Qwen3.5 9B via [Ollama](https://ollama.com)) or a cloud model through an API. Instead of
+guessing, it uses tools: it reads system information, opens and closes apps, changes settings, reads and writes
+files, runs PowerShell and Python, searches the web for things it doesn't know and remembers what it learns.
+Every action goes through a risk-based permission layer and is written to an audit log.
 
-```
-Arayüz (Textual text menü)
-        │
-Orkestratör ── agent döngüsü · izin/güvenlik katmanı · log
-        │
- ┌──────┼───────────────┬──────────────────┐
-LLM katmanı        Araçlar (MCP)        Hafıza
-LiteLLM            PowerShell, dosya,   sohbet, vektör DB,
-├ yerel: Ollama    Windows UI, web,     beceri kütüphanesi
-└ API: Gemini,     kod çalıştırma
-  DeepSeek, Claude
-```
+> Final-year capstone project (Information Systems and Technologies). Work in progress — it is being developed
+> step by step, and every step is measured. The interface and the assistant's replies are in Turkish; the
+> documentation is in English (Turkish originals in [`docs/tr/`](docs/tr/)).
 
-| Klasör | İçerik | Faz |
-|---|---|---|
-| `src/gengar/llm/` | Model seçimi, LiteLLM sarmalayıcı | 1 |
-| `src/gengar/core/` | Agent döngüsü, izin sistemi | 2 |
-| `src/gengar/tools/` | Araçlar | 2–5 |
-| `src/gengar/memory/` | Hafıza, beceri kütüphanesi | 6 |
-| `src/gengar/ui/` | Text menü | 7 |
-| `config/settings.toml` | Modeller ve ayarlar | — |
-| `tests/` | Testler | — |
+## Why it's interesting
 
-## Kurulum
+The core idea: **make a small, free model strong through the system around it.** A 4–9B model on an 8 GB laptop
+GPU makes mistakes a large cloud model doesn't — it stops before acting, gives empty answers, repeats failing
+commands, claims work it didn't do. Gengar's agent loop has a targeted safeguard for each of these, and every
+safeguard came from a failure that was observed and then measured.
 
-Gerekenler: [uv](https://docs.astral.sh/uv/), Python 3.12+, [Ollama](https://ollama.com).
+| | |
+|---|---|
+| **Runs locally** | Qwen3.5 9B on an RTX 4060 Laptop (8 GB): 16k context, ~32 tokens/s, no internet or API key needed |
+| **21 tools** | system info, apps, settings, UI automation, files, Recycle Bin delete/restore, PowerShell, Python sandbox, web search, official version lookup, memory |
+| **Safety in layers** | risk levels → PowerShell command classifier → permission modes → a guard that protects Gengar's own folder → undoable deletion → audit log |
+| **Learns** | remembers facts about the user and saves reusable "skills" after solving hard tasks (semantic search with bge-m3) |
+| **Measured** | an automatically verified benchmark (100+ tasks, dev/test split) drives every change |
+| **Distillation** | the 9B teacher generates verified training data to fine-tune a faster 4B student (LoRA on Kaggle) |
 
-```bash
+## Results so far
+
+| Benchmark | Score |
+|---|---|
+| v1 (24 tasks) — Qwen3 8B → Qwen3.5 9B + 16k context | 21/24 → **24/24**, 766 s → 358 s |
+| v2 test (53 never-tuned-on tasks) — Qwen3.5 9B, before → after the dev iterations | 45/53 → **51/53** |
+| v2 test — untrained Qwen3.5 4B | 46/53, **1.6× faster** than 9B |
+| "Save your earlier answer to a file" — with / without the turn hint (ablation) | **4/5** / 0/5 |
+
+Details, and what each number taught us: [docs/ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-evaluation).
+
+## How it was built
+
+Gengar grew in small, runnable steps. Each step was tested, measured, and committed before the next one.
+
+1. **Foundations (phases 0–2).** Project skeleton and `gengar doctor`; an LLM layer that talks to local and API
+   models through one interface (LiteLLM); the agent loop with a permission system and an audit log.
+2. **Windows and research tools (phases 3–4).** Dedicated tools for system info, apps, settings and UI automation
+   replaced free-form PowerShell — the 8B model had been misreading command output and inventing numbers. Web
+   search and page reading with relevance ranking (BM25).
+3. **Code agent and memory (phases 5–6).** Python in an isolated virtual environment, a write → run → fix loop;
+   long-term memory and a Voyager-style skill library with a measured similarity threshold.
+4. **Measuring instead of guessing.** A 24-task benchmark, then a 103-task benchmark with a dev/test split. Model
+   choice (Qwen3 8B → Qwen3.5 9B), a 16k context via KV-cache compression, and safeguards for the failure modes
+   the benchmark exposed. Fixes made on dev raised the untouched test score from 45/53 to 51/53.
+5. **Distillation pipeline.** The teacher solved 780 generated tasks overnight; 735 were verified and became 755
+   training examples. A Kaggle notebook fine-tunes Qwen3.5 4B with 16-bit LoRA. (The first full run ran out of GPU
+   memory; the notebook has been fixed and the run is pending.)
+6. **Real-use fixes.** Each problem found while using Gengar was reproduced, measured, and then fixed:
+   - deletions go to the Recycle Bin and can be restored;
+   - chats are saved automatically and can be reopened;
+   - long answers can be saved to a file without the model retyping them.
+   - An incident where a long save timed out was traced to three causes: a silence timeout, a context-limit
+     truncation, and a request being dropped from the history after an error.
+
+The full story, with the reasoning behind every design decision, is in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Known open problems: [docs/OPEN_ISSUES.md](docs/OPEN_ISSUES.md).
+
+## Quick start (Windows)
+
+Requirements: [uv](https://docs.astral.sh/uv/), Python 3.12+, [Ollama](https://ollama.com), ~8 GB of VRAM for the
+default model.
+
+```powershell
 winget install astral-sh.uv
 winget install Python.Python.3.12
 winget install Ollama.Ollama
-ollama pull qwen3:8b
+ollama pull qwen3.5:9b
 ollama pull bge-m3
 ```
 
-Proje klasöründe:
+For a 16k context on 8 GB of VRAM, set these user environment variables and restart Ollama (otherwise use
+`num_ctx = 8192` in `config/settings.toml`): `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`.
 
-```bash
+In the project folder:
+
+```powershell
 uv sync
-copy .env.example .env      # API anahtarlarını .env içine yazın (isteğe bağlı)
-uv run gengar doctor        # her şey hazır mı?
-uv run pytest               # testler
+copy .env.example .env      # optional: API keys for cloud profiles
+uv run gengar doctor        # checks that everything is ready
+uv run gengar               # start chatting (or double-click gengar.cmd)
 ```
 
-## Kullanım
+Example requests (in Turkish or English): "How much free space is on C:?", "Open Notepad", "Set the volume to
+30", "Switch to dark mode", "What's the latest Python version?", "Read this file and summarise it".
 
-```bash
-uv run gengar                    # varsayılan profille sohbet
-uv run gengar chat -p gemini     # belirli bir profille
-```
+### Chat commands
 
-Sohbet içinde: `/model` (profilleri listele), `/model <ad>` (değiştir),
-`/think` (düşünme modu), `/thinklog` (düşünce metnini göster), `/mode` (izin modu),
-`/memory`, `/remember`, `/skills`, `/skill`, `/learn`, `/forget` (hafıza), `/clear` (yeni sohbet), `/exit`. Windows'ta `gengar.cmd` dosyasına çift tıklayarak da açılır.
+| Command | |
+|---|---|
+| `/model [name]` | list profiles / switch model (local or API) |
+| `/think on\|off\|auto` | thinking mode |
+| `/mode normal\|strict\|trust` | permission mode |
+| `/memory`, `/remember`, `/skills`, `/skill`, `/learn`, `/forget` | memory and skills |
+| `/chats`, `/open <no>`, `/pin <no>`, `/unpin <no>`, `/export [no]`, `/new` | chat history |
+| `/help`, `/exit` | |
 
-Örnek istekler: "C diskinde ne kadar boş yer var?", "Not defterini aç", "Sesi 30 yap",
-"Karanlık moda geç", "Hangi uygulamalar açık?", "Masaüstümde kaç dosya var?",
-"şu dosyayı oku ve özetle", "Python'un en son sürümü hangisi?",
-"Get-StartApps komutu ne işe yarar, araştır".
+Confirmation prompts: `e` yes, `h` no, `o` allow for this session. Every action is logged to
+`logs/audit-YYYY-MM-DD.jsonl`.
 
-### Araçlar
+## Project structure
 
-| Araç | Risk | Ne yapar |
-|---|---|---|
-| `system_info` | okuma | OS, CPU, RAM, diskler, GPU, pil, ağ — birimleri hazır hesaplanmış |
-| `apps` | açık/kurulu listesi: okuma · aç: değişiklik · kapat: sistem | Uygulama aç/kapat (Türkçe/İngilizce adla), dosya/URL/`ms-settings:` sayfası aç |
-| `settings` | oku: okuma · değiştir: değişiklik | Tema, ses, sessiz, parlaklık, duvar kağıdı |
-| `windows_ui` | listele/incele: okuma · tıkla/yaz/tuş: sistem | Pencere içindeki düğme ve alanları UI Automation ile kullanma |
-| `web_search` | okuma | Web araması (DuckDuckGo/Bing, anahtar gerektirmez) |
-| `fetch_page` | okuma · yerel ağ adresi: sistem | Sayfa/PDF okuma; sadece soruyla ilgili parçalar (BM25) döner |
-| `read_file`, `list_directory`, `find_files` | okuma | Dosya okuma, listeleme, arama |
-| `search_text` | okuma | Dosya içeriklerinde regex arama (grep gibi) |
-| `run_python` | sistem | Python kodunu/dosyasını ayrı sanal ortamda (`data/sandbox`) çalıştırma, paket kurma |
-| `write_file`, `edit_file` | değişiklik | Dosya oluşturma/düzenleme (Windows klasörlerine yazma: sistem) |
-| `run_powershell` | komuta göre | Her türlü sistem işi. Sadece okuyan komutlar (Get-*, Test-* …) onaysız, diğerleri onaylı |
+| Path | Contents |
+|---|---|
+| `src/gengar/core/` | agent loop, conversation, permissions, audit log, routers, chat history |
+| `src/gengar/llm/` | model client (local and API through LiteLLM) |
+| `src/gengar/tools/` | tools and the guard |
+| `src/gengar/memory/` | facts, skills, embeddings, automatic learning |
+| `src/gengar/ui/` | terminal UI |
+| `config/` | settings and the system prompt |
+| `evals/` | benchmark, task families, training-data generation and export |
+| `training/` | Kaggle fine-tuning notebook and Ollama import ([training/README.md](training/README.md)) |
+| `tests/` | 314 automated tests (`uv run pytest`) |
+| `docs/` | [architecture](docs/ARCHITECTURE.md), [open issues](docs/OPEN_ISSUES.md), [future plans](docs/FUTURE.md) |
 
-Risk seviyeleri: **okuma** onaysız · **değişiklik** (geri alınabilir) onaylı, oturum boyu
-izin verilebilir · **sistem** (silme, kapatma, tıklama, keyfi komut) her seferinde onaylı.
-Onay sorusunda: `e` evet, `h` hayır, `o` oturum boyunca izin.
-Her eylem `logs/audit-YYYY-MM-DD.jsonl` dosyasına kaydedilir.
-Kod üzerinde uzun çalışırken `/mode trust` ile onaylar kapatılabilir (iş bitince `/mode normal`).
+## Roadmap
 
-### Kod ajanı (Faz 5)
+- [x] Phase 0–6: setup, LLM layer, agent loop, Windows tools, research, code agent, memory and learning
+- [x] Benchmark with a dev/test split; teacher data generation
+- [ ] Train the 4B student and compare it with the teacher and the untrained 4B
+- [ ] Shorten the ~5,000-token fixed prompt (faster inference and training)
+- [ ] Hybrid mode: local first, API fallback with a budget limit ([docs/FUTURE.md](docs/FUTURE.md))
+- [ ] Menu UI (postponed; the terminal UI is used for now)
 
-- Yer belirtilmeyen projeler `data/workspace` altına yazılır.
-- `run_python` ve PowerShell'deki `python`/`pip` aynı ayrı sanal ortamı kullanır; modelin
-  kurduğu paketler Gengar'ı etkilemez. **Bu bir güvenlik izolasyonu değildir**: kod yine
-  kullanıcının yetkileriyle çalışır, bu yüzden her çalıştırma onay ister.
-- Dayanıklılık önlemleri: PowerShell 5.1'de `&&`/`||` otomatik çevrilir, dosyalar UTF-8 yazılır,
-  aynı başarısız çağrının aynen tekrarı engellenir, "şunu yapacağım:" deyip duran model bir kez dürtülür.
+## License
 
-Kod görevleri karşılaştırması (`evals/code_tasks.py`, 3 görev):
-
-| | Qwen3 8B düşünme kapalı | Qwen3 8B düşünme açık | Gemini 3.5 Flash (ücretsiz) |
-|---|---|---|---|
-| A. Asal sayı toplamı | ✅ 17 sn | ✅ 57 sn | ✅ 29 sn |
-| B. Testler geçene kadar hata düzeltme | ❌ | ✅ 104 sn | ✅ 84 sn |
-| C. CSV + pandas | ❌ | ⚠️ sonuç doğru, yanlış klasör | ⚠️ sonuç doğru, son mesajda kota bitti |
-
-Gemini ücretsiz katmanı dakikada 5 istekle sınırlı; profildeki `rpm = 5` ile Gengar istekleri
-aralıklandırır, limit hatasında sağlayıcının önerdiği süre kadar bekleyip tekrar dener.
-
-### Hafıza ve öğrenme (Faz 6)
-
-| | Ne saklanır | Nasıl dolar |
-|---|---|---|
-| **Bilgiler** | Kullanıcı hakkında kalıcı bilgiler ("adım Kyle", "kısa cevap severim") | Model `remember` çağırır ya da `/remember` |
-| **Beceriler** | Başarıyla çözülmüş işlerin tarifi + çalışan komut/kod | Zor bir iş (araştırma yapılan ya da hatadan sonra düzelen) bitince **otomatik** yansıtma, ya da `/learn` |
-
-- Her mesajda ilgili bilgiler ve beceriler anlamsal aramayla bulunup sistem promptuna eklenir.
-- Embedding: Ollama + **bge-m3, CPU'da** (GPU'da Qwen3'ü VRAM'den atıyor; CPU'da sorgu ~0.05 sn).
-- Depolama: SQLite (`data/memory.db`), vektörler tam taramayla karşılaştırılır. Embedding
-  alınamazsa kelime örtüşmesine düşer.
-- Beceri eşleşme eşiği 0.47: `evals/similarity_calibration.py` ölçümünde ilgili istekler ≥ 0.494,
-  alakasızlar ≤ 0.436.
-- Gösterim: `evals/memory_demo.py` — 1. oturumda araştırarak çözülen iş (9 araç çağrısı, 45 sn)
-  beceri olarak öğrenildi; 2. oturumda farklı kelimelerle sorulan aynı iş bu beceriyle 1 çağrıda
-  (8 sn) çözüldü.
-- Sınırlılık: öğrenilen becerinin kalitesi modelin kalitesine bağlı; 8B model kendi hatalı komutunu
-  fark etmeden kaydedebiliyor. Beceriler modele "doğrulayarak kullan" notuyla verilir; kullanıcı
-  `/skills` ile görüp `/forget` ile silebilir.
-
-### Varsayılan model: Qwen3.5 9B, 16k bağlam
-
-Ollama'da kullanıcı ortam değişkenleri `OLLAMA_FLASH_ATTENTION=1` ve `OLLAMA_KV_CACHE_TYPE=q8_0`
-(KV önbelleği sıkıştırma) ile 8 GB VRAM'de 16k bağlam %86 GPU'da, ~32 tok/sn çalışır.
-Bu ayarlar yoksa `config/settings.toml`'da `num_ctx = 8192` yapın.
-Ollama'yı yeniden başlatırken `llama-server.exe` süreçlerini de kapatın; kalan eski süreçler
-VRAM'i tutup modeli CPU'ya (7 tok/sn) iter.
-
-Ölçüm seti (`evals/bench.py`, 24 görev, auto düşünme):
-
-| Ayar | Başarı | Süre |
-|---|---|---|
-| Qwen3 8B, düşünme kapalı, ilk kod | 20/24 | 201 sn |
-| Qwen3 8B, düşünme açık | 22/24 | 1092 sn |
-| Qwen3 8B, auto + iyileştirmeler | 21/24 | 766 sn |
-| Qwen3.5 9B, auto + iyileştirmeler, 8k | 22/24 | 418 sn |
-| **Qwen3.5 9B, auto + iyileştirmeler, 16k** | **24/24** | **358 sn** |
-
-Her satır tek çalıştırma; yerel model her seferinde farklı yollar deneyebildiğinden ±1 görevlik
-farklar rastlantı olabilir.
-
-### Yerel model notları (Qwen3 8B, RTX 4060 8 GB)
-
-- Düşünme kapalı: ~45 token/sn. Hazır araçlarla (Faz 3) basit görevlerde güvenilir;
-  serbest PowerShell yazması gerektiğinde bazen hatalı komut/uydurma sayı.
-- Düşünme açık (`/think`): ~6 kat yavaş, karmaşık görevlerde belirgin şekilde daha doğru.
-- Bağlam 8192 token (`num_ctx`); 8 GB VRAM'de model + 8k bağlam tamamen GPU'da.
-  12 aracın şeması ~2300 token tutuyor.
-- Araştırma: "en son sürüm" gibi sorularda artık arayıp kaynaktan cevap veriyor.
-  "Araştır + bilgisayarda kontrol et + karşılaştır" gibi çok adımlı görevlerde düşünme
-  kapalıyken adımları atlayabiliyor; `/think` ile ya da API modeliyle daha iyi.
-
-Yeni model eklemek için `config/settings.toml` dosyasına bir `[llm.profiles.<ad>]`
-bölümü eklemek yeterli; kod değişmez.
-
-## Yol haritası
-
-- [x] **Faz 0** — Kurulum, proje iskeleti, `gengar doctor`
-- [x] **Faz 1** — LLM katmanı: yerel/API modelle terminalde sohbet
-- [x] **Faz 2** — Agent döngüsü + ilk araçlar (PowerShell, dosya) + izin sistemi + log
-- [x] **Faz 3** — Windows araçları (ayarlar, süreçler, uygulamalar, UI otomasyonu)
-- [x] **Faz 4** — Araştırma (web arama, sayfa okuma)
-- [x] **Faz 5** — Kod ajanı (yaz, çalıştır, test et, düzelt)
-- [x] **Faz 6** — Hafıza ve beceri kütüphanesi (öğrenme)
-- [ ] **Faz 7** — Text menü arayüzü
-- [ ] **Faz 8** — Değerlendirme (test görevleri, yerel vs API karşılaştırması)
-
-## Güvenlik ilkeleri
-
-- Araçlar risk seviyesine göre ayrılır: okuma serbest; silme, registry ve
-  sistem ayarı değişikliği kullanıcı onayı ister.
-- Her eylem `logs/` altına kaydedilir.
-- API anahtarları yalnızca `.env` içinde durur, git'e girmez.
+[MIT](LICENSE) © 2026 Emir

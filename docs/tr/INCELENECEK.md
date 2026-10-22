@@ -1,5 +1,7 @@
 # İncelenecekler
 
+> Türkçe aslı. İngilizce sürümü: [`docs/OPEN_ISSUES.md`](../OPEN_ISSUES.md).
+
 Fark edilen ama henüz incelenmemiş/düzeltilmemiş sorunlar. Her madde: ne oldu, kanıt nerede, olası
 nedenler (hipotez — kanıtlanmadı), nasıl inceleriz. Bir madde çözülünce commit ile birlikte buradan
 silinir ve ilgili yere (MIMARI.md, commit mesajı) not edilir.
@@ -30,7 +32,7 @@ fikri için ayrı, ayrıntılı bir yapı kurmaya** başladı.
    Ollama'nın zaman aşımı LiteLLM'de bazen bağlantı hatası (`APIConnectionError`) olarak geliyor; Gengar
    bunu "Ollama'ya bağlanılamadı… Ollama açık mı?" diye çeviriyor (`llm/client.py → _translate`).
    Kullanıcının gördüğü mesaj buna uyuyor.
-2. **GPU paylaşımı.** Aynı saatlerde (15:56–16:02) Claude ölçüm ve deneme çalıştırıyordu; aynı Ollama/GPU
+2. **GPU paylaşımı.** Aynı saatlerde (15:56–16:02) bir ölçüm ve deneme çalışıyordu; aynı Ollama/GPU
    iki işe bölündü, her iki taraf da yavaşladı. O ölçümde de bir görev 120 sn sınırına takıldı.
    → Ders: kullanıcı Gengar'ı kullanırken ölçüm çalıştırılmamalı (ya da önce sorulmalı).
 3. **Hatadan sonra niyet kayması.** "Tekrar dene, açık değilse aç" cümlesi belirsiz ("neyi aç?"). Model

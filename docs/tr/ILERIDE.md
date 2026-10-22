@@ -1,5 +1,7 @@
 # İleride eklenecekler
 
+> Türkçe aslı. İngilizce sürümü: [`docs/FUTURE.md`](../FUTURE.md).
+
 Şimdilik bütçe olmadığı için ertelenen özellikler. Karar verilmeden önce tekrar tartışılacak.
 
 ## 1. Hibrit mod (yerel model + API yedeği)

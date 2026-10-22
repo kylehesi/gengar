@@ -2,7 +2,7 @@
 
 Neden: "bunu .md olarak kaydet" denince model cevabı write_file ile token token yeniden yazıyordu:
 yavaş (4.000 token ≈ 2 dk) ve uzun cevaplarda bağlam sınırında kesiliyor, hiçbir şey kaydedilmiyor
-(2026-10-20, docs/INCELENECEK.md madde 1). save_answer aynı işi anında ve birebir yapar.
+(2026-10-20, docs/OPEN_ISSUES.md madde 1). save_answer aynı işi anında ve birebir yapar.
 
 Görev iki turlu ve AYNI sohbette (same_chat): önce içerik isteği, sonra "kaydet". Başarı için dosya
 oluşmalı, konuyla ilgili içerik taşımalı VE save_answer kullanılmış olmalı (require_tools).

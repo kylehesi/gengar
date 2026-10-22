@@ -628,12 +628,12 @@
       "split": "test",
       "difficulty": 1,
       "ok": true,
-      "note": "['192.168.1.151']",
+      "note": "['192.168.x.x']",
       "seconds": 3.0,
       "tool_calls": 1,
       "steps": 2,
       "error": "",
-      "answer": "Bilgisayarınızın yerel ağdaki IPv4 adresi: **192.168.1.151**",
+      "answer": "Bilgisayarınızın yerel ağdaki IPv4 adresi: **192.168.x.x**",
       "tools": [
         "system_info"
       ]
