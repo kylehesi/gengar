@@ -103,3 +103,17 @@ def test_save_answer_next_to_folder_goes_inside(tmp_path):
                {"role": "user", "content": "gorev klasörüne kaydet"}]
     files.make_save_answer(lambda: history).run({"path": str(tmp_path / "gorev.md")})
     assert (tmp_path / "gorev" / "kayit.md").exists() and not (tmp_path / "gorev.md").exists()
+
+
+def test_summary_shows_real_target(tmp_path):
+    # Onay sorusu (ve ölçümdeki task_only kuralı) modelin ham yolunu değil, gerçek hedefi görmeli:
+    # 2026-10-26 A/B ölçümünde klasör yolu ve "klasör.md" çağrıları bu yüzden reddediliyordu.
+    (tmp_path / "gorev").mkdir()
+    tool = files.make_save_answer(lambda: [])
+    folder = tmp_path / "gorev"
+    assert tool.summary({"path": str(folder)}) == f"{folder / 'kayit.md'} (son 1 cevap)"
+    assert tool.summary({"path": str(tmp_path / "gorev.md"), "answers": 2}) == f"{folder / 'kayit.md'} (son 2 cevap)"
+    assert tool.summary({"path": str(tmp_path / "not.md")}).startswith(str(tmp_path / "not.md"))
+    (folder / "kayit.md").write_text("eski", encoding="utf-8")
+    assert tool.summary({"path": str(folder)}).startswith(str(folder / "kayit_2.md"))
+    assert not (folder / "kayit_2.md").exists()  # özet diske dokunmaz

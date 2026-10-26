@@ -49,7 +49,7 @@ reports the real value.
  │  Repl    │────▶│  1. prepare messages  ──▶  LLMClient ──▶ LiteLLM ──▶ Ollama (Qwen3.5 9B)      │
  │ (ui/)    │◀────│  2. did the model ask for a tool?                  or an API (Gemini, …)       │
  └──────────┘     │  3. guard → permission (PermissionPolicy) → ask the user                       │
-   confirmation   │  4. run the tool (ToolRegistry: 21 tools)                                      │
+   confirmation   │  4. run the tool (ToolRegistry: 20 tools)                                      │
    prompts,       │  5. add the result to the history, go back to 1 — until a plain answer         │
    output         └────────────┬──────────────────────┬──────────────────────────┬─────────────────┘
                                │                      │                          │
@@ -196,20 +196,20 @@ The model reads these definitions and, when needed, produces text like
 `{"name": "read_file", "arguments": "{\"path\": \"...\"}"}`. Models are specifically trained to do this; the
 format is OpenAI's "function calling" standard and almost all models support it.
 
-**Important:** Tool definitions cost tokens and are sent **with every request**. The system prompt plus 21
+**Important:** Tool definitions cost tokens and are sent **with every request**. The system prompt plus 20
 tool definitions is a fixed "entry fee" for every request, and most of every training example.
 
 **Measurement (v0.0.3, 2026-10-26).** Instead of estimating, we sent Ollama requests that generate 1 token
 and read `prompt_eval_count`. Tools with their descriptions removed were measured too, to separate the cost of
 the text from the cost of the structure:
 
-| Part | Before | v0.0.3 |
-|---|---|---|
-| System prompt | 1,098 | 842 |
-| Tool descriptions | 1,277 | 938 |
-| Parameter descriptions | 638 | 307 |
-| **Skeleton** (tool/parameter names, types, the template's ~190-token "how to call" header) | 1,598 | 1,598 |
-| **Total** | **4,611** | **3,685** (−20%) |
+| Part | Before | v0.0.3 | v0.0.4 (no `save_skill`) |
+|---|---|---|---|
+| System prompt | 1,098 | 842 | 842 |
+| Tool descriptions | 1,277 | 938 | 913 |
+| Parameter descriptions | 638 | 307 | 279 |
+| **Skeleton** (tool/parameter names, types, the template's ~190-token "how to call" header) | 1,598 | 1,598 | 1,491 |
+| **Total** | **4,611** | **3,685** (−20%) | **3,525** (−24%) |
 
 Lesson: the skeleton does not shrink with text. Every tool costs ~65 tokens even with an empty description;
 going further means fewer tools or parameters. The rule used while shortening: choosing between tools ("use
@@ -217,6 +217,28 @@ system_info for RAM") lives in the system prompt, a tool's own usage details liv
 each fact is stated once. Self-explanatory parameter descriptions (`command`: "PowerShell command to run")
 were removed. Sentences that were added because of a measured failure (e.g. the Turkish synonyms in
 `settings`: volume and brightness were being mixed up) were kept in a shorter form.
+
+**Effect on behaviour: A/B benchmark (2026-10-26).** Same 135 tasks, same seed, thinking off; the only
+difference is the prompt. A = v0.0.2 (old prompt, 21 tools; in a separate git worktree), B = v0.0.4 (short
+prompt, 20 tools):
+
+| | A (old) | B (short) |
+|---|---|---|
+| Passed | 121/135 | 119/135 |
+| Total time | 2,340 s | 2,113 s (**−10%**) |
+| Tool calls | 272 | 253 |
+
+- **The pass-rate difference is noise.** 21 tasks changed result between the runs: 10 in B's favour, 11 in
+  A's. Running the same model twice can also change ~15% of tasks, so a 2-task gap is not enough to say it got
+  worse. Seeing small differences needs every benchmark repeated 3 times (plan, phase 2).
+- **The speed difference is real.** The shorter prefix means fewer tokens to read in every new chat.
+- **Tool preference shifted:** B used Python more and PowerShell less (`run_python` 36 → 52, `run_powershell`
+  18 → 8). Pass rate did not change, but it shows the prompt affects the choice.
+- **A benchmark bug was found:** `save_answer_md` scored 5/10 in both runs because the benchmark's
+  `task_only` permission rule looked at the model's raw path. Given a folder path or "folder.md", the tool
+  writes inside the folder, but the rule treated it as outside and denied it. The `save_answer` confirmation
+  summary now shows the real target (`answer_target`), so the user also sees the right place in the
+  confirmation prompt. After the fix: **8/10**.
 
 ### In Gengar
 
@@ -227,7 +249,7 @@ were removed. Sentences that were added because of a measured failure (e.g. the 
   `register(tool, before=...)` controls the order.
 - [`tools/__init__.py`](../src/gengar/tools/__init__.py) → `default_registry()` builds the default tool set.
 
-**Tools** (21 = 17 core + `save_answer` + 3 memory):
+**Tools** (20 = 17 core + `save_answer` + 2 memory):
 
 | Tool | File | What it does | Risk |
 |---|---|---|---|
@@ -244,7 +266,7 @@ were removed. Sentences that were added because of a measured failure (e.g. the 
 | `search_text` | `code.py` | Search text in files (like grep) | read |
 | `run_python` | `code.py` | Run Python in a separate virtual environment | system |
 | `run_powershell` | `powershell.py` | General-purpose tool | depends on the command |
-| `remember`, `recall`, `save_skill` | `memory/__init__.py` | Memory | read |
+| `remember`, `recall` | `memory/__init__.py` | Memory | read |
 
 ### Why
 
@@ -541,7 +563,8 @@ means: find the information first, then answer from it.
 - [`__init__.py`](../src/gengar/memory/__init__.py) → `MemorySystem.context_for()`: relevant facts and at most 2
   skills are appended to the **end of the system prompt** on every message, so the model sees them even if it
   forgets to call `recall`.
-- The model saves facts with `remember` and skills with `save_skill`. If the user explicitly says "remember" and
+- The model saves facts with `remember`; skills are saved only automatically by `learn.py` (the `save_skill` tool
+  was removed in v0.0.4: it was never called in 1,227 tasks). If the user explicitly says "remember" and
   the model does not save, Gengar saves it itself (`explicit_fact`).
 - [`learn.py`](../src/gengar/memory/learn.py): if a turn involved web research, or recovered from an error, the
   model does a short "reflection": can a reusable skill be extracted? If so, it is saved.
@@ -699,7 +722,7 @@ examples should contain reasoning (Unsloth's recommendation, so the model keeps 
 
 | Topic | Status |
 |---|---|
-| Gengar (phases 0–6) | Working: 21 tools, permission/guard/undo/logging, memory, research, code agent, chat history |
+| Gengar (phases 0–6) | Working: 20 tools, permission/guard/undo/logging, memory, research, code agent, chat history |
 | Menu UI (phase 7) | Skipped on purpose; the terminal UI is used |
 | Default model | Qwen3.5 9B, 16k context, ~32 tokens/s |
 | Benchmark v2 dev | 48/50 (baseline 43/50), 1119 s (baseline 1796 s) |
@@ -707,7 +730,7 @@ examples should contain reasoning (Unsloth's recommendation, so the model keeps 
 | Training data | 780 tasks → 735 verified (94%) → **755 examples** (718 train, 37 validation) |
 | Teacher's weak families | `file_organize` 10/20, `web_version` 13/20, `app_not_installed` 15/20 |
 | Student model | **Not trained yet.** The full run ran out of memory on GPU 1 at step 45/168; the notebook is fixed |
-| Fixed prompt prefix | 4,611 → **3,685 tokens** (v0.0.3, measured); effect on behaviour not measured yet |
+| Fixed prompt prefix | 4,611 → **3,525 tokens** (v0.0.4, measured) |
 | Tests | 314 automated tests |
 
 **Next steps:**

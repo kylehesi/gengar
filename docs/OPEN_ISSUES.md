@@ -113,3 +113,11 @@ The teacher (51/53) and the untrained 4B (46/53) were measured at commit `ad944d
   generation (10/20). Investigate with dev tasks.
 - 49 training examples longer than 6,144 tokens were dropped; most are code-fixing and web-research examples
   (selection bias). Next training: `MAX_LEN` 8192 or shorter tool descriptions.
+
+## 6. `run_python` / `run_powershell` child processes are orphaned when Gengar is killed
+
+When the 2026-10-26 A/B benchmark was stopped, a test script the model had started with `run_python` (most
+likely an infinite loop) kept running for **1.5 hours** and locked the benchmark folder. The timeout
+(`taskkill /T`, the whole process tree) works, but once the Gengar process that enforces it dies, nothing stops
+the child. Closing the window has the same effect. Candidate fix: put child processes in a Windows **Job
+Object** (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), so Windows closes them all when Gengar exits.

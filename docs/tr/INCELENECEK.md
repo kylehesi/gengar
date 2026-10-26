@@ -129,3 +129,11 @@ Kaggle'daki öğrenci, eski araç seti (18 araç) ve eski sistem promptuyla üre
   (10/20). Dev görevleriyle incele.
 - Eğitim verisinde 6.144 token sınırını aşan 49 örnek atıldı; çoğu kod düzeltme ve web araştırma
   örnekleri (seçim yanlılığı). Sonraki eğitimde `MAX_LEN` 8192 ya da daha kısa araç açıklamaları.
+
+## 6. Gengar zorla kapanınca `run_python` / `run_powershell` alt süreçleri yetim kalıyor
+
+2026-10-26 A/B ölçümü durdurulunca modelin `run_python` ile başlattığı test scripti (büyük olasılıkla sonsuz
+döngü) **1,5 saat** çalışmaya devam etti ve ölçüm klasörünü kilitledi. Zaman aşımı (`taskkill /T`, tüm
+süreç ağacı) doğru çalışıyor, ama onu uygulayan Gengar süreci ölünce alt süreci durduracak kimse kalmıyor.
+Kullanıcı pencereyi kapatırsa da olur. Çözüm adayı: alt süreçleri Windows **Job Object**'e
+(`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) bağlamak; Gengar ölünce Windows hepsini kapatır.

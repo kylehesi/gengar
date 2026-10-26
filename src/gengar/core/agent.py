@@ -84,7 +84,7 @@ _CLAIM = re.compile(
     re.IGNORECASE,
 )
 # Riski "okuma" olduğu hâlde kalıcı bir şey kaydeden araçlar (hafıza).
-_RECORDING_TOOLS = {"remember", "save_skill"}
+_RECORDING_TOOLS = {"remember"}
 
 
 def _claims_change(text: str) -> bool:

@@ -49,7 +49,7 @@ gerçek sonucu söyler.
  │  Repl    │────▶│  1. mesajları hazırla  ──▶  LLMClient ──▶ LiteLLM ──▶ Ollama (Qwen3.5 9B) │
  │ (ui/)    │◀────│  2. model araç istedi mi?                       veya API (Gemini, …)     │
  └──────────┘     │  3. guard → izin (PermissionPolicy) → kullanıcıya sor                     │
-   onay soruları  │  4. aracı çalıştır (ToolRegistry: 21 araç)                                │
+   onay soruları  │  4. aracı çalıştır (ToolRegistry: 20 araç)                                │
    ekrana yazma   │  5. sonucu geçmişe ekle, 1'e dön — model düz cevap verene kadar          │
                   └────────────┬──────────────────────┬────────────────────────┬─────────────┘
                                │                      │                        │
@@ -204,25 +204,46 @@ Model bu tanımları okur ve gerekince `{"name": "read_file", "arguments": "{\"p
 metin üretir. Modeller bunu yapabilmek için özel olarak eğitilmiştir. Bu biçim OpenAI'nin "function calling"
 standardı ve neredeyse bütün modeller destekliyor.
 
-**Önemli:** Araç tanımları da token tutar ve **her istekte** gönderilir. Sistem promptu + 21 araç tanımı her
+**Önemli:** Araç tanımları da token tutar ve **her istekte** gönderilir. Sistem promptu + 20 araç tanımı her
 isteğin sabit bir "giriş ücreti" gibi. Eğitimde de her örneğin büyük kısmı bu sabit önek.
 
 **Ölçüm (v0.0.3, 2026-10-26).** Tahmin yerine Ollama'ya 1 token ürettiren istekler atıp `prompt_eval_count`
 okuduk. Açıklamaları silinmiş araçları da ayrıca ölçtük ki metin ile yapının maliyeti ayrılsın:
 
-| Parça | Önce | v0.0.3 |
-|---|---|---|
-| Sistem promptu | 1.098 | 842 |
-| Araç açıklamaları | 1.277 | 938 |
-| Parametre açıklamaları | 638 | 307 |
-| **İskelet** (araç/parametre adları, tipler, şablonun ~190 tokenlık "nasıl çağırılır" başlığı) | 1.598 | 1.598 |
-| **Toplam** | **4.611** | **3.685** (−%20) |
+| Parça | Önce | v0.0.3 | v0.0.4 (`save_skill` yok) |
+|---|---|---|---|
+| Sistem promptu | 1.098 | 842 | 842 |
+| Araç açıklamaları | 1.277 | 938 | 913 |
+| Parametre açıklamaları | 638 | 307 | 279 |
+| **İskelet** (araç/parametre adları, tipler, şablonun ~190 tokenlık "nasıl çağırılır" başlığı) | 1.598 | 1.598 | 1.491 |
+| **Toplam** | **4.611** | **3.685** (−%20) | **3.525** (−%24) |
 
 Ders: iskelet metinle küçülmez. Her araç açıklaması boş olsa bile ~65 token taşır. Daha fazla kısaltmanın
 yolu araç/parametre sayısını azaltmak. Kısaltırken uyulan ilke: araçlar arası seçim ("RAM için system_info")
 sistem promptunda, aracın kendi kullanım detayı açıklamasında; her bilgi tek yerde. Kendini açıklayan
 parametre açıklamaları (`command`: "PowerShell command to run") silindi. Ölçümle eklenmiş cümleler (ör.
 `settings`'teki Türkçe karşılıklar: ses/parlaklık karışıyordu) kısaltılarak korundu.
+
+**Davranış etkisi: A/B ölçümü (2026-10-26).** Aynı 135 görev, aynı seed, düşünme kapalı; tek fark prompt.
+A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa prompt, 20 araç):
+
+| | A (eski) | B (kısa) |
+|---|---|---|
+| Başarılı | 121/135 | 119/135 |
+| Toplam süre | 2.340 sn | 2.113 sn (**−%10**) |
+| Araç çağrısı | 272 | 253 |
+
+- **Başarı farkı gürültü düzeyinde.** 21 görev turlar arasında farklı sonuç verdi: 10'u B lehine, 11'i A
+  lehine. Aynı modeli iki kez koşunca da görevlerin ~%15'i değişebiliyor, yani 2 görevlik fark "kötüleşti"
+  demek için yetmez. Küçük farkları görmek için her ölçümü 3 kez tekrarlamak gerek (plan, 2. faz).
+- **Hız farkı gerçek.** Kısa önek her yeni sohbette daha az token okutuyor.
+- **Araç tercihi kaydı:** B, PowerShell yerine daha çok Python kullandı (`run_python` 36 → 52,
+  `run_powershell` 18 → 8). Başarıyı değiştirmedi ama prompt'un tercihi etkilediğini gösteriyor.
+- **Ölçüm hatası bulundu:** `save_answer_md` her iki turda 5/10 çıktı, çünkü ölçümün `task_only` izin
+  kuralı modelin ham yoluna bakıyordu. Klasör yolu ya da "klasör.md" verildiğinde araç dosyayı klasörün
+  içine yazar, ama kural bunu "klasörün dışı" sayıp reddediyordu. `save_answer`'ın onay özeti artık gerçek
+  hedefi gösteriyor (`answer_target`); bu, kullanıcının onay sorusunda da doğru yeri görmesini sağlıyor.
+  Düzeltmeden sonra: **8/10**.
 
 ### Gengar'da
 
@@ -234,7 +255,7 @@ parametre açıklamaları (`command`: "PowerShell command to run") silindi. Öl�
 - `ToolRegistry` araçları tutar; `schemas()` modele gidecek tanımları üretir.
 - [`tools/__init__.py`](../../src/gengar/tools/__init__.py) → `default_registry()` varsayılan araç setini kurar.
 
-**Araç listesi** (21 araç = 17 temel + `save_answer` + 3 hafıza):
+**Araç listesi** (20 araç = 17 temel + `save_answer` + 2 hafıza):
 
 | Araç | Dosya | Ne yapar | Risk |
 |---|---|---|---|
@@ -251,7 +272,7 @@ parametre açıklamaları (`command`: "PowerShell command to run") silindi. Öl�
 | `search_text` | `code.py` | Dosyalarda metin arama (grep gibi) | okuma |
 | `run_python` | `code.py` | Ayrı bir sanal ortamda Python çalıştırma | sistem |
 | `run_powershell` | `powershell.py` | Her şey için genel araç | komuta göre |
-| `remember`, `recall`, `save_skill` | `memory/__init__.py` | Hafıza | okuma |
+| `remember`, `recall` | `memory/__init__.py` | Hafıza | okuma |
 
 ### Neden böyle
 
@@ -559,7 +580,8 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
   Ollama kapalıysa kelime aramasına düşer.
 - [`__init__.py`](../../src/gengar/memory/__init__.py) → `MemorySystem.context_for()`: Her mesajda ilgili
   bilgiler ve en fazla 2 beceri **sistem promptunun sonuna** eklenir. Model `recall` çağırmayı unutsa bile görür.
-- Model `remember` ile bilgi, `save_skill` ile beceri kaydedebilir. Kullanıcı açıkça "hatırla" dediği hâlde
+- Model `remember` ile bilgi kaydeder; beceriler yalnızca `learn.py` ile otomatik kaydedilir (`save_skill` aracı
+  v0.0.4'te kaldırıldı: 1.227 görevde hiç çağrılmamıştı). Kullanıcı açıkça "hatırla" dediği hâlde
   model kaydetmezse Gengar kendisi kaydeder (`explicit_fact`).
 - [`learn.py`](../../src/gengar/memory/learn.py): Tur web araştırması içeriyorsa ya da önce hata alınıp sonra
   düzeltildiyse, model kısa bir "yansıtma" yapar: "Bu turdan tekrar kullanılabilir bir beceri çıkar mı?"
@@ -721,7 +743,7 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 
 | Konu | Durum |
 |---|---|
-| Gengar (Faz 0–6) | Çalışıyor: 21 araç, izin/koruma/geri alma/kayıt, hafıza, araştırma, kod ajanı, sohbet geçmişi |
+| Gengar (Faz 0–6) | Çalışıyor: 20 araç, izin/koruma/geri alma/kayıt, hafıza, araştırma, kod ajanı, sohbet geçmişi |
 | Menü arayüzü (Faz 7) | Bilerek atlandı; terminalden devam |
 | Varsayılan model | Qwen3.5 9B, 16k bağlam, ~32 token/sn |
 | Ölçüm v2 dev | 48/50 (başlangıç 43/50), 1119 sn (başlangıç 1796 sn) |
@@ -729,7 +751,7 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 | Eğitim verisi | 780 görev → 735 doğrulanmış (%94) → **755 örnek** (718 eğitim, 37 doğrulama) |
 | Öğretmenin zayıf olduğu aileler | `file_organize` 10/20, `web_version` 13/20, `app_not_installed` 15/20 |
 | Öğrenci model | **Eğitilmedi.** Tam eğitim 45/168 adımda GPU 1'de bellek hatası verdi; not defteri düzeltildi |
-| Sabit prompt kısmı | 4.611 → **3.685 token** (v0.0.3, ölçülmüş); davranış etkisi henüz ölçülmedi |
+| Sabit prompt kısmı | 4.611 → **3.525 token** (v0.0.4, ölçülmüş) |
 | Testler | 314 otomatik test |
 
 **Sıradaki adımlar:**

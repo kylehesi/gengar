@@ -138,7 +138,6 @@ def test_worth_reflecting_rules():
     assert not worth_reflecting(turn(("call", "system_info", "RAM: 16 GB"), ("text", "16 GB")))  # tek araç
     assert not worth_reflecting(turn(("call", "list_directory", "a"), ("call", "read_file", "b"), ("text", "x")))
     assert not worth_reflecting(turn(("call", "web_search", "s"), ("call", "run_powershell", bad), ("text", "x")))
-    assert not worth_reflecting(turn(("call", "web_search", "s"), ("call", "save_skill", "Saved"), ("text", "x")))
 
 
 def test_transcript_marks_failures():

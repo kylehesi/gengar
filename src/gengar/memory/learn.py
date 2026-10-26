@@ -60,7 +60,7 @@ def worth_reflecting(messages: list[dict[str, Any]]) -> bool:
     """Bu turdan beceri çıkarmayı denemeye değer mi? (ucuz kural; LLM çağrısı yapmaz)"""
     calls = [tc["function"]["name"] for m in messages for tc in (m.get("tool_calls") or [])]
     results = [m.get("content") or "" for m in messages if m["role"] == "tool"]
-    if len(calls) < MIN_TOOL_CALLS or "save_skill" in calls or not results:
+    if len(calls) < MIN_TOOL_CALLS or not results:
         return False
     if is_failure(results[-1]):
         return False  # iş başarıyla bitmedi

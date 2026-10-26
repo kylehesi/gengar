@@ -366,23 +366,40 @@ def previous_answers(history: list[dict], count: int) -> list[str]:
     return answers[-count:] if count > 0 else []
 
 
+def answer_target(path: str) -> Path:
+    """save_answer'ın gerçekte yazacağı dosya (diske dokunmaz).
+
+    Onay sorusu da bunu gösterir: kullanıcı (ve ölçümdeki izin kuralı) modelin verdiği ham yolu değil,
+    dosyanın gerçekten gideceği yeri görür.
+    """
+    p = resolve(path)
+    if not p.exists() and p.suffix and p.with_suffix("").is_dir():
+        # "X klasörüne kaydet" → model "X.md" yazıyor (X klasörünün YANINA); niyet X'in içi.
+        p = p.with_suffix("")
+    if p.is_dir() or path.rstrip().endswith(("\\", "/")):
+        # "X klasörüne kaydet" denince model sık sık sadece klasör yolunu veriyor: içine kayit.md yaz.
+        p = p / "kayit.md"
+        n = 2
+        while p.exists():
+            p = p.with_name(f"kayit_{n}.md")
+            n += 1
+    return p
+
+
+def _describe_save(args: dict) -> str:
+    try:
+        target = answer_target(str(args.get("path", "")))
+    except (OSError, ValueError):
+        target = args.get("path", "")
+    return f"{target} (son {args.get('answers', 1)} cevap)"
+
+
 def make_save_answer(history: Callable[[], list[dict]]) -> Tool:
     def save_answer(path: str, answers: int = 1) -> str:
         texts = previous_answers(history(), max(1, int(answers)))
         if not texts:
             raise ToolError("bu sohbette kaydedilecek önceki bir cevap yok")
-        p = resolve(path)
-        if not p.exists() and p.suffix and p.with_suffix("").is_dir():
-            # "X klasörüne kaydet" → model "X.md" yazıyor (X klasörünün YANINA); niyet X'in içi.
-            p = p.with_suffix("")
-        if p.is_dir() or path.rstrip().endswith(("\\", "/")):
-            # "X klasörüne kaydet" denince model sık sık sadece klasör yolunu veriyor: içine kayit.md yaz.
-            p.mkdir(parents=True, exist_ok=True)
-            p = p / "kayit.md"
-            n = 2
-            while p.exists():
-                p = p.with_name(f"kayit_{n}.md")
-                n += 1
+        p = answer_target(path)
         existed = p.exists()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("\n\n---\n\n".join(texts) + "\n", encoding="utf-8")
@@ -405,5 +422,5 @@ def make_save_answer(history: Callable[[], list[dict]]) -> Tool:
         risk=Risk.WRITE,
         func=save_answer,
         classify=write_risk,
-        describe=lambda a: f"{a.get('path', '')} (son {a.get('answers', 1)} cevap)",
+        describe=_describe_save,
     )

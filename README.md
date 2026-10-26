@@ -22,7 +22,7 @@ safeguard came from a failure that was observed and then measured.
 | | |
 |---|---|
 | **Runs locally** | Qwen3.5 9B on an RTX 4060 Laptop (8 GB): 16k context, ~32 tokens/s, no internet or API key needed |
-| **21 tools** | system info, apps, settings, UI automation, files, Recycle Bin delete/restore, PowerShell, Python sandbox, web search, official version lookup, memory |
+| **20 tools** | system info, apps, settings, UI automation, files, Recycle Bin delete/restore, PowerShell, Python sandbox, web search, official version lookup, memory |
 | **Safety in layers** | risk levels → PowerShell command classifier → permission modes → a guard that protects Gengar's own folder → undoable deletion → audit log |
 | **Learns** | remembers facts about the user and saves reusable "skills" after solving hard tasks (semantic search with bge-m3) |
 | **Measured** | an automatically verified benchmark (100+ tasks, dev/test split) drives every change |

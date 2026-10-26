@@ -3,9 +3,10 @@
 Akış:
   1. Her kullanıcı mesajında ilgili bilgiler ve beceriler bulunup sistem
      promptuna eklenir (model `recall` çağırmayı unutsa bile görür).
-  2. Model `remember` ile kullanıcı hakkında kalıcı bilgi, `save_skill` ile
-     beceri kaydedebilir.
-  3. Zor bir iş başarıyla bitince `Learner` turdan otomatik beceri çıkarmayı dener.
+  2. Model `remember` ile kullanıcı hakkında kalıcı bilgi kaydedebilir.
+  3. Zor bir iş başarıyla bitince `Learner` turdan otomatik beceri çıkarmayı dener. Modelin elle beceri
+     kaydettiği `save_skill` aracı v0.0.4'te kaldırıldı: 1.227 görevde hiç çağrılmamıştı, ama her istekte
+     ~180 token tutuyordu.
 """
 
 from __future__ import annotations
@@ -99,16 +100,6 @@ class MemorySystem:
             return "\n\n".join(f"[{m.kind} #{m.id}, score {m.score:.2f}]\n"
                                + (format_skill(m) if m.kind == "skill" else m.content) for m in hits)
 
-        def save_skill(name: str, description: str, steps: list[str] | None = None,
-                       code: str = "", language: str = "") -> str:
-            if not name.strip() or not description.strip():
-                raise ToolError("beceri için ad (name) ve açıklama (description) gerekli")
-            content = description.strip()
-            if steps:
-                content += "\nSteps:\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
-            mem, new = store.add("skill", name, content, code, language)
-            return f"{'Saved' if new else 'Updated'} skill #{mem.id}: {mem.title}"
-
         return [
             Tool(
                 name="remember",
@@ -125,19 +116,6 @@ class MemorySystem:
                 parameters={"type": "object", "properties": {"query": {"type": "string"}},
                             "required": ["query"]},
                 risk=Risk.READ, func=recall, describe=lambda a: str(a.get("query", "")),
-            ),
-            Tool(
-                name="save_skill",
-                description=("After solving a non-trivial task (especially after research or fixing errors), "
-                             "save the procedure for reuse."),
-                parameters={"type": "object", "properties": {
-                    "name": {"type": "string", "description": "Short title."},
-                    "description": {"type": "string", "description": "When to use it."},
-                    "steps": {"type": "array", "items": {"type": "string"}},
-                    "code": {"type": "string", "description": "Exact working command/script."},
-                    "language": {"type": "string", "enum": ["powershell", "python", ""]}},
-                    "required": ["name", "description"]},
-                risk=Risk.READ, func=save_skill, describe=lambda a: str(a.get("name", "")),
             ),
         ]
 

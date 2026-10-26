@@ -6,9 +6,37 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.4](#004---2026-10-27) | 2026-10-27 | `save_skill` removed (prefix 3,525 tokens); A/B benchmark: same pass rate, 10% faster; `save_answer` approval shows the real target |
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.4] - 2026-10-27
+
+### Highlights
+- **The shorter prompt was measured with an A/B benchmark:** 135 tasks, same seed, thinking off, old prompt
+  (v0.0.2, separate git worktree) vs new prompt. Passed 121 vs 119: within noise (21 tasks changed result,
+  10 in each direction ±1). Total time 2,340 s → 2,113 s (−10%), tool calls 272 → 253.
+
+### Added
+- `evals/compare_runs.py`: compares two benchmark runs task by task (pass rate, time, tool usage per tool,
+  tasks that changed result). A run split into several parts can be given as one glob.
+
+### Removed
+- `save_skill` tool. It was never called in 1,227 logged tasks; skills are still saved automatically by the
+  learner (`memory/learn.py`). The fixed prefix drops from 3,685 to 3,525 tokens (−24% since v0.0.2).
+
+### Fixed
+- The `save_answer` confirmation summary shows where the file will really be written (`answer_target`), not
+  the raw path from the model. For a folder path or "folder.md" next to a folder, the tool writes inside the
+  folder; the benchmark's `task_only` rule read the raw path and denied these calls. `save_answer_md`:
+  5/10 → 8/10.
+
+### Notes
+- With the shorter prompt the model chose Python more often than PowerShell (`run_python` 36 → 52,
+  `run_powershell` 18 → 8) with no change in pass rate.
+- New open issue: if Gengar is killed, `run_python` / `run_powershell` child processes keep running (one
+  test script ran for 1.5 h). Candidate fix: a Windows Job Object.
 
 ## [0.0.3] - 2026-10-26
 
