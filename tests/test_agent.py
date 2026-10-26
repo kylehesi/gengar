@@ -129,24 +129,46 @@ def test_stops_after_repeated_blocked_calls(tmp_path):
     assert "previous error was" in blocked and "olmadı" in blocked
 
 
-def test_auto_think_by_request_and_escalation(tmp_path):
+def think_per_step(agent, client, text):
+    """Her model çağrısında düşünmenin açık (medium) mı kapalı (none) mı olduğunu kaydeder."""
+    seen, original = [], client.stream_chat
+
+    def spy(messages, tools=None):
+        seen.append(client.reasoning_override)
+        yield from original(messages, tools)
+
+    client.stream_chat = spy
+    ui = RecordingUI()
+    agent.run(text, ui)
+    return seen, ui
+
+
+def test_auto_thinks_only_on_the_step_after_a_failure(tmp_path):
     agent, client = make_agent([
-        ("", [call("boom", "a")]),        # basit istekte hata → düşünme açılmalı
-        ("Tamam", []),
+        ("", [call("boom", "a")]),          # basit istek, düşünmeden; araç hata veriyor
+        ("", [call("echo", "b", text="x")]),  # bu adımda düşünülür
+        ("Tamam", []),                        # hata yok → yine düşünmeden
     ], tmp_path)
     agent.think = "auto"
-    ui = RecordingUI()
-    agent.run("sesi aç", ui)
-    assert client.reasoning_override == "medium"
-    assert any(e[0] == "delta" and "düşünme modu açıldı" in e[1] for e in ui.events)
+    seen, ui = think_per_step(agent, client, "sesi aç")
+    assert seen == ["none", "medium", "none"]
+    assert any(e[0] == "delta" and "sonraki adımda düşünülecek" in e[1] for e in ui.events)
 
-    agent2, client2 = make_agent([("ok", [])], tmp_path)
-    agent2.think = "auto"
-    agent2.run("sesi aç", RecordingUI())
-    assert client2.reasoning_override == "none"
-    agent2.client.steps = [("ok", [])]
-    agent2.run("bir program yaz ve çalıştır", RecordingUI())
-    assert client2.reasoning_override == "medium"
+
+def test_auto_plans_complex_requests_only_on_the_first_step(tmp_path):
+    agent, client = make_agent([("", [call("echo", text="x")]), ("Bitti.", [])], tmp_path)
+    agent.think = "auto"
+    seen, _ = think_per_step(agent, client, "bir python programı yaz ve çalıştır")
+    assert seen == ["medium", "none"]  # ilk adımda plan, araç sonucunu okurken düşünmez
+
+
+def test_auto_does_not_think_for_long_simple_requests(tmp_path):
+    # Eskiden 160 karakteri aşan her istekte düşünülüyordu; uzunluk çoğunlukla dosya yollarından geliyordu.
+    agent, client = make_agent([("Tamam.", [])], tmp_path)
+    agent.think = "auto"
+    long_path = r"C:\Users\kyle\Desktop\Proje Dosyaları\2026\Ekim\haftalık raporlar\taslaklar"
+    seen, _ = think_per_step(agent, client, f"{long_path} klasöründe kaç tane .txt dosyası var? {long_path}")
+    assert seen == ["none"]
 
 
 def test_think_on_and_off_are_respected(tmp_path):

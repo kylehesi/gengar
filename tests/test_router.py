@@ -7,9 +7,8 @@ from gengar.core.router import is_save_request, needs_thinking
     "Ollama'nın en son sürümünü araştır ve bilgisayarımdakiyle karşılaştır",
     "Bir Python programı yaz ve çalıştır",
     "stats.py'deki hataları düzelt",
-    "RAM, disk ve pil bilgisini rapor.txt dosyasına yaz",
-    "Masaüstündeki dosyaları listele ve en büyüğünü bul ve sonra onu belgeler klasörüne taşı",
-    "x" * 200,
+    "Bu kodu incele, neden yavaş olduğunu analiz et",
+    "write a script that renames my photos",
 ])
 def test_complex_requests_think(text):
     assert needs_thinking(text)
@@ -21,6 +20,11 @@ def test_complex_requests_think(text):
     "Hesap makinesini aç",
     "Benim adım ne?",
     "Karanlık moda geç",
+    # 2026-10-26'dan önce bunlar düşünmeyi açıyordu (uzunluk, "rapor", "ve ... ve sonra" kuralları):
+    "RAM, disk ve pil bilgisini rapor.txt dosyasına yaz",
+    "Masaüstündeki dosyaları listele ve en büyüğünü bul ve sonra onu belgeler klasörüne taşı",
+    "x" * 200,
+    "Çalışma programı klasörünü aç",
 ])
 def test_simple_requests_are_fast(text):
     assert not needs_thinking(text)

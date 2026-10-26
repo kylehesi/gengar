@@ -99,9 +99,11 @@ required_models = ["qwen3.5:9b", "bge-m3"]
 [agent]
 # Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.
 max_steps = 15
-# Düşünme modu: "auto" (karmaşık isteklerde ve bir adım başarısız olunca açılır), "on", "off".
-# Sohbette /think on|off|auto ile değişir.
-think = "auto"
+# Düşünme modu: "off" (varsayılan), "on", ya da "auto" (kod/araştırma isteklerinin ilk adımında ve bir araç
+# hata verdikten sonraki tek adımda düşünür). Sohbette /think on|off|auto ile değişir.
+# Neden off: Qwen3.5 9B ile düşünme açıkken aynı işler 2–4 kat yavaş, araç hatası oranı aynı (%11 / %10),
+# isteklerin ~yarısında boş cevap (2026-10-26 teşhisi, docs/ARCHITECTURE.md §7).
+think = "off"
 
 [code]
 # Model yer belirtilmemiş kod projelerini buraya koyar (proje köküne göre).

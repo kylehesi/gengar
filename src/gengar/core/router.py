@@ -1,9 +1,13 @@
-"""İsteğin zorluğunu kabaca tahmin eder: düşünme modu açılsın mı?
+"""İsteğin zorluğunu kabaca tahmin eder: auto modda ilk adımda düşünülsün mü?
 
-Düşünme modu yerel 8-9B modelde çok adımlı/kod/araştırma işlerinde başarıyı belirgin
-artırıyor ama 3-6 kat yavaşlatıyor. "auto" modunda basit istekler hızlı yoldan,
-karmaşık görünenler düşünerek çalışır; basit sanılan istekte bir adım başarısız olursa
-agent o istek için düşünmeyi ayrıca açar (bkz. Agent).
+Varsayılan düşünme modu "off" (config/settings.toml). 2026-10-26 teşhisi: Qwen3.5 9B ile aynı görev
+türlerinde düşünme açıkken süre 2–4 kat uzuyor, araç hatası oranı değişmiyor (%11 / %10), düşünme açıkken
+isteklerin yaklaşık yarısında boş cevap geliyor. "auto" artık sadece kod/araştırma gibi gerçekten zor görünen
+isteklerin İLK adımında (planlarken) ve bir araç hata verdikten sonraki TEK adımda düşünür (bkz. Agent).
+
+Kaldırılan kurallar: "istek 160 karakterden uzun" (tetiklemelerin 17/20'si; uzunluk çoğunlukla dosya
+yollarından geliyordu) ve "birden fazla ve/sonra". Basit isteklerde de sık geçen kelimeler (test, hata, rapor,
+plan, dosyasına yaz, neden…) listeden çıkarıldı.
 """
 
 from __future__ import annotations
@@ -14,11 +18,13 @@ from ..tools.apps import fold
 
 # Sadeleştirilmiş (fold) metinde aranır: Türkçe karakterler ASCII, küçük harf.
 _COMPLEX = re.compile(
-    r"arastir|karsilastir|program|kod|script|betik|duzelt|hata|test|analiz|hesapla|rapor|"
-    r"dosyasina yaz|adim adim|plan|neden|nasil yapilir|otomatik|kur ve|indir ve|"
-    r"research|compare|debug|fix|refactor|implement|write .*(code|script|program)",
+    r"arastir|karsilastir|analiz|adim adim|duzelt|\bkod\w*|script|betik|fonksiyon|program\w* (yaz|olustur|gelistir)|"
+    r"research|compare|analy[sz]e|debug|fix|refactor|implement|write .*(code|script|program)",
 )
-LONG_REQUEST = 160
+
+
+def needs_thinking(text: str) -> bool:
+    return bool(_COMPLEX.search(fold(text)))
 
 
 # --- "önceki cevabı kaydet" istekleri ------------------------------------------------
@@ -36,13 +42,3 @@ def is_save_request(text: str) -> bool:
     """Kullanıcı önceden yazılmış bir cevabı dosyaya kaydetmek mi istiyor?"""
     t = fold(text)
     return bool(_SAVE_VERB.search(t) and _FILE_WORD.search(t) and not _NEW_CONTENT.search(t))
-
-
-def needs_thinking(text: str) -> bool:
-    t = fold(text)
-    if len(t) > LONG_REQUEST:
-        return True
-    if _COMPLEX.search(t):
-        return True
-    # "şunu yap ve sonra şunu yap" gibi birden fazla iş içeren istekler
-    return len(re.findall(r"\b(ve|sonra|ardindan|then|and then)\b", t)) >= 2

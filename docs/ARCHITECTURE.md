@@ -432,17 +432,29 @@ reasoning. It clearly improves hard tasks, but output tokens and time grow **3�
 
 ### In Gengar
 
-- [`core/router.py`](../src/gengar/core/router.py) → `needs_thinking()` decides with simple rules: words like
-  "research", "compare", "code", "error", "plan"; requests longer than 160 characters; several "and/then".
-- Three modes (`/think`): `auto` (default: simple requests fast, complex ones with thinking, and thinking is
-  turned on if a step of a "simple" request fails), `on`, `off`.
+- Three modes (`/think`):
+  - `off` (**default** since 0.0.2): never thinks
+  - `on`: thinks on every step
+  - `auto`: thinks only **when** it helps:
+    - on the **first step** of code, research, comparison or analysis requests (planning). The decision is made by
+      word rules in [`core/router.py`](../src/gengar/core/router.py) → `needs_thinking()`.
+    - on the **single step** after a tool failure, then off again (`Agent._think_next_step`)
+    - never on routine steps that read a tool result and do the next thing
 - The reasoning text is not printed (`show_thinking = false`). It is stored in the history as `_reasoning`,
   **never sent back to the model**, but it does go into the training data (section 11).
 
 ### Why
 
-- Measured on code tasks: qwen3:8b without thinking 1/3, with thinking 2/3+. For "how much RAM?" thinking is a
-  waste of time; `auto` tries to get the best of both.
+- **Why off by default (diagnosis of 2026-10-26, Qwen3.5 9B):**
+  - On the same task types, time is **2–4×** longer with thinking on.
+  - The tool error rate does not change (11% on vs 10% off).
+  - With thinking on, about **half of the requests return an empty answer** (overnight generation: 422 of 819
+    requests). This both slows things down and produces "incomplete results".
+- **What was wrong with the old auto:** 17 of 20 triggers came from the "request longer than 160 characters" rule,
+  but the length mostly came from file paths; once on, thinking stayed on for **every** step of the request.
+- Older measurement (qwen3:8b): code tasks 1/3 without thinking, 2/3+ with it. Thinking may only pay off on hard
+  tasks, so the new auto turns it on only there. **The new auto is not measured yet**; an `off/on/auto` × same
+  tasks run will test it.
 - **Word rules** decide, not a model — calling a model just to decide would add seconds to every request.
 
 ### The same idea, second use: turn hints

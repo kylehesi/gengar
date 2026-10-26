@@ -203,11 +203,19 @@ class Agent:
         elif self.think == "auto":
             self.client.reasoning_override = "medium" if needs_thinking(user_text) else "none"
 
-    def _escalate(self, ui: AgentUI) -> None:
-        """auto modda düşünmeden başlanan istekte bir adım başarısız olduysa düşünmeyi aç."""
-        if self.think == "auto" and self.client.reasoning_override == "none":
+    def _think_next_step(self, failed: bool, ui: AgentUI) -> None:
+        """auto: her araç adımından sonra bir SONRAKİ adım için karar. Sadece bir araç hata verdiyse o adımda
+        düşünülür, sonra kapanır. Eskiden düşünme açılınca isteğin bütün adımlarında açık kalıyordu; araç
+        sonucunu okuyan rutin adımlarda bile (2026-10-26 teşhisi: aynı işlerde 2–4 kat yavaş, araç hatası
+        oranı aynı, düşünme açıkken isteklerin ~yarısında boş cevap)."""
+        if self.think != "auto":
+            return
+        if failed:
+            if self.client.reasoning_override in (None, "none"):
+                ui.on_delta(Delta("status", "bir adım başarısız oldu; sonraki adımda düşünülecek"))
             self.client.reasoning_override = "medium"
-            ui.on_delta(Delta("status", "bir adım başarısız oldu; bu istek için düşünme modu açıldı"))
+        else:
+            self.client.reasoning_override = "none"
 
     def _learn(self, ui: AgentUI) -> None:
         """Zor bir iş başarıyla bittiyse turdan beceri çıkarmayı dene (hata sohbeti bozmasın)."""
@@ -311,8 +319,7 @@ class Agent:
                         "İsteği farklı ifade etmeyi ya da /think ile düşünme modunu açmayı deneyin.)")
                 self.conversation.add_assistant(note)
                 return note
-            if failed:
-                self._escalate(ui)
+            self._think_next_step(failed, ui)
 
         note = f"(Adım sınırına ulaşıldı: {self.max_steps}. Devam etmek için 'devam et' yazın.)"
         self.conversation.add_assistant(note)

@@ -451,23 +451,29 @@ token sayısı ve süre **3–6 kat** artıyor.
 
 ### Gengar'da
 
-- [`core/router.py`](../../src/gengar/core/router.py) → `needs_thinking()`: Düşünmenin açılıp açılmayacağına
-  basit kurallarla karar verir. Açılma durumları:
-  - "araştır", "karşılaştır", "kod", "hata", "plan" gibi kelimeler
-  - 160 karakterden uzun istek
-  - birden fazla "ve/sonra" içeren istek
 - Üç mod (`/think`):
-  - `auto` (varsayılan): basit istek hızlı yoldan; zor görünen düşünerek; basit sanılan istekte bir adım
-    başarısız olursa o istek için düşünme açılır
-  - `on`: her zaman açık
-  - `off`: her zaman kapalı
+  - `off` (**varsayılan**, 0.0.2'den beri): hiç düşünmez
+  - `on`: her adımda düşünür
+  - `auto`: sadece gerektiği **anda** düşünür:
+    - kod, araştırma, karşılaştırma, analiz isteklerinin **ilk adımında** (plan yaparken). Karar
+      [`core/router.py`](../../src/gengar/core/router.py) → `needs_thinking()` içindeki kelime kurallarıyla verilir.
+    - bir araç hata verdikten sonraki **tek adımda**, sonra tekrar kapanır (`Agent._think_next_step`)
+    - araç sonucunu okuyup sıradakini yapan rutin adımlarda düşünmez
 - Düşünce metni ekrana basılmaz (`show_thinking = false`). Geçmişte `_reasoning` alanında saklanır, **modele
   geri gönderilmez** ama eğitim verisine girer (bölüm 11).
 
 ### Neden böyle
 
-- Kod görevlerinde ölçüm: düşünmesiz qwen3:8b 1/3, düşünerek 2/3+. "RAM ne kadar?" gibi sorularda düşünmek
-  sadece zaman kaybı. `auto` iki dünyanın iyisini almaya çalışıyor.
+- **Neden varsayılan kapalı (2026-10-26 teşhisi, Qwen3.5 9B):**
+  - Aynı görev türlerinde düşünme açıkken süre **2–4 kat** uzun.
+  - Araç hatası oranı değişmiyor (açık %11, kapalı %10).
+  - Düşünme açıkken isteklerin yaklaşık **yarısında boş cevap** geliyor (gece üretimi: 819 istekte 422); bu hem
+    yavaşlatıyor hem "eksik sonuç" üretiyor.
+- **Eski auto neden yanlıştı:** tetiklemelerin 17/20'si "istek 160 karakterden uzun" kuralındandı ama uzunluk
+  çoğunlukla dosya yollarından geliyordu; ayrıca açılınca isteğin **bütün** adımlarında açık kalıyordu.
+- Eski ölçüm (qwen3:8b): kod görevlerinde düşünmesiz 1/3, düşünerek 2/3+. Düşünmenin faydası belki sadece zor
+  işlerde var; yeni auto bu yüzden onu sadece oralarda açıyor. **Yeni auto henüz ölçülmedi**; `off/on/auto` ×
+  aynı görevler ölçümüyle sınanacak.
 - Kararı bir model değil **kelime kuralları** veriyor, çünkü karar için ayrıca model çağırmak her isteğe
   saniyeler ekler. Basit ama ucuz.
 
