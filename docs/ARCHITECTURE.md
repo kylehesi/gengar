@@ -236,6 +236,15 @@ format is OpenAI's "function calling" standard and almost all models support it.
 - **Tool output is truncated at 8,000 characters** (`truncate`), keeping the head and the tail, so a huge
   output does not fill the context.
 - **Windows line endings (`\r\n`) are normalised.** They cost tokens and looked like empty lines to the model.
+- **Some tool errors came from the tools themselves (diagnosis of 2026-10-26).**
+  - In 23 of 26 `run_python` import errors the model had passed the correct working folder, but Python looks for
+    modules next to the script (`.runs`). The working folder is now added to `PYTHONPATH`.
+  - Every `edit_file` "not found" error was caused by whitespace or copying. Matching now has three tiers: exact →
+    ignoring leading/trailing whitespace per line (indentation is taken from the file, so Python stays valid) → if
+    still not found, the most similar lines of the file are shown verbatim. A copied `read_file` header and line
+    numbers are stripped. Content differences are never guessed. Replaying the real failures: 7 of 11 now succeed.
+  - Side finding: the old `edit_file` silently changed the line endings of the Windows files it edited; the file is
+    now read as bytes.
 
 ---
 

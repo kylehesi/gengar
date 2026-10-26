@@ -146,6 +146,10 @@ class PythonSandbox:
             script.write_text(code, encoding="utf-8")
 
         env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
+        # Python modülleri betiğin klasöründe arar, çalışma klasöründe değil. `code` ile verilen kod
+        # .runs içine yazıldığı için `import cozum` gibi görev klasöründeki modüller bulunamıyordu
+        # (dökümlerde 26 ModuleNotFoundError; 23'ünde model cwd'yi doğru vermişti).
+        env["PYTHONPATH"] = os.pathsep.join(p for p in (str(workdir), os.environ.get("PYTHONPATH", "")) if p)
         timeout = max(1, min(int(timeout), MAX_TIMEOUT))
         proc = subprocess.Popen([str(python), str(script), *map(str, args)], cwd=workdir,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,

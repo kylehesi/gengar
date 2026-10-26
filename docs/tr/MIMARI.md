@@ -245,6 +245,15 @@ yaklaşık **4.000 token**. Bu, her isteğin sabit bir "giriş ücreti" gibi.
 - **Araç çıktısı 8.000 karakterde kesiliyor** (`truncate`): baştan ve sondan parça tutuluyor. Dev bir çıktı
   bağlamı doldurmasın diye.
 - **Windows satır sonları (`\r\n`) normalleştiriliyor.** Model için gereksiz token ve boş satır gibi görünüyordu.
+- **Araç hatalarının bir kısmı aracın kendisinden geliyordu (2026-10-26 teşhisi).**
+  - `run_python` 26 import hatasının 23'ünde model çalışma klasörünü doğru vermişti. Ama Python modülleri betiğin
+    klasöründe (`.runs`) arıyordu; çalışma klasörü artık modül yoluna (`PYTHONPATH`) ekleniyor.
+  - `edit_file` "bulunamadı" hatalarının hepsi boşluk ya da kopyalama kaynaklıydı. Artık üç kademeli eşleştiriyor:
+    birebir → satır başı/sonu boşluğu yok sayılarak (girinti dosyaya göre ayarlanır, Python bozulmaz) → bulunamazsa
+    dosyadaki en benzer satırlar birebir gösterilir. `read_file`'dan kopyalanan başlık ve satır numaraları atılır.
+    İçerik farkı asla tahmin edilmez. Gerçek hatalar yeniden oynatıldığında 11'in 7'si artık başarılı.
+  - Yan bulgu: eski `edit_file` düzenlediği Windows dosyalarının satır sonlarını sessizce değiştiriyordu; dosya
+    artık bayt olarak okunuyor.
 
 ---
 

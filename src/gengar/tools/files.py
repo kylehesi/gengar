@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import os
+import re
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -149,18 +150,103 @@ def write_file(path: str, content: str) -> str:
     return f"{p} {verb} ({_human(p.stat().st_size)})"
 
 
+# --- edit_file: üç kademeli eşleştirme ------------------------------------------------------
+# Dökümlerdeki 17 "bulunamadı" hatasının hepsi boşluk kaynaklıydı: model satır numarası sütunundan kalan
+# girintiyi metnin parçası sandı ("    port=8080") ya da girintiyi yanlış hatırladı. 1) birebir (satır sonu
+# farkı yok sayılır) 2) satır başı/sonu boşlukları yok sayılarak, girinti DOSYAYA göre ayarlanır
+# 3) bulunamazsa en benzer satırlar birebir gösterilir. İçerik farkı (virgül, kelime) asla tahmin edilmez.
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" \t"))
+
+
+def _fuzzy_replace(text: str, old: str, new: str) -> tuple[str, int]:
+    """Satırları boşluksuz karşılaştırarak eşleşen tek bloğu değiştirir. (yeni metin, eşleşme sayısı)"""
+    lines = text.split("\n")
+    old_lines = old.strip("\n").split("\n")
+    want = [ln.strip() for ln in old_lines]
+    n = len(want)
+    hits = [i for i in range(len(lines) - n + 1) if [ln.strip() for ln in lines[i:i + n]] == want]
+    if len(hits) != 1:
+        return text, len(hits)
+    i = hits[0]
+    block = lines[i:i + n]
+    # Her satırın girinti farkı (dosya - model). Yeni metin aynı satır sayısındaysa satır satır,
+    # değilse en sık görülen farkla düzeltilir; Python gibi girintinin anlamlı olduğu dosyalar bozulmasın.
+    deltas = [_indent(f) - _indent(o) for f, o in zip(block, old_lines)]
+    new_lines = new.strip("\n").split("\n")
+    common = max(set(deltas), key=deltas.count)
+
+    def shift(line: str, d: int) -> str:
+        return (" " * d + line) if d >= 0 else line[min(-d, _indent(line)):]
+
+    if len(new_lines) == n:
+        fixed = [shift(ln, d) for ln, d in zip(new_lines, deltas)]
+    else:
+        fixed = [shift(ln, common) for ln in new_lines]
+    return "\n".join(lines[:i] + fixed + lines[i + n:]), 1
+
+
+def _closest_lines(text: str, old: str, around: int = 3) -> str:
+    """old_text'in ilk anlamlı satırına en çok benzeyen yerin çevresini birebir gösterir."""
+    import difflib
+
+    lines = text.split("\n")
+    first = next((ln.strip() for ln in old.split("\n") if ln.strip()), "")
+    if not first or not lines:
+        return ""
+    scores = [difflib.SequenceMatcher(None, first, ln.strip()).ratio() for ln in lines]
+    best = max(range(len(lines)), key=scores.__getitem__)
+    if scores[best] < 0.5:
+        return ""
+    lo, hi = max(0, best - around), min(len(lines), best + around + 1)
+    shown = "\n".join(lines[lo:hi])
+    return f"\nDosyada en benzer kısım (satır {lo + 1}-{hi}), birebir:\n```\n{shown}\n```"
+
+
+_READ_HEADER = re.compile(r"^\[.+ — satır \d+-\d+ / \d+\]$")
+_LINE_NO = re.compile(r"^\s*\d+\t")
+
+
+def _strip_read_artifacts(s: str) -> str:
+    """read_file çıktısından kopyalanmış başlık satırını ve (tüm satırlarda varsa) satır numaralarını atar.
+    Dökümlerde model "[yol — satır 1-3 / 3]" başlığını ve "    2\\t" numaralarını old_text'e kopyalamıştı."""
+    lines = [ln for ln in s.split("\n") if not _READ_HEADER.match(ln.strip())]
+    filled = [ln for ln in lines if ln.strip()]
+    if filled and all(_LINE_NO.match(ln) for ln in filled):
+        lines = [_LINE_NO.sub("", ln) for ln in lines]
+    return "\n".join(lines)
+
+
 def edit_file(path: str, old_text: str, new_text: str) -> str:
     p = resolve(path)
     if not p.is_file():
         raise ToolError(f"dosya yok: {p}")
-    text = p.read_text(encoding="utf-8", errors="strict")
-    count = text.count(old_text)
-    if count == 0:
-        raise ToolError("old_text dosyada bulunamadı; önce read_file ile tam metni kontrol edin")
+    # read_text satır sonlarını \n'e çevirir; Windows dosyası (\r\n) olduğu fark edilmez ve yazarken
+    # tüm dosyanın satır sonları sessizce değişirdi (eski davranış). Bayt olarak okunur.
+    raw = p.read_bytes().decode("utf-8")
+    crlf = "\r\n" in raw
+    text = raw.replace("\r\n", "\n")
+    old, new = old_text.replace("\r\n", "\n"), new_text.replace("\r\n", "\n")
+    note = ""
+    if old and old not in text and _strip_read_artifacts(old) != old:
+        old, new = _strip_read_artifacts(old).strip("\n"), _strip_read_artifacts(new).strip("\n")
+        note = " (read_file çıktısından kopyalanan başlık/satır numaraları atıldı)"
+    count = text.count(old) if old else 0
     if count > 1:
         raise ToolError(f"old_text dosyada {count} kez geçiyor; daha fazla bağlam ekleyerek benzersiz yapın")
-    p.write_text(text.replace(old_text, new_text), encoding="utf-8", newline="")
-    return f"{p} düzenlendi"
+    if count == 1:
+        result = text.replace(old, new)
+    else:
+        result, hits = _fuzzy_replace(text, old, new)
+        if hits > 1:
+            raise ToolError(f"old_text (boşluklar yok sayılınca) dosyada {hits} kez geçiyor; daha fazla bağlam ekleyin")
+        if hits == 0:
+            raise ToolError("old_text dosyada bulunamadı." + (_closest_lines(text, old)
+                            or " Önce read_file ile dosyanın tam metnine bakın."))
+        note += " (satır başı/sonu boşluk farkı yok sayıldı; girinti dosyaya göre ayarlandı)"
+    p.write_text(result.replace("\n", "\r\n") if crlf else result, encoding="utf-8", newline="")
+    return f"{p} düzenlendi{note}"
 
 
 def _protected_roots() -> list[Path]:

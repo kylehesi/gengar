@@ -214,3 +214,78 @@ def test_sibling_file_is_written_where_asked(tmp_path):
     (tmp_path / "Notlar").mkdir()
     files.write_file(str(tmp_path / "Notlar.md"), "yeni")      # kullanıcı yanına istemiş olabilir
     assert (tmp_path / "Notlar.md").read_text(encoding="utf-8") == "yeni"
+
+
+# --- edit_file: dökümlerdeki gerçek hatalardan ---------------------------------------------------
+
+INI = "[sunucu]\nadres=127.0.0.1\nport=3000\nkayit=acik\n\n[veritabani]\nport=5432\n"
+
+
+def test_edit_ignores_indent_copied_from_line_numbers(tmp_path):
+    # file_ini_edit_0: model satır numarası sütunundaki boşluğu metnin parçası sandı
+    f = tmp_path / "ayarlar.ini"
+    f.write_text(INI.replace("port=3000", "port=8080"), encoding="utf-8")
+    out = files.edit_file(str(f), "    port=8080", "    port=9090")
+    assert "port=9090\n" in f.read_text(encoding="utf-8") and "    port" not in f.read_text(encoding="utf-8")
+    assert "boşluk farkı yok sayıldı" in out
+
+
+def test_edit_multiline_with_wrong_indent_keeps_file_layout(tmp_path):
+    # file_ini_edit_2: çok satırlı blokta girinti yanlış hatırlanmış
+    f = tmp_path / "ayarlar.ini"
+    f.write_text(INI, encoding="utf-8")
+    old = "[sunucu]\n    adres=127.0.0.1\n    port=3000\n    kayit=acik"
+    new = "[sunucu]\n    adres=127.0.0.1\n    port=4000\n    kayit=acik"
+    files.edit_file(str(f), old, new)
+    assert f.read_text(encoding="utf-8") == INI.replace("port=3000", "port=4000")
+
+
+def test_edit_python_indentation_is_preserved(tmp_path):
+    f = tmp_path / "kod.py"
+    f.write_text("def f():\n    x = 1\n    return x\n", encoding="utf-8")
+    files.edit_file(str(f), "def f():\nx = 1", "def f():\nx = 2")  # model girintiyi kaybetmiş
+    assert f.read_text(encoding="utf-8") == "def f():\n    x = 2\n    return x\n"
+
+
+def test_edit_content_difference_is_not_guessed(tmp_path):
+    # file_json_edit_1: kapanış "}" ama dosyada "  }," — içerik farkı, tahmin edilmez; en benzer yer gösterilir
+    f = tmp_path / "config.json"
+    body = '{\n  "ayarlar": {\n    "tema": "acik",\n    "yazi_boyutu": 12\n  },\n  "surum": "1.0"\n}\n'
+    f.write_text(body, encoding="utf-8")
+    with pytest.raises(ToolError) as e:
+        files.edit_file(str(f), '"ayarlar": {\n    "tema": "acik",\n    "yazi_boyutu": 12\n}', "x")
+    assert '"ayarlar": {' in str(e.value) and "birebir" in str(e.value)
+    assert f.read_text(encoding="utf-8") == body
+
+
+def test_edit_keeps_windows_line_endings(tmp_path):
+    f = tmp_path / "a.txt"
+    f.write_bytes(b"bir\r\niki\r\n")
+    files.edit_file(str(f), "iki", "IKI")
+    assert f.read_bytes() == b"bir\r\nIKI\r\n"
+
+
+def test_edit_ambiguous_fuzzy_match_is_refused(tmp_path):
+    f = tmp_path / "a.ini"
+    f.write_text("port=1\n\nport=1\n", encoding="utf-8")
+    with pytest.raises(ToolError, match="2 kez"):
+        files.edit_file(str(f), "  port=1", "port=2")
+
+
+def test_edit_strips_copied_read_file_header_and_line_numbers(tmp_path):
+    # multi_find_fix_19: model read_file başlığını ve satır numaralarını old_text'e kopyalamıştı
+    f = tmp_path / "servis_3.ini"
+    f.write_text("ad=servis3\nport=8003\n# TODO: port çakışıyor\n", encoding="utf-8")
+    files.edit_file(str(f), f"[{f} — satır 1-3 / 3]\nad=servis3\nport=8003", "ad=servis3\nport=8013")
+    assert "port=8013" in f.read_text(encoding="utf-8")
+    out = files.edit_file(str(f), "    2\tport=8013", "    2\tport=8023")
+    assert f.read_text(encoding="utf-8") == "ad=servis3\nport=8023\n# TODO: port çakışıyor\n"
+    assert "satır numaraları atıldı" in out
+
+
+def test_tab_separated_data_is_not_mangled(tmp_path):
+    # Sayı+sekme ile başlayan gerçek veri satırları: birebir eşleşince hiçbir şey atılmaz
+    f = tmp_path / "veri.tsv"
+    f.write_text("1\telma\n2\tarmut\n", encoding="utf-8")
+    files.edit_file(str(f), "2\tarmut", "2\tkiraz")
+    assert f.read_text(encoding="utf-8") == "1\telma\n2\tkiraz\n"

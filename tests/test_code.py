@@ -138,3 +138,13 @@ def test_search_text_glob_and_case(project):
 def test_search_text_invalid_regex_falls_back_to_literal(project):
     (project / "src" / "a.py").write_text("x = liste[0\n", encoding="utf-8")
     assert "a.py:1" in search_text("liste[0", str(project))
+
+
+def test_code_can_import_modules_from_cwd(run, sandbox):
+    # Model kodu `code` ile verip cwd'yi görev klasörü yapınca o klasördeki modülü import edebilmeli
+    # (önceden kod .runs içinde çalıştığı için ModuleNotFoundError veriyordu).
+    project = sandbox.workspace / "gorev"
+    project.mkdir(parents=True, exist_ok=True)
+    (project / "cozum.py").write_text("def topla(a, b):\n    return a + b\n", encoding="utf-8")
+    out = run(code="import cozum\nprint(cozum.topla(2, 3))", cwd=str(project))
+    assert out.startswith("exit code: 0") and "5" in out
