@@ -133,14 +133,13 @@ def software_version(name: str) -> str:
 TOOL = Tool(
     name="software_version",
     description=(
-        "Get the installed version of a program on this PC and its latest stable (non-prerelease) version "
-        "from the official source, and whether an update is available. Use it for questions like "
-        "'what is the latest version of X', 'is my X up to date'. Works best for: python, node, git, ollama, "
-        "powershell, vscode, uv, go, docker, 7zip, obs; for others it reports the installed version only."
+        "Installed version of a program on this PC, its latest stable version from the official source, "
+        "and whether an update is available. Latest version known for python, node, git, ollama, powershell, "
+        "vscode, uv, go, docker, 7zip, obs; for others only the installed version."
     ),
     parameters={
         "type": "object",
-        "properties": {"name": {"type": "string", "description": "Program name, e.g. 'git', 'python', 'node'."}},
+        "properties": {"name": {"type": "string", "description": "e.g. 'git'."}},
         "required": ["name"],
     },
     risk=Risk.READ,

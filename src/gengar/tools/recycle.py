@@ -254,13 +254,12 @@ def _delete_risk(args: dict) -> Risk:
 TOOLS = [
     Tool(
         name="delete_files",
-        description="Delete files or folders by moving them to the Windows Recycle Bin (can be undone with "
-                    "restore_files). Use this for every deletion instead of Remove-Item or os.remove. "
-                    "If an item cannot go to the Recycle Bin, nothing is deleted and you are told why.",
+        description="Delete files or folders by moving them to the Recycle Bin (undo with restore_files). "
+                    "If an item cannot go there, nothing is deleted and you are told why.",
         parameters={
             "type": "object",
             "properties": {"paths": {"type": "array", "items": {"type": "string"},
-                                     "description": "Absolute paths of files or folders to delete."}},
+                                     "description": "Absolute paths."}},
             "required": ["paths"],
         },
         risk=Risk.WRITE,
@@ -270,12 +269,12 @@ TOOLS = [
     ),
     Tool(
         name="restore_files",
-        description="Restore deleted files or folders from the Recycle Bin to their original location. "
-                    "Without paths, lists the most recently deleted items.",
+        description="Restore items from the Recycle Bin to their original location. Without paths, lists "
+                    "recently deleted items.",
         parameters={
             "type": "object",
             "properties": {"paths": {"type": "array", "items": {"type": "string"},
-                                     "description": "Original paths to restore. Omit to list recent items."}},
+                                     "description": "Original paths."}},
         },
         risk=Risk.WRITE,
         func=restore_files,

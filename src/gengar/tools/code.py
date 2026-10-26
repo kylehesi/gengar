@@ -238,15 +238,14 @@ def make_tools(sandbox: PythonSandbox) -> list[Tool]:
         Tool(
             name="search_text",
             description=(
-                "Search file contents with a regex (like grep) under a folder. Returns path:line: text. "
-                "Use it to find where something is defined or used in a project."
+                "Search file contents with a regex (like grep); returns path:line: text."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "pattern": {"type": "string", "description": "Regex or plain text to find."},
-                    "root": {"type": "string", "description": "Folder or file to search (default: workspace)."},
-                    "glob": {"type": "string", "description": "File name filter, e.g. '*.py' (default all)."},
+                    "pattern": {"type": "string"},
+                    "root": {"type": "string", "description": "Folder or file (default: workspace)."},
+                    "glob": {"type": "string", "description": "e.g. '*.py'."},
                     "ignore_case": {"type": "boolean", "description": "Default true."},
                 },
                 "required": ["pattern"],
@@ -258,19 +257,18 @@ def make_tools(sandbox: PythonSandbox) -> list[Tool]:
         Tool(
             name="run_python",
             description=(
-                "Run Python 3.12 code (or a .py file) in an isolated virtualenv and return exit code, "
-                "stdout and stderr/traceback. `packages` are pip-installed first. Working directory: "
-                f"{sandbox.workspace} unless `cwd` is given. Use it to test code you write."
+                "Run Python 3.12 `code` or a .py `file` in an isolated virtualenv; returns exit code, stdout "
+                "and stderr. `packages` are pip-installed first. Runs in the workspace unless `cwd` is given."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "Python source to run."},
-                    "file": {"type": "string", "description": "Existing .py file to run instead of code."},
-                    "args": {"type": "array", "items": {"type": "string"}, "description": "Command-line arguments."},
-                    "packages": {"type": "array", "items": {"type": "string"}, "description": "pip packages to install first."},
+                    "code": {"type": "string"},
+                    "file": {"type": "string"},
+                    "args": {"type": "array", "items": {"type": "string"}},
+                    "packages": {"type": "array", "items": {"type": "string"}},
                     "timeout": {"type": "integer", "description": f"Seconds (default {DEFAULT_TIMEOUT})."},
-                    "cwd": {"type": "string", "description": "Working directory."},
+                    "cwd": {"type": "string"},
                 },
             },
             risk=Risk.SYSTEM,

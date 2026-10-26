@@ -6,8 +6,35 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.3] - 2026-10-26
+
+### Highlights
+- **The fixed part of every request is 20% shorter:** system prompt plus tool definitions went from 4,611 to
+  3,685 tokens. This prefix is re-read at the start of every new chat and makes up most of every training
+  example.
+
+### Changed
+- System prompt regrouped and de-duplicated: 1,098 → 842 tokens. Choosing between tools stays in the system
+  prompt; each rule is stated once (unit conversion, Recycle Bin deletion and "no unverified claims" each
+  appeared twice).
+- Tool descriptions shortened: 1,277 → 938 tokens. Usage hints already covered by the system prompt were
+  removed from the tools. Hints added because of measured failures (the Turkish synonyms in `settings`, the
+  `save_answer` wording) were kept.
+- Self-explanatory parameter descriptions removed: 638 → 307 tokens.
+
+### Added
+- `evals/prefix_tokens.py`: measures the real prefix size with Ollama (`prompt_eval_count`). It reports the
+  system prompt, tool text, parameter text and the tool "skeleton" separately.
+
+### Notes
+- The skeleton (tool and parameter names, types, the template's "how to call" header) is 1,598 tokens and does
+  not shrink with shorter text. Going further means fewer tools or parameters.
+- Not measured on the benchmark yet; a teacher run on dev/test is planned to check that tool choice did not
+  get worse.
 
 ## [0.0.2] - 2026-10-26
 

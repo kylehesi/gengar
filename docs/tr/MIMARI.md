@@ -204,8 +204,25 @@ Model bu tanımları okur ve gerekince `{"name": "read_file", "arguments": "{\"p
 metin üretir. Modeller bunu yapabilmek için özel olarak eğitilmiştir. Bu biçim OpenAI'nin "function calling"
 standardı ve neredeyse bütün modeller destekliyor.
 
-**Önemli:** Araç tanımları da token tutar ve **her istekte** gönderilir. 18 aracın tanımı + sistem promptu
-yaklaşık **4.000 token**. Bu, her isteğin sabit bir "giriş ücreti" gibi.
+**Önemli:** Araç tanımları da token tutar ve **her istekte** gönderilir. Sistem promptu + 21 araç tanımı her
+isteğin sabit bir "giriş ücreti" gibi. Eğitimde de her örneğin büyük kısmı bu sabit önek.
+
+**Ölçüm (v0.0.3, 2026-10-26).** Tahmin yerine Ollama'ya 1 token ürettiren istekler atıp `prompt_eval_count`
+okuduk. Açıklamaları silinmiş araçları da ayrıca ölçtük ki metin ile yapının maliyeti ayrılsın:
+
+| Parça | Önce | v0.0.3 |
+|---|---|---|
+| Sistem promptu | 1.098 | 842 |
+| Araç açıklamaları | 1.277 | 938 |
+| Parametre açıklamaları | 638 | 307 |
+| **İskelet** (araç/parametre adları, tipler, şablonun ~190 tokenlık "nasıl çağırılır" başlığı) | 1.598 | 1.598 |
+| **Toplam** | **4.611** | **3.685** (−%20) |
+
+Ders: iskelet metinle küçülmez. Her araç açıklaması boş olsa bile ~65 token taşır. Daha fazla kısaltmanın
+yolu araç/parametre sayısını azaltmak. Kısaltırken uyulan ilke: araçlar arası seçim ("RAM için system_info")
+sistem promptunda, aracın kendi kullanım detayı açıklamasında; her bilgi tek yerde. Kendini açıklayan
+parametre açıklamaları (`command`: "PowerShell command to run") silindi. Ölçümle eklenmiş cümleler (ör.
+`settings`'teki Türkçe karşılıklar: ses/parlaklık karışıyordu) kısaltılarak korundu.
 
 ### Gengar'da
 
@@ -712,7 +729,7 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 | Eğitim verisi | 780 görev → 735 doğrulanmış (%94) → **755 örnek** (718 eğitim, 37 doğrulama) |
 | Öğretmenin zayıf olduğu aileler | `file_organize` 10/20, `web_version` 13/20, `app_not_installed` 15/20 |
 | Öğrenci model | **Eğitilmedi.** Tam eğitim 45/168 adımda GPU 1'de bellek hatası verdi; not defteri düzeltildi |
-| Sabit prompt kısmı | ~5.000 token (sistem promptu + 21 araç tanımı); kısaltma adayı |
+| Sabit prompt kısmı | 4.611 → **3.685 token** (v0.0.3, ölçülmüş); davranış etkisi henüz ölçülmedi |
 | Testler | 314 otomatik test |
 
 **Sıradaki adımlar:**

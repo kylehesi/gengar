@@ -275,18 +275,16 @@ def describe(args: dict) -> str:
 TOOL = Tool(
     name="apps",
     description=(
-        "Manage applications. action=open: start an app by name (e.g. 'Not Defteri', 'chrome', 'Spotify'), "
-        "or open a file/folder path, a URL, or a Settings page like 'ms-settings:bluetooth'. "
-        "action=close: close an app's windows by name (force=true kills it). "
-        "action=running: list open windows. action=installed: installed programs with their versions "
-        "(name filters, e.g. 'ollama')."
+        "open: start an app by name ('Not Defteri', 'chrome') or open a file/folder path, URL or "
+        "'ms-settings:...' page. close: close an app's windows (force=true kills it). running: open windows. "
+        "installed: installed programs and versions (name filters)."
     ),
     parameters={
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": list(ACTIONS)},
-            "name": {"type": "string", "description": "App name, path, URL, or filter text."},
-            "force": {"type": "boolean", "description": "close only: kill instead of asking the app to close."},
+            "name": {"type": "string", "description": "App name, path, URL or filter."},
+            "force": {"type": "boolean"},
         },
         "required": ["action"],
     },

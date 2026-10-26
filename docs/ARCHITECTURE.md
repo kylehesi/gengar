@@ -196,8 +196,27 @@ The model reads these definitions and, when needed, produces text like
 `{"name": "read_file", "arguments": "{\"path\": \"...\"}"}`. Models are specifically trained to do this; the
 format is OpenAI's "function calling" standard and almost all models support it.
 
-**Important:** Tool definitions cost tokens and are sent **with every request**. Today the system prompt plus
-21 tool definitions is about **5,000 tokens** — a fixed "entry fee" for every request.
+**Important:** Tool definitions cost tokens and are sent **with every request**. The system prompt plus 21
+tool definitions is a fixed "entry fee" for every request, and most of every training example.
+
+**Measurement (v0.0.3, 2026-10-26).** Instead of estimating, we sent Ollama requests that generate 1 token
+and read `prompt_eval_count`. Tools with their descriptions removed were measured too, to separate the cost of
+the text from the cost of the structure:
+
+| Part | Before | v0.0.3 |
+|---|---|---|
+| System prompt | 1,098 | 842 |
+| Tool descriptions | 1,277 | 938 |
+| Parameter descriptions | 638 | 307 |
+| **Skeleton** (tool/parameter names, types, the template's ~190-token "how to call" header) | 1,598 | 1,598 |
+| **Total** | **4,611** | **3,685** (−20%) |
+
+Lesson: the skeleton does not shrink with text. Every tool costs ~65 tokens even with an empty description;
+going further means fewer tools or parameters. The rule used while shortening: choosing between tools ("use
+system_info for RAM") lives in the system prompt, a tool's own usage details live in its description, and
+each fact is stated once. Self-explanatory parameter descriptions (`command`: "PowerShell command to run")
+were removed. Sentences that were added because of a measured failure (e.g. the Turkish synonyms in
+`settings`: volume and brightness were being mixed up) were kept in a shorter form.
 
 ### In Gengar
 
@@ -688,7 +707,7 @@ examples should contain reasoning (Unsloth's recommendation, so the model keeps 
 | Training data | 780 tasks → 735 verified (94%) → **755 examples** (718 train, 37 validation) |
 | Teacher's weak families | `file_organize` 10/20, `web_version` 13/20, `app_not_installed` 15/20 |
 | Student model | **Not trained yet.** The full run ran out of memory on GPU 1 at step 45/168; the notebook is fixed |
-| Fixed prompt prefix | ~5,000 tokens (system prompt + 21 tool definitions); a candidate for shortening |
+| Fixed prompt prefix | 4,611 → **3,685 tokens** (v0.0.3, measured); effect on behaviour not measured yet |
 | Tests | 314 automated tests |
 
 **Next steps:**

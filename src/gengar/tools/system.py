@@ -154,8 +154,8 @@ def system_info(sections: list[str] | None = None) -> str:
 TOOL = Tool(
     name="system_info",
     description=(
-        "Get facts about this PC with values already converted to GB/%: OS version, uptime, CPU, "
-        "RAM, disks (free space), GPU, battery, network/Wi-Fi. Prefer this over PowerShell for these."
+        "Facts about this PC, values already in GB/%: OS version, uptime, CPU, RAM, disks (free space), "
+        "GPU, battery, network/Wi-Fi."
     ),
     parameters={
         "type": "object",
@@ -163,7 +163,7 @@ TOOL = Tool(
             "sections": {
                 "type": "array",
                 "items": {"type": "string", "enum": list(SECTIONS)},
-                "description": "Which parts to return (default: all).",
+                "description": "Default: all.",
             },
         },
     },

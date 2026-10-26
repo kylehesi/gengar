@@ -266,17 +266,15 @@ TOOLS = [
     Tool(
         name="web_search",
         description=(
-            "Search the web. Use it for anything you don't know, recent or changing facts "
-            "(versions, prices, news, how-tos) and errors you can't solve. Returns titles, URLs and snippets. "
-            "For software versions prefer official sources (the project's site or its GitHub releases page) "
-            "over blogs, and check the date: pages can be outdated."
+            "Search the web; returns titles, URLs and snippets. For software versions prefer official "
+            "sources (project site, GitHub releases) over blogs, and check page dates."
         ),
         parameters={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query. English often gives better results."},
+                "query": {"type": "string", "description": "English often gives better results."},
                 "max_results": {"type": "integer", "description": "1-10 (default 5)."},
-                "region": {"type": "string", "description": "'wt-wt' worldwide (default) or 'tr-tr' for Turkish results."},
+                "region": {"type": "string", "description": "'wt-wt' (default) or 'tr-tr'."},
             },
             "required": ["query"],
         },
@@ -287,15 +285,14 @@ TOOLS = [
     Tool(
         name="fetch_page",
         description=(
-            "Read a web page or online PDF. Returns the parts most relevant to `focus` (what you are "
-            "looking for), to save context. Use `part` to read a specific part."
+            "Read a web page or online PDF; returns the parts most relevant to `focus`. `part` reads one part."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "url": {"type": "string"},
-                "focus": {"type": "string", "description": "What to look for on the page, e.g. the user's question."},
-                "part": {"type": "integer", "description": "Read only this part number."},
+                "focus": {"type": "string", "description": "What you are looking for."},
+                "part": {"type": "integer"},
             },
             "required": ["url"],
         },

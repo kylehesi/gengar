@@ -276,20 +276,18 @@ def describe(args: dict) -> str:
 TOOL = Tool(
     name="windows_ui",
     description=(
-        "Operate app windows through UI Automation when there is no command for the job. "
-        "list: open windows. inspect: numbered buttons/fields of a window. focus: bring to front. "
-        "click: press control `target` ([number] from inspect, or its name). "
-        "type: enter `text` (into control `target` if given, else the focused field). "
-        "keys: press shortcut(s) in `text`, e.g. 'ctrl+s', 'alt+f4', 'enter'. "
-        "Always inspect before clicking."
+        "Operate app windows via UI Automation when no command does the job. list: open windows. "
+        "inspect: numbered controls of a window (always inspect before clicking). focus: bring to front. "
+        "click: press control `target`. type: enter `text` into `target` or the focused field. "
+        "keys: press shortcuts in `text`, e.g. 'ctrl+s', 'enter'."
     ),
     parameters={
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": list(ACTIONS)},
-            "window": {"type": "string", "description": "Window title or app process name (partial match)."},
-            "target": {"type": "string", "description": "Control number from inspect, or control name."},
-            "text": {"type": "string", "description": "Text to type, or keys to press."},
+            "window": {"type": "string", "description": "Title or process name (partial)."},
+            "target": {"type": "string", "description": "Number from inspect, or control name."},
+            "text": {"type": "string"},
         },
         "required": ["action"],
     },

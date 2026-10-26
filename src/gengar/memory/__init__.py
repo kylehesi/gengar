@@ -113,8 +113,7 @@ class MemorySystem:
             Tool(
                 name="remember",
                 description=("Save a lasting fact or preference about the user or their setup for future "
-                             "sessions (e.g. 'Projects are in D:\\Projeler', 'Prefers short answers'). "
-                             "Use it when the user tells you such a fact or asks you to remember something."),
+                             "sessions, e.g. 'Projects are in D:\\Projeler'."),
                 parameters={"type": "object", "properties": {
                     "fact": {"type": "string", "description": "One self-contained sentence."}},
                     "required": ["fact"]},
@@ -122,20 +121,20 @@ class MemorySystem:
             ),
             Tool(
                 name="recall",
-                description="Search your long-term memory (user facts and learned skills).",
+                description="Search long-term memory (user facts and learned skills).",
                 parameters={"type": "object", "properties": {"query": {"type": "string"}},
                             "required": ["query"]},
                 risk=Risk.READ, func=recall, describe=lambda a: str(a.get("query", "")),
             ),
             Tool(
                 name="save_skill",
-                description=("Save a reusable procedure after you solved a non-trivial task (especially "
-                             "after research or fixing errors), so you can reuse it next time."),
+                description=("After solving a non-trivial task (especially after research or fixing errors), "
+                             "save the procedure for reuse."),
                 parameters={"type": "object", "properties": {
                     "name": {"type": "string", "description": "Short title."},
                     "description": {"type": "string", "description": "When to use it."},
                     "steps": {"type": "array", "items": {"type": "string"}},
-                    "code": {"type": "string", "description": "Exact working command/script, if any."},
+                    "code": {"type": "string", "description": "Exact working command/script."},
                     "language": {"type": "string", "enum": ["powershell", "python", ""]}},
                     "required": ["name", "description"]},
                 risk=Risk.READ, func=save_skill, describe=lambda a: str(a.get("name", "")),

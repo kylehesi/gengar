@@ -272,16 +272,15 @@ def _path_arg(desc: str) -> dict:
 TOOLS = [
     Tool(
         name="read_file",
-        description="Read a UTF-8 text file. Returns the content after a one-line [path — lines] header "
-                    "(the header is not part of the file). Use offset/limit for long files.",
+        description="Read a UTF-8 text file. Output starts with a [path — lines] header that is not part "
+                    "of the file. Use offset/limit for long files.",
         parameters={
             "type": "object",
             "properties": {
-                "path": _path_arg("File path. '~' and %ENV% vars allowed; relative paths are inside the "
-                                  "workspace folder."),
-                "offset": {"type": "integer", "description": "First line number (1-based)."},
-                "limit": {"type": "integer", "description": "Max lines to return (default 400)."},
-                "line_numbers": {"type": "boolean", "description": "Prefix each line with its number (default false)."},
+                "path": {"type": "string"},
+                "offset": {"type": "integer", "description": "First line (1-based)."},
+                "limit": {"type": "integer", "description": "Default 400."},
+                "line_numbers": {"type": "boolean", "description": "Default false."},
             },
             "required": ["path"],
         },
@@ -294,7 +293,7 @@ TOOLS = [
         description="List a folder's entries with size and modification time.",
         parameters={
             "type": "object",
-            "properties": {"path": _path_arg("Folder path (default: home folder).")},
+            "properties": {"path": _path_arg("Default: home folder.")},
         },
         risk=Risk.READ,
         func=list_directory,
@@ -302,13 +301,13 @@ TOOLS = [
     ),
     Tool(
         name="find_files",
-        description="Find files or folders by glob pattern under a folder (default: home folder), "
+        description="Find files or folders by glob under `root` (default: home folder), "
                     "e.g. pattern='**/*.pdf' or '**/çalışma programı'.",
         parameters={
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Glob pattern; use **/ to search subfolders."},
-                "root": _path_arg("Folder to search in (default: home folder)."),
+                "pattern": {"type": "string"},
+                "root": {"type": "string"},
             },
             "required": ["pattern"],
         },
@@ -318,12 +317,12 @@ TOOLS = [
     ),
     Tool(
         name="write_file",
-        description="Create or overwrite a UTF-8 text file. Parent folders are created.",
+        description="Create or overwrite a UTF-8 text file (parent folders are created).",
         parameters={
             "type": "object",
             "properties": {
-                "path": _path_arg("File path."),
-                "content": {"type": "string", "description": "Full file content."},
+                "path": {"type": "string"},
+                "content": {"type": "string"},
             },
             "required": ["path", "content"],
         },
@@ -334,13 +333,13 @@ TOOLS = [
     ),
     Tool(
         name="edit_file",
-        description="Replace one exact, unique occurrence of old_text with new_text in a text file.",
+        description="Replace old_text with new_text in a text file.",
         parameters={
             "type": "object",
             "properties": {
-                "path": _path_arg("File path."),
-                "old_text": {"type": "string", "description": "Exact text to replace (must occur once)."},
-                "new_text": {"type": "string", "description": "Replacement text."},
+                "path": {"type": "string"},
+                "old_text": {"type": "string", "description": "Exact text; must occur once."},
+                "new_text": {"type": "string"},
             },
             "required": ["path", "old_text", "new_text"],
         },
@@ -392,16 +391,14 @@ def make_save_answer(history: Callable[[], list[dict]]) -> Tool:
 
     return Tool(
         name="save_answer",
-        description="Save your previous answer(s) in this conversation to a file exactly as written, without "
-                    "retyping them. Use this whenever the user asks to save or export something you already "
-                    "wrote (e.g. 'bunu .md olarak kaydet'); it is instant and never truncated. Use write_file "
-                    "only for new content.",
+        description="Save your previous answer(s) to a file exactly as written, without retyping them. Use "
+                    "it whenever the user asks to save something you already wrote (e.g. 'bunu .md olarak "
+                    "kaydet'); it is instant and never truncated. write_file is only for new content.",
         parameters={
             "type": "object",
             "properties": {
-                "path": _path_arg("File path (absolute for the user's folders, e.g. on their Desktop)."),
-                "answers": {"type": "integer",
-                            "description": "How many of your latest answers to include, oldest first (default 1)."},
+                "path": _path_arg("Absolute for the user's folders."),
+                "answers": {"type": "integer", "description": "How many latest answers (default 1)."},
             },
             "required": ["path"],
         },

@@ -158,19 +158,16 @@ def settings(action: str, setting: str = "", value: str = "") -> str:
 TOOL = Tool(
     name="settings",
     description=(
-        "Read or change common Windows settings. action=get: current theme, volume, brightness, wallpaper. "
-        "action=set with setting: theme (dark|light; Turkish: tema, koyu/açık mod), "
-        "volume (0-100 or +10/-10; Turkish: ses, ses seviyesi), mute (true|false; Turkish: sessiz, sesi kapat), "
-        "brightness (0-100 or +10/-10, laptop screen; Turkish: parlaklık, ekran ışığı), "
-        "wallpaper (image file path; Turkish: duvar kağıdı, arka plan). "
-        "For other settings open the right page with apps(open, 'ms-settings:...') or use PowerShell."
+        "Read (get) or change (set) Windows settings: theme (tema; dark|light), volume (ses; 0-100 or "
+        "+10/-10), mute (sessiz; true|false), brightness (parlaklık, laptop screen; 0-100 or +10/-10), "
+        "wallpaper (duvar kağıdı; image path). Other settings: apps(open, 'ms-settings:...') or PowerShell."
     ),
     parameters={
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["get", "set"]},
             "setting": {"type": "string", "enum": list(SETTINGS)},
-            "value": {"type": "string", "description": "New value for action=set."},
+            "value": {"type": "string"},
         },
         "required": ["action"],
     },

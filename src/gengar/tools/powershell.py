@@ -242,25 +242,22 @@ def make_tool(python_dir: Callable[[], str] | None = None) -> Tool:
         prepend = [python_dir()] if python_dir and _USES_PYTHON.search(command) else []
         return run_powershell(command, timeout, cwd, prepend)
 
-    note = ("`python` and `pip` run in Gengar's isolated Python environment (same as run_python). "
-            if python_dir else "")
+    note = "`python` and `pip` use run_python's environment. " if python_dir else ""
     return Tool(
         name="run_powershell",
         description=(
-            "Run a Windows PowerShell 5.1 command and return its exit code, stdout and stderr. "
-            "Use it for anything on the system: settings, processes, services, network, registry, "
-            "installed apps, opening programs. Prefer non-interactive commands. "
-            "This is PowerShell 5.1; use `cwd` instead of cd. " + note +
-            "Do unit conversions inside the command, never by hand: e.g. "
-            "Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}. "
-            "The working directory is Gengar's workspace folder unless `cwd` is given."
+            "Run a Windows PowerShell 5.1 command; returns exit code, stdout and stderr. Can do almost "
+            "anything on the system (processes, services, network, registry). Use non-interactive commands, "
+            "one clear command rather than many small ones, and `cwd` instead of cd (default: workspace). "
+            + note + "Convert units inside the command, e.g. "
+            "Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}."
         ),
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "PowerShell command or script to run."},
-                "timeout": {"type": "integer", "description": f"Seconds before the command is killed (default {DEFAULT_TIMEOUT}, max {MAX_TIMEOUT})."},
-                "cwd": {"type": "string", "description": "Optional working directory."},
+                "command": {"type": "string"},
+                "timeout": {"type": "integer", "description": f"Seconds (default {DEFAULT_TIMEOUT}, max {MAX_TIMEOUT})."},
+                "cwd": {"type": "string"},
             },
             "required": ["command"],
         },
