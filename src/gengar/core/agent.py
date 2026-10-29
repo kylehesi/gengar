@@ -108,9 +108,12 @@ def _announces_action(text: str) -> bool:
 # "Oluşturdum / kaydedildi / sildim …": yapılmış bir değişiklik iddiası. Olumsuzları ("silinmedi",
 # "oluşturulamadı") eşleşmez. "yazdım" tek başına sohbette yazılan metin de olabilir; dosya/klasör
 # sözüyle birlikte geçince sayılır.
+# Model bazen kendinden 3. şahısla söz ediyor ("Metni Notlar klasörüne kaydetti."; 2026-10-29 tekrar oynatma).
 _CLAIM = re.compile(
     r"\b\w*(oluşturdum|oluşturuldu|kaydettim|kaydedildi|sildim|silindi|taşıdım|taşındı|güncelledim|"
     r"güncellendi|değiştirdim|değiştirildi)\b"
+    # Ön eksiz: "\w*sildi" "kesildi"yi de yakalardı.
+    r"|\b(oluşturdu|kaydetti|sildi|taşıdı|güncelledi|değiştirdi)\b"
     r"|\b(dosya|klasör)\w*\b[^.\n]{0,40}\b(yazdım|yazıldı|hazırladım|hazırlandı|ekledim|eklendi)\b"
     r"|\bI(?:'ve| have)? (created|saved|deleted|moved|wrote|written|updated)\b"
     r"|\b(has|have) been (created|saved|deleted|moved|written|updated)\b",

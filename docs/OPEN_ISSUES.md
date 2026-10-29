@@ -76,9 +76,14 @@ at all**, neither does "try again" at 16:06:45; no new .md file on the Desktop.
       Windows' misleading "Permission denied".
 - [ ] The `save_answer_md` target should also be a realistically named sub-folder (the current folder name
       produces the artefact). If changed, re-run that family's baseline and final measurements.
-- [ ] **Over-confirmation:** for "…write the text, would you save it to folder X?" the 9B wrote the text, asked
+- [~] **Over-confirmation:** for "…write the text, would you save it to folder X?" the 9B wrote the text, asked
       "shall we save it?" and did not save (write_to_folder_7, dev, 1/10). It reads the polite question as a
       real question.
+      v0.0.6: system prompt rule; replay "create a folder" 3/6 → 6/6, write_to_folder_7 1/6 → 3/6. Remaining
+      pattern: "…I'll save it. Ready?" (announcement + permission question; the nudge skips replies ending with
+      a question).
+- [ ] **Changing Turkish letters on its own:** in write_to_folder_8 (2026-10-29) the model wrote to `Yapilacaklar`
+      instead of `Yapılacaklar`, creating a new folder. It should use the existing folder's name exactly.
 - [ ] **Unrequested side effect:** for "write an 8-item plan" the 9B saved the plan as a file on the user's Desktop
       on its own initiative instead of writing it in the chat (save_answer_md_4, 2026-10-20 17:32; benchmark
       approvals are automatic so the file was really written, then moved to the Recycle Bin). In real use the

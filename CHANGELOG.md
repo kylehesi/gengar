@@ -6,11 +6,37 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.6](#006---2026-10-29) | 2026-10-29 | Fewer unnecessary questions: a system prompt rule, replay-tested; same pass rate, 18% faster on the affected tasks |
 | [0.0.5](#005---2026-10-29) | 2026-10-29 | "Announce and stop" fix: up to two nudges per turn, also after tool use; replay-tested on a real session |
 | [0.0.4](#004---2026-10-27) | 2026-10-27 | `save_skill` removed (prefix 3,525 tokens); A/B benchmark: same pass rate, 10% faster; `save_answer` approval shows the real target |
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.6] - 2026-10-29
+
+### Highlights
+- **Gengar asks fewer unnecessary questions.** For "create a folder on the Desktop and split it by month" the
+  model used to ask "What should the folder be called?" without doing anything. Replaying that request: it now
+  starts working 6 of 6 times (before: 3 of 6).
+
+### Changed
+- System prompt rule: details with a sensible default (name, format, location) are chosen by the model, which
+  then says what it chose; the requested action is done instead of asking "shall I?", since risky actions get
+  an approval prompt anyway. Questions are kept for requests that could mean clearly different things.
+  Prefix: 3,525 → 3,623 tokens.
+- The claim check also recognises the third-person forms the model sometimes uses about itself ("Metni
+  klasöre kaydetti."), but not look-alikes such as "kesildi".
+
+### Notes
+- Necessary questions are kept: with two matching folders and a delete request, the model still asks which
+  one 6 of 6 times, with the old and the new prompt.
+- End-to-end benchmark on the affected families (38 tasks): 32/38 before and after, 623 s → 508 s (−18%),
+  44 → 33 tool calls. No extra tool use in tasks that need none.
+- Not fixed on purpose: "…I'll save it. Ready?" appeared in one task among 1,766 logged stopping points.
+- Found while testing: after the user denies a deletion, the model often retries it with a different tool
+  (`Remove-Item` denied → `delete_files`), and the user is asked again. Fixed in the next version.
+- New open issue: the model sometimes writes to `Yapilacaklar` instead of the existing `Yapılacaklar` folder.
 
 ## [0.0.5] - 2026-10-29
 

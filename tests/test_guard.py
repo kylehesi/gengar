@@ -102,6 +102,7 @@ def test_agent_refuses_protected_delete_even_in_trust_mode(protected, tmp_path):
     "Türkçe klasörler silindi.",
     "Kurs planını dosyaya yazdım.",
     "I've created the plan file.",
+    "Metni Notlar klasörüne kaydetti.",   # model kendinden 3. şahısla söz ediyor
 ])
 def test_claims(text):
     assert _claims_change(text)
@@ -112,6 +113,7 @@ def test_claims(text):
     "Dosya oluşturulamadı.",
     "İşte programı yazdım:\n1. gün ...",   # sohbette yazılan metin, dosya iddiası değil
     "Bilgisayarınızda 16 GB RAM var.",
+    "İndirme sırasında bağlantı kesildi.",  # "kesildi" "sildi" ile bitiyor ama iddia değil
 ])
 def test_not_claims(text):
     assert not _claims_change(text)

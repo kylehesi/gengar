@@ -345,6 +345,30 @@ step), announcements after tool use were never checked, and the Turkish "let me 
   "you announced again; if you cannot do it, tell the user": **3/6**. The model took the way out and
   explained instead. Lesson: an option added "just in case" becomes the model's easiest path.
 
+**The unnecessary-question rule (v0.0.6, 2026-10-29).** In the same session the model answered "create a folder
+on the Desktop" with "What should the folder be called?" without doing anything, and the user said "up to
+you". This time the fix is in the system prompt, not the loop: some questions are necessary ("two folders
+match, which one should I delete?") and only the model can tell which from the context. The rule: don't ask
+about details with a sensible default (name, format, location): choose, do it, say what you chose; don't ask
+"shall I?" about the requested action, since risky actions get an approval prompt anyway. The model was
+asking for permission a second time because it did not know about the permission layer.
+
+| Replay (6 tries each) | Old | New |
+|---|---|---|
+| "Create a folder" (real session): started working | 3/6 | **6/6** |
+| `write_to_folder_7` ("would you save it?"): started working | 1/6 | 3/6 |
+| CONTROL: two folders matched, delete requested: asked | 6/6 | **6/6** |
+
+End-to-end benchmark (38 tasks: saving, `file_organize`, `notool`, safety): 32/38 → 32/38, time 623 → 508 s
+(−18%), tool calls 44 → 33. The rule did not add tool use to tasks that need none. Replay looks only at the
+first step; in the real loop, announcements like "I'll save it." are caught by the nudge and undone claims
+like "saved it" by the claim check (layered safeguards). The claim detector now also knows the third-person
+forms the model sometimes uses about itself ("kaydetti / oluşturdu / sildi", but not "kesildi").
+
+Deliberately not added: "…I'll save it. Ready?" (announcement + short permission question). It appeared in a
+single task among 1,766 stopping points; a rule for one task would be overfitting. Nudges are now logged, so
+its frequency in real use can be tracked.
+
 ### Why
 
 - **These safeguards are almost unnecessary for large models (Claude, GPT) but essential for a 4–9B local

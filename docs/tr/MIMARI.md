@@ -355,6 +355,29 @@ sonraki duyurular hiç kontrol edilmiyordu ve "kontrol edeyim / bakalım" (-eyim
   söyle" diyen "sert" bir ikinci metin: **3/6**. Model kaçış yolunu seçip açıklamaya girişti. Ders: "her
   ihtimale karşı" eklenen seçenek modelin en kolay yolu olur.
 
+**Gereksiz soru kuralı (v0.0.6, 2026-10-29).** Aynı oturumda model "masaüstünde klasör aç" isteğine hiçbir şey
+yapmadan "Klasörün adı ne olsun?" diye sordu, kullanıcı "sana kalmış" dedi. Bu sefer çözüm döngüde değil,
+sistem promptunda: bazı sorular gerekli ("iki klasör eşleşti, hangisini sileyim?") ve hangisinin gerekli
+olduğunu ancak model bağlamdan anlayabilir. Kural: varsayılanı olan ayrıntıları (ad, format, konum) sorma,
+seç, yap, neyi seçtiğini söyle; istenen işi "yapayım mı?" diye sorma, riskli işlemlere zaten onay soruluyor.
+Model aslında izin katmanını bilmediği için izni ikinci kez istiyordu.
+
+| Tekrar oynatma (6'şar deneme) | Eski | Yeni |
+|---|---|---|
+| "Klasör aç" (gerçek oturum): işe başladı | 3/6 | **6/6** |
+| `write_to_folder_7` ("kaydeder misin?"): işe başladı | 1/6 | 3/6 |
+| KONTROL: iki klasör eşleşti, silme istendi: soru sordu | 6/6 | **6/6** |
+
+Uçtan uca ölçüm (38 görev: kaydetme, `file_organize`, `notool`, güvenlik): 32/38 → 32/38, süre 623 → 508 sn
+(−%18), araç çağrısı 44 → 33. Kural araç gerektirmeyen görevlerde gereksiz araç kullanımını artırmadı.
+Tekrar oynatma yalnızca ilk adıma bakar; gerçek döngüde "kaydedeceğim." gibi duyuruları dürtme, "kaydetti"
+gibi yapılmamış iddiaları iddia kontrolü yakalıyor (katmanlı koruma). İddia algılayıcısı modelin kendinden 3.
+şahısla söz ettiği "kaydetti / oluşturdu / sildi" biçimlerini de tanıyor ("kesildi" hariç).
+
+Bilerek eklenmeyen: "…kaydedeceğim. Hazır mısın?" (duyuru + kısa izin sorusu). 1.766 duruş noktasında
+yalnızca bir görevde görüldü; tek görev için kural yazmak aşırı uydurma olur. Dürtmeler artık audit log'a
+yazıldığı için gerçek kullanımda sıklığı izlenebilir.
+
 ### Neden böyle
 
 - **Bu önlemler büyük modellerde (Claude, GPT) neredeyse gereksiz; 4–9B yerel modelde şart.** Projenin

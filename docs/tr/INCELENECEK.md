@@ -93,8 +93,12 @@ sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. O
       Yapılan: write_file'a klasör yolu verilince Windows'un "Permission denied"ı yerine açık hata.
 - [ ] `save_answer_md` ailesinde de hedef, gerçekçi adlı bir alt klasör olmalı (şu anki klasör adı
       artefakt üretiyor). Değişirse ailenin başlangıç/son ölçümleri yenilenmeli.
-- [ ] **Aşırı onay sorma:** "…metni yaz, X klasörüne kaydeder misin?" isteğinde 9B metni yazıp "kaydedelim mi?"
+- [~] **Aşırı onay sorma:** "…metni yaz, X klasörüne kaydeder misin?" isteğinde 9B metni yazıp "kaydedelim mi?"
       diye sordu, kaydetmedi (write_to_folder_7, dev, 1/10). Kibar soru kalıbını onay sorusu sanıyor.
+      v0.0.6: sistem promptu kuralı; tekrar oynatmada "klasör aç" 3/6 → 6/6, write_to_folder_7 1/6 → 3/6.
+      Kalan kalıp: "…kaydedeceğim. Hazır mısın?" (duyuru + izin sorusu; dürtme soruyla biten cevaba bakmıyor).
+- [ ] **Türkçe harfi kendiliğinden değiştirme:** write_to_folder_8'de (2026-10-29) model `Yapılacaklar` yerine
+      `Yapilacaklar` klasörüne yazdı, yani yeni bir klasör açtı. Var olan klasörün adını aynen kullanmalı.
 - [ ] **İstenmeyen yan etki:** "8 maddelik plan yaz" isteğinde 9B planı sohbete yazmak yerine kendi
       kararıyla kullanıcının masaüstüne dosya olarak kaydetti (save_answer_md_4, 2026-10-20 17:32; ölçüm
       onayları otomatik olduğu için gerçekten yazıldı, sonra geri dönüşüm kutusuna atıldı). Gerçek
