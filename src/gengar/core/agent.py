@@ -30,6 +30,12 @@ Answer = Literal["yes", "no", "session"]
 RESPONSE_RESERVE_TOKENS = 1500
 
 DENIED = "The user denied this action. Do not retry it; ask the user how they want to proceed."
+# Ret sonrası model aynı işi başka araçla deniyordu (Remove-Item reddedildi → delete_files) ve kullanıcıya aynı
+# silme tekrar soruluyordu: tekrar oynatmada 6 denemenin 5'i (2026-10-29). Turda bir ret olduysa onay gerektiren
+# yeni çağrılar sorulmadan reddedilir.
+ALREADY_DENIED = ("Not executed: the user denied an action earlier in this request, so Gengar does not ask again "
+                  "with a different tool or command. Tell the user what was not done and ask how they want to "
+                  "proceed.")
 # Aynı başarısız çağrı bu kadar kez engellenirse tur durdurulur.
 MAX_BLOCKED = 3
 # Model boş cevapla biterse en fazla bu kadar kez tekrar istenir.
@@ -162,6 +168,7 @@ class Agent:
         self._last_failed: tuple[str, str] | None = None
         self._last_error = ""
         self._changed = False  # bu turda yazan/silen bir araç başarıyla çalıştı mı
+        self._denied = False   # bu turda kullanıcı bir eylemi reddetti mi
 
     def _max_chars(self) -> int | None:
         ctx = self.client.context_tokens
@@ -178,6 +185,7 @@ class Agent:
         mark = len(self.conversation.history)
         self._last_failed = None
         self._changed = False
+        self._denied = False
         self._set_thinking(user_text)
         context = self.memory.context_for(user_text) if self.memory else ""
         self.conversation.add_user(user_text)
@@ -393,8 +401,13 @@ class Agent:
         summary = tool.summary(args)
         decision = "auto"
         if self.policy.needs_confirmation(tool.name, risk):
+            if self._denied:
+                self.audit.record("tool", tool=tool.name, args=args, risk=risk.label, decision="after_denial")
+                ui.on_tool_end(call, ALREADY_DENIED, False)
+                return ALREADY_DENIED
             answer = ui.confirm(tool, summary, risk, self.policy.can_grant_for_session(risk))
             if answer == "no":
+                self._denied = True
                 self.audit.record("tool", tool=tool.name, args=args, risk=risk.label, decision="denied")
                 ui.on_tool_end(call, DENIED, False)
                 return DENIED

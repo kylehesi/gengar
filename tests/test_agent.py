@@ -3,7 +3,7 @@ import json
 import pytest
 
 from gengar.core import Agent, AuditLog, Conversation, PermissionPolicy
-from gengar.core.agent import DENIED
+from gengar.core.agent import ALREADY_DENIED, DENIED
 from gengar.llm import LLMError, ToolCall
 from gengar.llm.client import _ToolCallBuffer
 from gengar.tools import Risk, Tool, ToolError, ToolRegistry
@@ -74,6 +74,27 @@ def test_denied_action_is_reported_to_model(tmp_path):
     assert ("confirm", "system", Risk.SYSTEM, False) in ui.events
     assert not any(e[0] == "start" for e in ui.events)
     assert [e for e in audit_entries(agent) if e["event"] == "tool"][-1]["decision"] == "denied"
+
+
+def test_after_denial_other_tool_is_not_asked_again(tmp_path):
+    # Remove-Item reddedilince model aynı silmeyi delete_files ile deniyordu; kullanıcıya tekrar soruluyordu.
+    agent, client = make_agent([
+        ("", [call("system", "c1", text="Remove-Item x")]),
+        ("", [call("write", "c2", text="x'i geri dönüşüme at"), call("echo", "c3", text="oku")]),
+        ("Silmedim; nasıl devam edelim?", []),
+        ("", [call("write", "c4", text="yeni istek")]),   # sonraki istekte yine sorulur
+        ("Tamam.", []),
+    ], tmp_path)
+    ui = RecordingUI(answers=["no", "yes"])
+    agent.run("x'i sil", ui)
+    outputs = [m["content"] for m in agent.conversation.history if m["role"] == "tool"]
+    assert outputs == [DENIED, ALREADY_DENIED, "echo: oku"]   # okuma yine çalışır
+    assert [e[1] for e in ui.events if e[0] == "confirm"] == ["system"]  # yalnızca bir kez soruldu
+    decisions = [e.get("decision") for e in audit_entries(agent) if e["event"] == "tool"]
+    assert decisions == ["denied", "after_denial", "auto"]
+
+    agent.run("şimdi şunu yaz", ui)
+    assert [e[1] for e in ui.events if e[0] == "confirm"] == ["system", "write"]
 
 
 def test_session_grant_skips_next_confirmation(tmp_path):

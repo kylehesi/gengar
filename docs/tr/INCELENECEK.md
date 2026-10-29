@@ -113,6 +113,12 @@ sohbet geçmişi özelliğinden önce açıldığı için `data/chats`'te yok. O
 düşünme moduna geçti, reddedilen çağrıyı **aynen tekrar** denedi (tekrar koruması engelledi), sonra o kadar
 uzun düşündü ki 120 sn sınırını aştı. Madde 1'deki zaman aşımı sorunuyla bağlantılı olabilir.
 
+**Kısmen çözüldü (v0.0.7, 2026-10-29).** Tekrar oynatmada model reddi "yanlış yöntem" sanıp aynı silmeyi
+*başka araçla* deniyordu (`Remove-Item` reddedildi → `delete_files`; 6 denemenin 5'i), aynı olmayan çağrıyı
+tekrar koruması yakalamıyordu ve kullanıcıya aynı silme yeniden soruluyordu. Artık turda bir ret olduysa onay
+gerektiren yeni çağrılar sorulmadan reddediliyor (`ALREADY_DENIED`). Düşünme varsayılan olarak kapalı
+olduğu için (v0.0.2) zaman aşımı kısmı da büyük olasılıkla geçersiz; yeniden görülürse incelenecek.
+
 ## 3. `tests/test_ui.py::test_inspect_type_click` başarısız
 
 Gerçek bir pencereye yazı yazıp tıklayan test. 2026-10-20'de değişiklikler geri alınınca da başarısız →

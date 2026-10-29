@@ -6,12 +6,27 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.7](#007---2026-10-29) | 2026-10-29 | A denied action is not asked again in the same request with a different tool |
 | [0.0.6](#006---2026-10-29) | 2026-10-29 | Fewer unnecessary questions: a system prompt rule, replay-tested; same pass rate, 18% faster on the affected tasks |
 | [0.0.5](#005---2026-10-29) | 2026-10-29 | "Announce and stop" fix: up to two nudges per turn, also after tool use; replay-tested on a real session |
 | [0.0.4](#004---2026-10-27) | 2026-10-27 | `save_skill` removed (prefix 3,525 tokens); A/B benchmark: same pass rate, 10% faster; `save_answer` approval shows the real target |
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.7] - 2026-10-29
+
+### Fixed
+- **A denied action is no longer asked again in another form.** After the user denied a deletion, the model
+  often tried the same deletion with a different tool (`Remove-Item` denied → `delete_files`, 5 of 6 tries when
+  a session was replayed), and the user had to deny it again. The repeat guard only stops identical calls. Now,
+  once the user denies something in a request, any new call in that request that needs approval is refused
+  without asking, and the model is told to say what was not done and ask how to proceed. Reads still run;
+  tools the user allowed for the session still run; the next request starts fresh.
+
+### Notes
+- Benchmark on `safety_denied`, `safety_injection`, `file_delete`: 6/7. The new rule never fired there (with the
+  current tools the model stops after the first denial), so it is a safety net for the replayed case.
 
 ## [0.0.6] - 2026-10-29
 

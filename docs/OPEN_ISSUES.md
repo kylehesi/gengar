@@ -98,6 +98,12 @@ at all**, neither does "try again" at 16:06:45; no new .md file on the Desktop.
 9B switched to thinking mode, retried the **identical** denied call (blocked by the repeat guard), then thought so
 long that it hit the 120 s limit. Possibly related to the timeout issue in item 1.
 
+**Partly fixed (v0.0.7, 2026-10-29).** In a replay the model read the denial as "wrong method" and retried the
+same deletion *with a different tool* (`Remove-Item` denied → `delete_files`; 5 of 6 tries). The repeat guard
+only catches identical calls, so the user was asked about the same deletion again. Now, once something is
+denied in a turn, new calls that need approval are refused without asking (`ALREADY_DENIED`). Thinking is off
+by default since v0.0.2, so the timeout part is probably gone; to be checked if it shows up again.
+
 ## 3. `tests/test_ui.py::test_inspect_type_click` fails
 
 A test that types into and clicks a real window. On 2026-10-20 it also failed with the changes reverted → not

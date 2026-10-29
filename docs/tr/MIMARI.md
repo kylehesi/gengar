@@ -339,6 +339,7 @@ gerçek bir hatadan doğdu:
 | Model **aynı başarısız komutu tekrar tekrar** denedi | Aynı başarısız çağrıyı çalıştırma, "önceki hatayı oku" de; 3 kez olursa turu durdur | `REPEATED`, `MAX_BLOCKED` |
 | Model bir şeyi **yapmadığı hâlde "oluşturdum" dedi** | Bu turda yazan bir araç çalışmadıysa bir kez uyar | `CLAIMED`, `_claims_change` |
 | `auto` modda bir adım başarısız oldu | Yalnızca sonraki adımda düşün | `_think_next_step` |
+| Kullanıcı silmeyi reddetti, model **aynı silmeyi başka araçla** denedi (`Remove-Item` → `delete_files`); kullanıcıya tekrar soruldu | Turda bir ret olduysa onay gerektiren yeni çağrıları sormadan reddet; okumalar çalışır | `ALREADY_DENIED`, `_denied` |
 
 **"Duyurup durma" düzeltmesi (v0.0.5, 2026-10-29).** Gerçek bir oturumda (masaüstünde aylara göre
 klasör) model üç kez duyurup durdu ve kullanıcı "ee eklesene?" demek zorunda kaldı. Sebepler: turda tek

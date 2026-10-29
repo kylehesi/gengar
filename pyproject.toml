@@ -1,6 +1,6 @@
 [project]
 name = "gengar"
-version = "0.0.6"
+version = "0.0.7"
 description = "Windows desktop assistant powered by a local or API language model (capstone project)"
 license = "MIT"
 authors = [{ name = "Emir" }]

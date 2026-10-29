@@ -325,6 +325,7 @@ in a measurement or a test:
 | The model **repeated the same failing command** | Do not run an identical failing call again, say "read the previous error"; stop after 3 | `REPEATED`, `MAX_BLOCKED` |
 | The model **said "I created it" without doing it** | If no writing tool succeeded this turn, warn once | `CLAIMED`, `_claims_change` |
 | A step failed in `auto` mode | Think on the next step only | `_think_next_step` |
+| The user denied a deletion and the model tried **the same deletion with another tool** (`Remove-Item` → `delete_files`); the user was asked again | After a denial in a turn, refuse new calls that need approval without asking; reads still run | `ALREADY_DENIED`, `_denied` |
 | The reply was **cut off at the context limit** (`finish_reason=length`); the half-written tool call never arrives and looks like an empty answer | Recognise it, do not retry, explain what happened | `TRUNCATED` |
 | A model error **deleted the user's request** from the history, so "try again" repeated the *previous* request | Keep the request with a "(no answer could be produced, error: …)" note | `FAILED_NOTE` |
 
