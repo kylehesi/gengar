@@ -320,13 +320,30 @@ in a measurement or a test:
 
 | Problem (observed) | Safeguard | In code |
 |---|---|---|
-| The model said "I'll list the files:" and **stopped without calling a tool** | Nudge once: "Do it now, with a tool" | `CONTINUE`, `_announces_action` |
+| The model said "I'll list the files:" and **stopped without calling a tool**; also after using tools ("now I'll add the subfolders:") | Nudge at most twice per turn: "Do it now, with a tool"; if it still stops, add an "the task may not be finished" note to the answer | `CONTINUE`, `MAX_NUDGES`, `_announces_action`, `UNFINISHED` |
 | **Empty answer** after a tool result (random in Qwen3.5; 55% of sessions with thinking on) | Retry the step without thinking, then an explicit warning, finally show the last tool output | `MAX_EMPTY_RETRIES`, `FINAL_ANSWER`, `_fallback_answer` |
 | The model **repeated the same failing command** | Do not run an identical failing call again, say "read the previous error"; stop after 3 | `REPEATED`, `MAX_BLOCKED` |
 | The model **said "I created it" without doing it** | If no writing tool succeeded this turn, warn once | `CLAIMED`, `_claims_change` |
-| A step failed on a request that looked simple | Turn thinking on for that request | `_escalate` |
+| A step failed in `auto` mode | Think on the next step only | `_think_next_step` |
 | The reply was **cut off at the context limit** (`finish_reason=length`); the half-written tool call never arrives and looks like an empty answer | Recognise it, do not retry, explain what happened | `TRUNCATED` |
 | A model error **deleted the user's request** from the history, so "try again" repeated the *previous* request | Keep the request with a "(no answer could be produced, error: …)" note | `FAILED_NOTE` |
+
+**The "announce and stop" fix (v0.0.5, 2026-10-29).** In a real session (month folders on the Desktop) the
+model announced a step and stopped three times, and the user had to ask "so add them?". The causes: one
+nudge per turn (the model started working after the nudge, then announced and stopped again on the next
+step), announcements after tool use were never checked, and the Turkish "let me check / let's look" forms
+(-eyim, -elim) were missing.
+
+- **The detector was tried on the logs first.** Before changing any code it was run on 1,644 stopping points
+  (benchmark + chat history). Offers ("I can do it if you want") and requests for information ("tell me and
+  I'll save it") gave false alarms in the first try and were excluded. Result: 13 matches, 12 of them real
+  announcements. Only the last sentence is checked: "let's sort them: the newest is rapor_3.txt" is a finished
+  answer.
+- **Whether the nudge works was measured by replay.** The real session was given to Qwen3.5 9B up to the
+  point where the model stopped, with the nudge appended (tools were not run; only whether a call was made
+  was counted, 6 tries each). The same `CONTINUE` text again: **6/6**. A "stronger" second text that said
+  "you announced again; if you cannot do it, tell the user": **3/6**. The model took the way out and
+  explained instead. Lesson: an option added "just in case" becomes the model's easiest path.
 
 ### Why
 

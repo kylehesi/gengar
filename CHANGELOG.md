@@ -6,10 +6,38 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.5](#005---2026-10-29) | 2026-10-29 | "Announce and stop" fix: up to two nudges per turn, also after tool use; replay-tested on a real session |
 | [0.0.4](#004---2026-10-27) | 2026-10-27 | `save_skill` removed (prefix 3,525 tokens); A/B benchmark: same pass rate, 10% faster; `save_answer` approval shows the real target |
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.5] - 2026-10-29
+
+### Highlights
+- **The model no longer leaves the user with an announced but undone step as easily.** In a real session it
+  said "I'll add the month subfolders:" and stopped three times; the user had to ask "so add them?". Replaying
+  that session up to each stop, the nudge now makes the model call a tool 6 of 6 times.
+
+### Changed
+- The "do it now" nudge can fire twice per turn instead of once. The model often started working after the
+  first nudge, then announced and stopped again on the next step.
+- Announcements are also caught after tools were used ("Klasör oluşturuldu. Şimdi alt klasörleri ekleyeceğim:").
+- The detector looks at the last sentence only and knows more Turkish forms: "kontrol edeyim", "bakalım"
+  (-eyim/-ayım, -elim/-alım). Negatives ("yapmayacağım"), offers ("isterseniz yapayım") and requests for
+  information ("bana söyle, kaydedeyim") are not announcements. Tried on 1,644 logged stopping points before
+  the code changed: 13 matches, 12 real announcements.
+- If the model still announces and stops after two nudges, the answer ends with a note that the task may not
+  be finished.
+- Nudges and unfinished turns are recorded in the audit log (`nudge`, `unfinished`), so real use can be
+  measured.
+
+### Notes
+- A "stronger" second nudge ("you announced again; if you cannot do it, tell the user") was tested and
+  rejected: 3/6 tool calls versus 6/6 for repeating the same nudge. The model took the way out it was offered.
+- Targeted benchmark (`memory_fact`, `web_version`, `file_rename_ext`, `file_folder_size`): 9/12; the nudge
+  fired once, in a passing task. The three failures are unrelated model errors.
+- Docs: the safeguard table now names `_think_next_step` (it still said `_escalate`).
 
 ## [0.0.4] - 2026-10-27
 

@@ -79,6 +79,15 @@ def test_export_keeps_clean_sessions_only():
                                       *good["messages"][1:]]}
     roles = [m["role"] for m in clean_session(announced)["messages"]]
     assert roles[:3] == ["system", "user", "assistant"] and "Önce" not in clean_session(announced)["messages"][2]["content"]
+    # Turda iki dürtme: ikisinin duyuru mesajı da ayıklanmalı.
+    twice = {**good, "messages": [good["messages"][0],
+                                  {"role": "assistant", "content": "Önce dosyayı okuyacağım."},
+                                  {"role": "user", "content": "[Gengar] Do it now: ..."},
+                                  {"role": "assistant", "content": "Şimdi dosyayı okuyacağım:"},
+                                  {"role": "user", "content": "[Gengar] Do it now: ..."},
+                                  *good["messages"][1:]]}
+    texts = [m.get("content") or "" for m in clean_session(twice)["messages"]]
+    assert not any("okuyacağım" in t for t in texts)
 
     blocked = {**good, "messages": good["messages"][:2] + [
         {"role": "tool", "tool_call_id": "c1", "name": "read_file", "content": "Not executed: ..."}]

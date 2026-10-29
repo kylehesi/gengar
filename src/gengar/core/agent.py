@@ -35,6 +35,13 @@ MAX_BLOCKED = 3
 # Model boş cevapla biterse en fazla bu kadar kez tekrar istenir.
 MAX_EMPTY_RETRIES = 2
 CONTINUE = "[Gengar] Do it now: carry out those steps yourself with tool calls instead of describing them."
+# Model dürtmeden sonra işe başlayıp bir sonraki adımda yine "şimdi şunu ekleyeceğim:" deyip durabiliyor
+# (2026-10-26 gerçek oturum: kullanıcı "ee eklesene?" demek zorunda kaldı). Turda en fazla bu kadar dürtülür.
+# İkinci dürtme de aynı metin: gerçek oturumu tekrar oynatınca aynı CONTINUE 6/6 araç çağırttı; "yapamıyorsan
+# kullanıcıya söyle" kaçış yolu içeren "sert" bir metin 3/6 (model açıklamaya kaçtı).
+MAX_NUDGES = 2
+UNFINISHED = ("(Gengar: Model bir sonraki adımı duyurdu ama yapmadı; iş tamamlanmamış olabilir. Devam etmesi "
+              "için \"devam et\" yazabilirsiniz.)")
 FINAL_ANSWER = ("[Gengar] Your last reply was empty. Using the tool results you already have above, write your "
                 "final answer to the user's request now. Do not redo the work.")
 # Model hata verince isteğin yanına geçmişe yazılır; "tekrar dene" denince model neyin yarım kaldığını görür.
@@ -61,15 +68,41 @@ REPEATED = ("Not executed: you just made this exact call and it failed. Repeatin
             "Read the previous error and change the command, the arguments, or the approach.")
 
 
-# Gelecek zamanlı eylem bildirimi: "listeleyeceğim", "kontrol edeceğim", "yapacağım", "let me", "I'll".
-_FUTURE_ACTION = re.compile(r"\w+(?:ece|aca)ğım\b|\w+(?:eceğiz|acağız)\b|\blet me\b|\bI'll\b|\bI will\b",
-                            re.IGNORECASE)
+# Eylem duyurusu: "ekleyeceğim", "bakacağız", "kontrol edeyim", "oluşturalım", "let me", "I'll".
+# Olumsuzlar ("yapmayacağım", "eklemeyelim") ret ya da vazgeçmedir, duyuru değil: önünde -ma/-me(y) olamaz.
+_FUTURE_ACTION = re.compile(
+    r"\w+(?<!m[ae]y)(?:ece|aca)ğım\b|\w+(?<!m[ae]y)(?:eceğiz|acağız)\b"
+    r"|\w+(?<!m[ae])y?(?:eyim|ayım)\b|\w+(?<!m[ae])y?(?:elim|alım)\b"
+    r"|\blet me\b|\bI'll\b|\bI will\b|\bI am going to\b",
+    re.IGNORECASE)
+# Teklif ("istersen yapayım") ya da kullanıcıdan bilgi isteme ("bana söyle, kaydedeyim"): seçim kullanıcıda,
+# dürtülmez.
+_OFFER = re.compile(
+    r"\bister(?:sen|seniz)\b|\bdilerseniz\b|\bif you (?:want|like|prefer)\b|\bwould you like\b"
+    r"|\b(?:söyle|söyleyin|belirt|belirtin|bildir|bildirin|paylaş|paylaşın)\b",
+    re.IGNORECASE)
+# ":" + boşluk da böler: "sıralayalım: en yenisi rapor_3.txt" duyurusunun sonucu aynı satırda ("15:32" bölünmez).
+_SENTENCE_END = re.compile(r"(?<=[.!?:])\s+|\n+")
+
+
+def _last_sentence(text: str) -> str:
+    parts = [p.strip() for p in _SENTENCE_END.split(text.strip()) if p.strip()]
+    return parts[-1] if parts else ""
 
 
 def _announces_action(text: str) -> bool:
-    """Cevap, yapılacak bir işi duyurup bitiyorsa (henüz hiçbir araç çağrılmamışken) True."""
-    tail = text.strip()[-300:]
-    return bool(tail) and bool(_FUTURE_ACTION.search(tail)) and "?" not in tail[-80:]
+    """Cevap, yapılacak bir işi duyurup bitiyorsa True ("şu adımları uygulayacağım:" dahil).
+
+    Yalnızca son cümleye bakılır: "Dosyaları sıralayalım: en yenisi rapor_3.txt." tamamlanmış bir cevaptır.
+    Kayıtlı 1.644 duruş noktasında denendi: 13 yakalama, 12'si gerçek duyuru (2026-10-29).
+    """
+    t = text.strip()
+    if not t:
+        return False
+    if t.endswith(":"):
+        return True
+    s = _last_sentence(t)
+    return not s.endswith("?") and bool(_FUTURE_ACTION.search(s)) and not _OFFER.search(s)
 
 
 # "Oluşturdum / kaydedildi / sildim …": yapılmış bir değişiklik iddiası. Olumsuzları ("silinmedi",
@@ -231,9 +264,8 @@ class Agent:
 
     def _loop(self, ui: AgentUI) -> str:
         schemas = self.tools.schemas()
-        nudged = False
+        nudges = 0
         claim_checked = False
-        used_tools = False
         empty_retries = 0
         restore_think: str | None = None
         blocked = 0
@@ -255,11 +287,19 @@ class Agent:
 
             if not calls:
                 # Küçük modeller "şu adımları uygulayacağım:" / "önce dosyaları listeleyeceğim." deyip
-                # araç çağırmadan durabiliyor.
-                if not nudged and (text.rstrip().endswith(":") or (not used_tools and _announces_action(text))):
-                    nudged = True
-                    self.conversation.add_user(CONTINUE)
-                    continue
+                # araç çağırmadan durabiliyor; araç kullandıktan sonra da ("şimdi alt klasörleri ekleyeceğim:").
+                if _announces_action(text):
+                    if nudges < MAX_NUDGES:
+                        nudges += 1
+                        self.audit.record("nudge", n=nudges, text=_last_sentence(text)[-200:])
+                        self.conversation.add_user(CONTINUE)
+                        continue
+                    # İki dürtmeye rağmen yine duyurup durdu: kullanıcı yapılmamış bir sözle kalmasın.
+                    self.audit.record("unfinished", text=_last_sentence(text)[-200:])
+                    self.conversation.history.pop()
+                    text = text.rstrip() + "\n\n" + UNFINISHED
+                    self.conversation.add_assistant(text)
+                    return text
                 # Bazı modeller (örn. qwen3.5 + Ollama) araç sonucundan sonra ara sıra boş cevapla bitiriyor;
                 # aynı bağlam tekrar oynatılınca cevap geliyor, yani rastlantısal. Birkaç kez tekrar iste.
                 # Düşünme açıkken qwen3.5 bu sorunu çok daha sık yaşıyor (veri üretiminde oturumların
@@ -296,7 +336,6 @@ class Agent:
                     continue
                 return text
             failed = False
-            used_tools = True
             for call in calls:
                 sig = _signature(call)
                 if sig == self._last_failed:

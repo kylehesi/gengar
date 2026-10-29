@@ -334,11 +334,26 @@ gerçek bir hatadan doğdu:
 
 | Sorun (gözlenen) | Önlem | Kodda |
 |---|---|---|
-| Model "dosyaları listeleyeceğim:" deyip **araç çağırmadan durdu** | Bir kez dürt: "Şimdi yap, araçla" | `CONTINUE`, `_announces_action` |
+| Model "dosyaları listeleyeceğim:" deyip **araç çağırmadan durdu**; araç kullandıktan sonra da ("şimdi alt klasörleri ekleyeceğim:") | Turda en fazla iki kez dürt: "Şimdi yap, araçla"; yine durursa cevaba "iş tamamlanmamış olabilir" notu ekle | `CONTINUE`, `MAX_NUDGES`, `_announces_action`, `UNFINISHED` |
 | Model araç sonucundan sonra **boş cevap** verdi (Qwen3.5'te rastlantısal; düşünme açıkken oturumların %55'inde) | Önce aynı adımı düşünmesiz tekrar, sonra açık uyarı, en son son araç çıktısını göster | `MAX_EMPTY_RETRIES`, `FINAL_ANSWER`, `_fallback_answer` |
 | Model **aynı başarısız komutu tekrar tekrar** denedi | Aynı başarısız çağrıyı çalıştırma, "önceki hatayı oku" de; 3 kez olursa turu durdur | `REPEATED`, `MAX_BLOCKED` |
 | Model bir şeyi **yapmadığı hâlde "oluşturdum" dedi** | Bu turda yazan bir araç çalışmadıysa bir kez uyar | `CLAIMED`, `_claims_change` |
-| Basit sanılan istekte bir adım başarısız oldu | O istek için düşünme modunu aç | `_escalate` |
+| `auto` modda bir adım başarısız oldu | Yalnızca sonraki adımda düşün | `_think_next_step` |
+
+**"Duyurup durma" düzeltmesi (v0.0.5, 2026-10-29).** Gerçek bir oturumda (masaüstünde aylara göre
+klasör) model üç kez duyurup durdu ve kullanıcı "ee eklesene?" demek zorunda kaldı. Sebepler: turda tek
+dürtme hakkı vardı (model dürtmeden sonra işe başlayıp bir sonraki adımda yine duyurdu), araç kullanıldıktan
+sonraki duyurular hiç kontrol edilmiyordu ve "kontrol edeyim / bakalım" (-eyim, -elim) kalıpları yoktu.
+
+- **Algılayıcı önce kayıtlarda denendi.** Kod değiştirmeden önce 1.644 duruş noktasında (ölçüm + sohbet
+  geçmişi) çalıştırıldı. "İsterseniz yapayım" gibi teklifler ve "bana söyle, kaydedeyim" gibi bilgi istekleri
+  ilk denemede yanlış alarm verdi; hariç tutuldu. Sonuç: 13 yakalama, 12'si gerçek duyuru. Yalnızca son
+  cümleye bakılıyor: "sıralayalım: en yenisi rapor_3.txt" tamamlanmış bir cevap.
+- **Dürtmenin işe yaradığı tekrar oynatmayla ölçüldü.** Gerçek oturum modelin durduğu yere kadar
+  Qwen3.5 9B'ye verildi, sonuna dürtme eklendi (araçlar çalıştırılmadı, sadece çağrı yapılıp yapılmadığı
+  sayıldı, 6'şar deneme). Aynı `CONTINUE` metni tekrar: **6/6**. "Yine duyurdun; yapamıyorsan kullanıcıya
+  söyle" diyen "sert" bir ikinci metin: **3/6**. Model kaçış yolunu seçip açıklamaya girişti. Ders: "her
+  ihtimale karşı" eklenen seçenek modelin en kolay yolu olur.
 
 ### Neden böyle
 

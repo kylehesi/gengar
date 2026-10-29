@@ -37,7 +37,8 @@ def salvage(messages: list[dict]) -> tuple[list[dict], bool]:
 
     - "[Gengar] Your last reply was empty…": boş asistan adımı zaten geçmişten silinmişti; uyarı
       atılınca uyarıdan sonraki cevap doğrudan araç sonuçlarına verilmiş cevap olur.
-    - "[Gengar] Do it now…": modelin "şunu yapacağım" deyip durduğu araçsız mesaj da atılır.
+    - "[Gengar] Do it now…" (turda en fazla iki kez): modelin "şunu yapacağım" deyip durduğu araçsız mesaj
+      da atılır; yoksa öğrenci "duyur ve dur" davranışını öğrenir.
     - "[Gengar] Your answer says something was created…": yapılmamış işi "yaptım" diyen mesaj da atılır.
     Uyarıdan sonraki asistan mesajının düşünce metni atılır (uyarıya atıf yapıyor olabilir).
     """

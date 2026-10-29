@@ -189,17 +189,32 @@ def test_successful_call_can_be_repeated(tmp_path):
     assert outputs == ["echo: x", "echo: x"]
 
 
-def test_plan_without_action_is_nudged_once(tmp_path):
+def test_announce_after_tool_use_is_nudged_again(tmp_path):
+    # 2026-10-26 gerçek oturum: dürtmeden sonra klasörü oluşturdu, "şimdi alt klasörleri ekleyeceğim:"
+    # deyip yine durdu; tek dürtme hakkı bittiği için kullanıcı "ee eklesene?" demek zorunda kaldı.
+    agent, client = make_agent([
+        ("Klasörü oluşturacağım.", []),
+        ("", [call("echo", text="klasör")]),
+        ("Klasör oluşturuldu. Şimdi içine alt klasörleri ekleyeceğim:", []),
+        ("", [call("echo", "c2", text="alt")]),
+        ("Bitti: 12 alt klasör.", []),
+    ], tmp_path)
+    assert agent.run("klasör aç", RecordingUI()).strip() == "Bitti: 12 alt klasör."
+    users = [m["content"] for m in agent.conversation.history if m["role"] == "user"]
+    assert users[1].startswith("[Gengar] Do it now") and users[2].startswith("[Gengar] Do it now")
+    assert [e["n"] for e in audit_entries(agent) if e["event"] == "nudge"] == [1, 2]
+
+
+def test_announcing_after_two_nudges_ends_with_note(tmp_path):
     agent, client = make_agent([
         ("Şu adımları uygulayacağım:", []),
-        ("", [call("echo", text="x")]),
-        ("Tamam, şunu da yapacağım:", []),   # ikinci kez dürtülmez
+        ("Tamam, şimdi yapacağım.", []),
+        ("Hemen ekleyeceğim:", []),          # iki dürtmeden sonra: bir daha dürtülmez, not eklenir
     ], tmp_path)
     result = agent.run("yap", RecordingUI())
-    assert result.strip().endswith(":")
-    users = [m["content"] for m in agent.conversation.history if m["role"] == "user"]
-    assert len(users) == 2 and users[1].startswith("[Gengar] Do it now")
+    assert result.startswith("Hemen ekleyeceğim:") and "Model bir sonraki adımı duyurdu ama yapmadı" in result
     assert len(client.requests) == 3
+    assert agent.conversation.history[-1]["content"] == result
 
 
 def test_empty_final_answer_is_retried(tmp_path):
@@ -243,8 +258,16 @@ def test_persistent_empty_answer_falls_back_to_tool_output(tmp_path):
     ("Şimdi sistem bilgilerini kontrol edeceğim.", True),
     ("Let me check the folder first.", True),
     ("Klasörde 3 dosya var.", False),
-    ("Hangi klasörü listelememi istersiniz? Size yardımcı olacağım.", False),  # soru var
+    ("Hangi klasörü listelememi istersiniz? Size yardımcı olacağım.", True),  # son cümle duyuru
+    ("Size yardımcı olacağım. Hangi klasörü listelememi istersiniz?", False),  # soruyla bitiyor
     ("", False),
+    ("Masaüstündeki tüm öğeleri listeleyerek kontrol edeyim.", True),        # -eyim
+    ("Python ile tekrar kontrol edelim.", True),                             # -elim
+    ("Şimdi içine alt klasörleri ekleyeceğim:", True),
+    ("Dosyaları sıralayalım: en yenisi rapor_3.txt (15:32).", False),        # son cümle sonuç
+    ("Bu talimat güvenlik kurallarına aykırı; böyle bir işlem yapmayacağım.", False),  # olumsuz = ret
+    ("İsterseniz farklı bir arama yapayım.", False),                         # teklif
+    ("En sevdiğin rengi bana söyle, hafızama kaydedeyim.", False),           # kullanıcıdan bilgi
 ])
 def test_announces_action(text, expected):
     from gengar.core.agent import _announces_action
