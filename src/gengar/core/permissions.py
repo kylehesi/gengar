@@ -32,14 +32,19 @@ class PermissionPolicy:
             return True
         if risk == Risk.READ:
             return False
-        if risk == Risk.WRITE and tool_name in self.session_grants:
-            return False
-        return True
+        if risk == Risk.CRITICAL:
+            return True  # oturum izni kritik eylemleri kapsamaz
+        return tool_name not in self.session_grants
 
     @staticmethod
     def can_grant_for_session(risk: Risk) -> bool:
-        """Oturum boyu izin yalnızca yazma için verilebilir; sistem eylemleri her seferinde sorulur."""
-        return risk == Risk.WRITE
+        """Oturum izni aracın değişiklik VE sistem seviyesindeki eylemlerini kapsar (tıklama, komut, kod).
+
+        2026-11-07'ye kadar yalnızca "değişiklik" kapsanıyordu: windows_ui'ye odaklanırken "oturum boyunca"
+        diyen kullanıcıya aynı aracın her tıklaması yine soruldu (bir oturumda 16 kez). Geri dönüşü zor
+        eylemler artık ayrı bir seviyede (CRITICAL) ve her seferinde soruluyor.
+        """
+        return risk in (Risk.WRITE, Risk.SYSTEM)
 
     def grant_for_session(self, tool_name: str) -> None:
         self.session_grants.add(tool_name)

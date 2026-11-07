@@ -77,7 +77,7 @@ def test_select_chunks_budget_and_order():
 ])
 def test_private_urls_need_confirmation(url, private):
     assert is_private_url(url) is private
-    assert web.classify({"url": url}) == (Risk.SYSTEM if private else Risk.READ)
+    assert web.classify({"url": url}) == (Risk.CRITICAL if private else Risk.READ)
 
 
 @pytest.fixture

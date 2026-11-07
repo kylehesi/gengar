@@ -56,7 +56,45 @@ def test_read_only_commands(cmd):
     "",
 ])
 def test_risky_commands_need_confirmation(cmd):
-    assert classify(cmd) == Risk.SYSTEM
+    assert classify(cmd) >= Risk.SYSTEM
+
+
+@pytest.mark.parametrize("cmd,risk", [
+    ("Remove-Item C:\\temp\\x.txt", Risk.CRITICAL),
+    ("Get-ChildItem *.log | Remove-Item", Risk.CRITICAL),
+    ("Get-Date; Stop-Computer", Risk.CRITICAL),
+    ("[IO.File]::Delete('x')", Risk.CRITICAL),
+    ("ls | % Delete", Risk.CRITICAL),
+    ("Set-ItemProperty HKCU:\\x -Name y -Value 1", Risk.CRITICAL),
+    ("shutdown /s", Risk.CRITICAL),
+    ("reg delete HKCU\\Software\\X /f", Risk.CRITICAL),
+    ("Stop-Process -Name chrome", Risk.CRITICAL),
+    ("taskkill /im notepad.exe /f", Risk.CRITICAL),
+    ("Get-Process > procs.txt", Risk.SYSTEM),
+    ("New-Item -ItemType Directory C:\\Users\\x\\Desktop\\Plan", Risk.SYSTEM),
+    ("Start-Process 'https://w2g.tv'", Risk.SYSTEM),
+    ("Copy-Item a.txt b.txt", Risk.SYSTEM),
+    ("Rename-Item 'Kasım' 'November'", Risk.SYSTEM),
+    ("& notepad.exe", Risk.SYSTEM),
+    ("Get-ItemProperty 'HKCU:\\Control Panel\\Desktop'", Risk.READ),  # okuma: kritik sayılmaz
+])
+def test_critical_commands_are_asked_even_with_session_grant(cmd, risk):
+    # Oturum izni SYSTEM'i kapsar; kalıcı silme, kapatma, kayıt defteri gibi işler CRITICAL ve her seferinde sorulur.
+    assert classify(cmd) == risk
+
+
+@pytest.mark.parametrize("code,risk", [
+    ("print(2 + 2)", Risk.SYSTEM),
+    ("from pathlib import Path\nPath('a.txt').write_text('x')", Risk.SYSTEM),
+    ("import shutil\nshutil.rmtree('x')", Risk.CRITICAL),
+    ("import os\nos.remove('a.txt')", Risk.CRITICAL),
+    ("from pathlib import Path\nPath('a').unlink()", Risk.CRITICAL),
+    ("import subprocess\nsubprocess.run(['cmd', '/c', 'dir'])", Risk.CRITICAL),
+    ("import winreg", Risk.CRITICAL),
+])
+def test_run_python_risk(code, risk):
+    from gengar.tools.code import python_risk
+    assert python_risk({"code": code}) == risk
 
 
 def test_run_powershell_utf8_and_exit_code():
@@ -151,8 +189,8 @@ def test_list_and_find(tmp_path):
     assert "eşleşen bir şey yok" in files.find_files("**/*.docx", str(tmp_path))
 
 
-def test_writing_to_windows_folder_is_system_risk(tmp_path):
-    assert files.write_risk({"path": "C:\\Windows\\gengar.txt"}) == Risk.SYSTEM
+def test_writing_to_windows_folder_is_critical(tmp_path):
+    assert files.write_risk({"path": "C:\\Windows\\gengar.txt"}) == Risk.CRITICAL
     assert files.write_risk({"path": str(tmp_path / "x.txt")}) == Risk.WRITE
 
 
@@ -180,10 +218,21 @@ def test_permission_modes():
     p.grant_for_session("write_file")
     assert not p.needs_confirmation("write_file", Risk.WRITE)
     assert p.needs_confirmation("run_powershell", Risk.SYSTEM)
-    assert not PermissionPolicy.can_grant_for_session(Risk.SYSTEM)
+    assert PermissionPolicy.can_grant_for_session(Risk.SYSTEM)
+    assert not PermissionPolicy.can_grant_for_session(Risk.CRITICAL)
 
     assert PermissionPolicy("strict").needs_confirmation("read_file", Risk.READ)
     assert not PermissionPolicy("trust").needs_confirmation("x", Risk.SYSTEM)
+
+
+def test_session_grant_covers_system_actions_but_not_critical():
+    # 2026-11-07: windows_ui odaklanmada "oturum boyunca" denmişti, her tıklama (sistem) yine soruldu.
+    p = PermissionPolicy("normal")
+    p.grant_for_session("windows_ui")
+    assert not p.needs_confirmation("windows_ui", Risk.WRITE)
+    assert not p.needs_confirmation("windows_ui", Risk.SYSTEM)
+    assert p.needs_confirmation("windows_ui", Risk.CRITICAL)
+    assert p.needs_confirmation("run_python", Risk.SYSTEM)  # izin araca özel
     with pytest.raises(ValueError):
         PermissionPolicy("yolo")
 

@@ -255,13 +255,13 @@ def _protected_roots() -> list[Path]:
 
 
 def write_risk(args: dict) -> Risk:
-    """Windows/Program Files ve Gengar'ın kendi dosyalarına yazmak sistem eylemi sayılır (her seferinde sorulur)."""
+    """Windows/Program Files ve Gengar'ın kendi dosyalarına yazmak kritik sayılır (oturum izni olsa da sorulur)."""
     try:
         p = resolve(str(args.get("path", "")))
     except (OSError, ValueError):
-        return Risk.SYSTEM
+        return Risk.CRITICAL
     if any(p.is_relative_to(root) for root in _protected_roots()) or guard.is_protected(p):
-        return Risk.SYSTEM
+        return Risk.CRITICAL
     return Risk.WRITE
 
 

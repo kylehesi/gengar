@@ -85,8 +85,8 @@ def is_private_url(url: str) -> bool:
 
 
 def classify(args: dict) -> Risk:
-    # Yerel ağdaki cihazlara/servislere istek atmak her seferinde onay ister.
-    return Risk.SYSTEM if is_private_url(str(args.get("url", ""))) else Risk.READ
+    # Yerel ağdaki cihazlara/servislere istek atmak her seferinde onay ister (oturum izni kapsamaz).
+    return Risk.CRITICAL if is_private_url(str(args.get("url", ""))) else Risk.READ
 
 
 # --- indirme ve metin çıkarma ----------------------------------------------

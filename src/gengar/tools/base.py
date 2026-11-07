@@ -34,13 +34,15 @@ def set_working_dir(path: Path) -> None:
 class Risk(IntEnum):
     """Bir eylemin riski. İzin katmanı neyin sorulacağına buna bakarak karar verir."""
 
-    READ = 0     # sadece okur: dosya okuma, listeleme, Get-* komutları
-    WRITE = 1    # geri alınabilir değişiklik: dosya yazma, uygulama açma, ses/tema ayarı
-    SYSTEM = 2   # keyfi komut, silme, uygulama kapatma, tıklama/yazma — her zaman sorulur
+    READ = 0      # sadece okur: dosya okuma, listeleme, Get-* komutları
+    WRITE = 1     # geri alınabilir değişiklik: dosya yazma, uygulama açma, ses/tema ayarı
+    SYSTEM = 2    # keyfi eylem: komut, kod çalıştırma, pencerede tıklama/yazma, uygulama kapatma
+    CRITICAL = 3  # geri dönüşü zor: kalıcı silme, Windows/Program Files/Gengar'a yazma, kayıt defteri,
+    #               bilgisayarı kapatma, yerel ağa istek — oturum izni verilse de HER SEFERİNDE sorulur
 
     @property
     def label(self) -> str:
-        return {Risk.READ: "okuma", Risk.WRITE: "değişiklik", Risk.SYSTEM: "sistem"}[self]
+        return {Risk.READ: "okuma", Risk.WRITE: "değişiklik", Risk.SYSTEM: "sistem", Risk.CRITICAL: "kritik"}[self]
 
 
 class ToolError(Exception):

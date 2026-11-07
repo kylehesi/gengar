@@ -101,11 +101,13 @@ Example requests (in Turkish or English): "How much free space is on C:?", "Open
 | `/model [name]` | list profiles / switch model (local or API) |
 | `/think on\|off\|auto` | thinking mode |
 | `/mode normal\|strict\|trust` | permission mode |
+| `/izin`, `/izin sıfırla` | list / revoke "allow for this session" grants |
 | `/memory`, `/remember`, `/skills`, `/skill`, `/learn`, `/forget` | memory and skills |
 | `/chats`, `/open <no>`, `/pin <no>`, `/unpin <no>`, `/export [no]`, `/new` | chat history |
 | `/help`, `/exit` | |
 
-Confirmation prompts: `e` yes, `h` no, `o` allow for this session. Every action is logged to
+Confirmation prompts: `e` yes, `h` no, `o` don't ask again for this tool in this session. Critical actions
+(permanent delete, system folders, registry, shutdown) are asked every time. Every action is logged to
 `logs/audit-YYYY-MM-DD.jsonl`.
 
 ## Project structure

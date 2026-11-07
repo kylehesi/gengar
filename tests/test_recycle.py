@@ -114,5 +114,5 @@ def test_risk_levels():
     tool = {t.name: t for t in recycle.TOOLS}
     assert tool["delete_files"].risk_for({"paths": [r"C:\Users\kyle\Desktop\a.txt"]}).name == "WRITE"
     windir = os.environ.get("SystemRoot", r"C:\Windows")
-    assert tool["delete_files"].risk_for({"paths": [rf"{windir}\a.txt"]}).name == "SYSTEM"
+    assert tool["delete_files"].risk_for({"paths": [rf"{windir}\a.txt"]}).name == "CRITICAL"
     assert tool["restore_files"].risk_for({}).name == "READ"

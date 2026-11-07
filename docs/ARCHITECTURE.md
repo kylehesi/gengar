@@ -264,7 +264,7 @@ prompt, 20 tools):
 | `save_answer` | `files.py` | Copies an earlier answer to a file exactly, without the model retyping it | write |
 | `delete_files`, `restore_files` | `recycle.py` | Delete to / restore from the Recycle Bin | write (listing: read) |
 | `search_text` | `code.py` | Search text in files (like grep) | read |
-| `run_python` | `code.py` | Run Python in a separate virtual environment | system |
+| `run_python` | `code.py` | Run Python in a separate virtual environment | system; critical if the code deletes or starts programs |
 | `run_powershell` | `powershell.py` | General-purpose tool | depends on the command |
 | `remember`, `recall` | `memory/__init__.py` | Memory | read |
 
@@ -286,6 +286,17 @@ prompt, 20 tools):
     numbers are stripped. Content differences are never guessed. Replaying the real failures: 7 of 11 now succeed.
   - Side finding: the old `edit_file` silently changed the line endings of the Windows files it edited; the file is
     now read as bytes.
+- **`windows_ui` was the weakest tool (diagnosis of 2026-11-07, `evals/error_report.py`).** In real use 39% of its
+  calls failed; every other tool was at 0–10%. The model kept retrying until it found the window, and three
+  requests hit the 15-step limit. Of the 14 errors in one session:
+  - 6 × "window name required": the model inspected a window, then forgot `window` in the next click. Now the
+    last-used window is taken.
+  - 5 × "no matching window": Edge's title contains an invisible zero-width space (`Microsoft​Edge`), so
+    "Microsoft Edge" never matched. Titles are normalised before matching (invisible characters removed, all
+    dash types → `-`). If a title changes after a page loads, an old title still finds the window, and `edge` →
+    `msedge.exe` works too.
+  - The remaining 3 are real mistakes (a URL used as a window name, a tab that was not open, several "Play"
+    buttons, where the tool rightly asks for a number). 11 of 14 would no longer occur.
 
 ---
 
@@ -404,14 +415,25 @@ Defence must be **layered**; no single safeguard is trusted.
 | Level | Example | Default behaviour |
 |---|---|---|
 | `READ` | reading files, `Get-*` commands | runs without asking |
-| `WRITE` | writing files, volume | asked; "always yes this session" allowed |
-| `SYSTEM` | permanent delete, arbitrary command, closing apps | asked **every time** |
+| `WRITE` | writing files, volume, opening apps | asked; "don't ask again this session" allowed |
+| `SYSTEM` | arbitrary command, running Python, clicking/typing in a window, closing apps | asked; "don't ask again this session" allowed |
+| `CRITICAL` | permanent delete (`Remove-Item`, `shutil.rmtree`), writing to Windows/Program Files/Gengar, registry, shutdown, killing processes, requests to the local network | asked **every time**, even with a session grant |
+
+**Session grant (v0.0.9, 2026-11-07).** "Don't ask again this session" used to cover only `WRITE`. In a real
+session the user granted it while the model was focusing a browser window, and then had to confirm every click
+and keystroke of the same tool (16 times): clicks were `SYSTEM`. `SYSTEM` also mixed two different things:
+"arbitrary but asked for" (a click, a Python script) and "hard to undo" (permanent delete, registry). These are
+now separate levels. A grant covers one tool's `WRITE` and `SYSTEM` actions, and `CRITICAL` is always asked.
+`/izin` lists the grants and `/izin sıfırla` revokes them.
 
 **2. PowerShell classifier** ([`tools/powershell.py`](../src/gengar/tools/powershell.py) → `classify`). The same
 tool can read or delete, so the risk depends on the **content of the command**: read-only verbs like `Get-`,
-`Select-`, `Measure-` → `READ`; patterns like `>` (write to file), `$(` (sub-command), `::` (.NET call),
-`.Delete(` → definitely `SYSTEM`. **Anything uncertain is `SYSTEM`** — deliberately conservative: asking by
-mistake is better than deleting by mistake.
+`Select-`, `Measure-` → `READ`; patterns like `>` (write to file), `$(` (sub-command), `::` (.NET call) →
+definitely not `READ`. **Anything uncertain is `SYSTEM`** — deliberately conservative: asking by mistake is better
+than deleting by mistake. A non-read command that deletes, clears, formats, shuts down, kills a process or touches
+the registry (`Remove-Item`, `rm`, `del`, `Delete`, `Stop-Process`, `shutdown`, `reg`, `HKCU:` …) is `CRITICAL`.
+`run_python` works the same way: code with `rmtree`, `os.remove`, `unlink`, `subprocess`, `winreg` or `ctypes` is
+`CRITICAL`.
 
 **3. Permission mode** ([`core/permissions.py`](../src/gengar/core/permissions.py)): `normal` (read free, the
 rest asked; default), `strict` (everything asked), `trust` (nothing asked; for benchmarks only).
@@ -434,7 +456,8 @@ but "always yes this session" is allowed. Permanent deletion (`Remove-Item`) is 
   otherwise the bin would fill with hundreds of junk files every night.
 
 **Lesson:** asking for confirmation is not the only safety tool. Making an action **undoable** is both faster
-and safer. Confirmation fatigue is when the user ends up pressing "yes" without reading.
+and safer. Confirmation fatigue is when the user ends up pressing "yes" without reading. The 16 repeated
+questions above were exactly that: a question that is asked too often stops protecting anything.
 
 **6. Audit log** ([`core/audit.py`](../src/gengar/core/audit.py)): every user message, tool call, answer and
 model error is written to `logs/audit-DATE.jsonl`: what was asked, what ran, who approved, what came out.

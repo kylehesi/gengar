@@ -9,6 +9,7 @@ yazı kullanıcının o an çalıştığı başka bir pencereye gidebilirdi.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -45,31 +46,85 @@ def _auto():
 
 @dataclass
 class _Cache:
-    """Son `inspect` sonucunu tutar; model sonra [numara] ile öğeye başvurabilir."""
+    """Son `inspect` sonucunu tutar; model sonra [numara] ile öğeye başvurabilir.
+
+    last: son kullanılan pencere (model pencere adını vermezse o kullanılır).
+    seen: her pencerenin daha önce görülen başlıkları; tarayıcıda sayfa değişince başlık da değişir ve model
+    eski başlıkla çağırmaya devam eder.
+    """
 
     hwnd: int = 0
     controls: list[Any] = field(default_factory=list)
+    last: int = 0
+    seen: dict[int, set[str]] = field(default_factory=dict)
 
 
 _cache = _Cache()
 
 
 # --- pencere bulma --------------------------------------------------------
+# 2026-11-07 gerçek oturumda windows_ui çağrılarının %39'u hata verdi (diğer araçlar %0-10). Üç neden:
+# 1) Model inspect'ten sonraki tıklamada `window` vermeyi unuttu (12 kez) → son kullanılan pencere.
+# 2) Edge başlığında "Microsoft​Edge" (görünmez sıfır genişlikli boşluk) var; "Microsoft Edge" hiç
+#    eşleşmiyordu → görünmez karakterler ve tire türleri eşleştirmeden önce temizlenir.
+# 3) Sayfa açılınca başlık değişti, model eski başlıkla aradı → daha önce görülen başlıklar da eşleşir.
+
+_INVISIBLE = re.compile("[­​-‏‪-‮⁠-⁤﻿]")
+_DASHES = re.compile("[‐-―−]")
+# Kullanıcının/modelin söylediği ad → süreç adı (.exe'siz)
+PROCESS_ALIASES = {
+    "edge": "msedge", "microsoft edge": "msedge", "chrome": "chrome", "google chrome": "chrome",
+    "firefox": "firefox", "mozilla firefox": "firefox", "vs code": "code", "vscode": "code",
+    "visual studio code": "code", "not defteri": "notepad", "dosya gezgini": "explorer",
+    "file explorer": "explorer", "terminal": "windowsterminal", "paint": "mspaint",
+}
+
+
+def norm_title(text: str) -> str:
+    """Karşılaştırma için: görünmez karakterler atılır, tire türleri '-' olur, fold, tek boşluk."""
+    return " ".join(fold(_DASHES.sub("-", _INVISIBLE.sub("", text))).split())
+
+
+def _remember(windows: list[winapi.Window]) -> None:
+    for w in windows:
+        _cache.seen.setdefault(w.hwnd, set()).add(norm_title(w.title))
+
+
+def _use(win: winapi.Window) -> winapi.Window:
+    _cache.last = win.hwnd
+    return win
+
 
 def find_window(query: str) -> winapi.Window:
-    if not query.strip():
-        raise ToolError("pencere adı (window) gerekli; 'list' ile açık pencerelere bakın")
-    q = fold(query)
     windows = winapi.list_windows()
-    hits = [w for w in windows if q in fold(w.title) or q == fold(w.process.removesuffix(".exe"))]
-    exact = [w for w in hits if fold(w.title) == q]
-    if len(exact) == 1 or len(hits) == 1:
-        return (exact or hits)[0]
-    if not hits:
-        raise ToolError(f"'{query}' ile eşleşen pencere yok. Açık pencereler: "
-                        + "; ".join(w.title[:50] for w in windows[:15]))
-    raise ToolError(f"'{query}' birden fazla pencereyle eşleşiyor: "
-                    + "; ".join(w.title[:50] for w in hits[:10]) + ". Daha belirgin bir ad verin.")
+    _remember(windows)
+    if not query.strip():
+        last = [w for w in windows if w.hwnd == _cache.last]
+        if last:
+            return last[0]
+        raise ToolError("pencere adı (window) gerekli; 'list' ile açık pencerelere bakın")
+    q = norm_title(query)
+    proc = PROCESS_ALIASES.get(q, q)
+    words = [w for w in q.split() if len(w) > 1 or w.isalnum()]
+    rules = (
+        lambda w: norm_title(w.title) == q,
+        lambda w: q in norm_title(w.title),
+        lambda w: proc == norm_title(w.process.removesuffix(".exe")),
+        lambda w: bool(words) and all(x in norm_title(w.title) for x in words),   # kelimeler ayrı yerlerde
+        lambda w: any(q in t for t in _cache.seen.get(w.hwnd, ())),               # eski başlık
+    )
+    for rule in rules:
+        hits = [w for w in windows if rule(w)]
+        if len(hits) == 1:
+            return _use(hits[0])
+        if hits:
+            last = [w for w in hits if w.hwnd == _cache.last]
+            if last:
+                return _use(last[0])
+            raise ToolError(f"'{query}' birden fazla pencereyle eşleşiyor: "
+                            + "; ".join(w.title[:50] for w in hits[:10]) + ". Daha belirgin bir ad verin.")
+    raise ToolError(f"'{query}' ile eşleşen pencere yok. Açık pencereler: "
+                    + "; ".join(w.title[:50] for w in windows[:15]))
 
 
 def _focus(win: winapi.Window) -> None:
@@ -234,7 +289,9 @@ def press_keys(window: str, keys: str) -> str:
 
 def windows_ui(action: str, window: str = "", target: str = "", text: str = "") -> str:
     if action == "list":
-        rows = [f"{w.title[:90]}  [{w.process}]" for w in winapi.list_windows()]
+        windows = winapi.list_windows()
+        _remember(windows)
+        rows = [f"{w.title[:90]}  [{w.process}]" for w in windows]
         return "\n".join(rows) or "(no windows)"
     if action == "inspect":
         return inspect(window)
@@ -285,7 +342,7 @@ TOOL = Tool(
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": list(ACTIONS)},
-            "window": {"type": "string", "description": "Title or process name (partial)."},
+            "window": {"type": "string", "description": "Title or process name (partial); omit to reuse the last window."},
             "target": {"type": "string", "description": "Number from inspect, or control name."},
             "text": {"type": "string"},
         },

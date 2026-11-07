@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.9](#009---2026-11-07) | 2026-11-07 | "Allow for this session" now really stops the questions; critical actions are still asked; `windows_ui` finds windows reliably |
 | [0.0.8](#008---2026-11-07) | 2026-11-07 | Real-requests benchmark: 24 tasks from real use, request texts kept local; `--repeat`, `--suite` |
 | [0.0.7](#007---2026-10-29) | 2026-10-29 | A denied action is not asked again in the same request with a different tool |
 | [0.0.6](#006---2026-10-29) | 2026-10-29 | Fewer unnecessary questions: a system prompt rule, replay-tested; same pass rate, 18% faster on the affected tasks |
@@ -14,6 +15,42 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.9] - 2026-11-07
+
+### Highlights
+- **"Allow for this session" now does what it says.** In a real session the user allowed `windows_ui` for the
+  session while the model focused a browser window, and was then asked again for every click and keystroke of
+  the same tool (16 times). The grant only covered "change" actions; clicks, typing, commands and running
+  Python were "system" actions, which were always asked and never offered the session option.
+- **Window control fails much less often.** `windows_ui` was the weakest tool in real use: 39% of its calls failed
+  (every other tool 0–10%). 11 of the 14 errors in the latest session would no longer occur.
+
+### Changed
+- New risk level `CRITICAL` for actions that are hard to undo: permanent deletion (`Remove-Item`, `rm`, `del`,
+  `[IO.File]::Delete`, `shutil.rmtree`, `os.remove`), writing to Windows / Program Files / Gengar's own files,
+  the registry, shutdown/restart, killing processes, forced app close, requests to the local network, and Python
+  code that starts other programs (`subprocess`, `os.system`). These are asked **every time**.
+- A session grant now covers a tool's `WRITE` and `SYSTEM` actions (clicks, commands, Python). The prompt says
+  so: `[o]turum boyunca windows_ui için sorma`; after granting, Gengar says that critical actions will still be
+  asked. `/izin` lists the grants, `/izin sıfırla` revokes them.
+- `windows_ui` window matching:
+  - Titles are normalised before matching: invisible characters are removed (Edge puts a zero-width space in
+    "Microsoft Edge", so that name never matched) and all dash types become `-`.
+  - Without `window`, the last-used window is taken (the model forgot it 6 times in one session).
+  - A window is still found by a title it had earlier (the title changes when a page loads).
+  - Common names map to processes (`edge` → `msedge.exe`), all words of the name may appear separately, and
+    when several windows match, the last-used one wins.
+
+### Added
+- `evals/error_report.py`: tool error rates and the most frequent error patterns from the audit log (benchmark
+  calls excluded), with `--since`, `--tool`, `--examples`. This report found the `windows_ui` problem.
+
+### Notes
+- Fixed prefix: the `window` parameter description grew by a few tokens ("omit to reuse the last window");
+  not re-measured, since the GPU is busy.
+- `test_recycle::test_delete_goes_to_recycle_bin_and_restores` failed once in a combined run and passed 3 of 3
+  alone; it uses the real Recycle Bin.
 
 ## [0.0.8] - 2026-11-07
 

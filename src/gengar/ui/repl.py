@@ -25,7 +25,7 @@ from ..tools.base import Risk, Tool
 DIM, BOLD, RED, GREEN, YELLOW, CYAN, RESET = (
     "\033[2m", "\033[1m", "\033[31m", "\033[32m", "\033[33m", "\033[36m", "\033[0m")
 
-RISK_COLOR = {Risk.READ: GREEN, Risk.WRITE: YELLOW, Risk.SYSTEM: RED}
+RISK_COLOR = {Risk.READ: GREEN, Risk.WRITE: YELLOW, Risk.SYSTEM: RED, Risk.CRITICAL: BOLD + RED}
 
 HELP = """\
 Komutlar:
@@ -34,6 +34,7 @@ Komutlar:
   /think <mod>    düşünme modu: on (doğru, yavaş), off (hızlı), auto (gerektiğinde açılır)
   /thinklog       düşünce metnini göster/gizle
   /mode <mod>     izin modu: normal (varsayılan), strict (her şeyi sor), trust (hiçbir şeyi sorma)
+  /izin           oturum boyunca izin verilen araçlar  /izin sıfırla  hepsini geri al
   /memory         hatırlanan bilgiler        /remember <bilgi>  bilgi ekle
   /skills         öğrenilmiş beceriler       /skill <no>        beceriyi göster
   /learn          son işten beceri çıkar     /forget <no>       bilgi/beceri sil
@@ -178,6 +179,8 @@ class Repl:
             self.print(f"Düşünme modu {modes[self.agent.think]}.")
         elif cmd == "/mode":
             self.set_mode(arg)
+        elif cmd == "/izin":
+            self.grants_command(arg)
         elif cmd in ("/memory", "/remember", "/forget", "/skills", "/skill", "/learn"):
             self.memory_command(cmd, arg)
         elif cmd == "/thinklog":
@@ -186,6 +189,18 @@ class Repl:
         else:
             self.print(f"Bilinmeyen komut: {cmd}. /help yazın.")
         return True
+
+    def grants_command(self, arg: str) -> None:
+        policy = self.agent.policy
+        if arg.strip().lower() in ("sıfırla", "sifirla", "reset", "temizle"):
+            policy.session_grants.clear()
+            self.print("Oturum izinleri geri alındı; değişiklik ve sistem eylemleri yine sorulacak.")
+            self.agent.audit.record("grants_reset")
+        elif policy.session_grants:
+            self.print("Bu oturumda sorulmadan çalışan araçlar: " + ", ".join(sorted(policy.session_grants))
+                       + "\n(kritik eylemler yine sorulur; geri almak için /izin sıfırla)")
+        else:
+            self.print("Oturum boyunca izin verilmiş araç yok.")
 
     def set_mode(self, mode: str) -> None:
         policy = self.agent.policy
@@ -408,7 +423,9 @@ class Repl:
         self.print(f"{color}{BOLD}Onay gerekiyor ({risk.label}){RESET} — {tool.name}:")
         for row in summary.strip().splitlines() or [""]:
             self.print(f"  {color}{row}{RESET}")
-        choices = "[e]vet / [h]ayır" + (" / [o]turum boyunca izin ver" if can_grant else "")
+        if risk == Risk.CRITICAL:
+            self.print(f"  {DIM}(kritik eylem: oturum izni olsa da her seferinde sorulur){RESET}")
+        choices = "[e]vet / [h]ayır" + (f" / [o]turum boyunca {tool.name} için sorma" if can_grant else "")
         while True:
             try:
                 answer = self.read(f"{choices}: ").strip().lower().lstrip("﻿")
@@ -420,4 +437,6 @@ class Repl:
             if answer in ("h", "hayır", "hayir", "n", "no", ""):
                 return "no"
             if can_grant and answer in ("o", "oturum"):
+                self.print(f"  {DIM}{tool.name} bu oturumda sorulmadan çalışacak; kritik eylemler (kalıcı silme, "
+                           f"sistem klasörleri, kayıt defteri…) yine sorulur. Geri almak için: /izin sıfırla{RESET}")
                 return "session"

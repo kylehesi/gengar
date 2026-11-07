@@ -218,6 +218,24 @@ def error_hint(stderr: str) -> str:
     return "\n".join(hint for rx, hint in _HINTS if rx.search(stderr))
 
 
+# Kodda bunlardan biri geçerse run_python kritik sayılır (oturum izni olsa da sorulur): dosya/klasör silme,
+# başka program çalıştırma, kayıt defteri, Windows API.
+_CRITICAL_PY = re.compile(
+    r"\brmtree\b|\bos\.(remove|unlink|rmdir|removedirs|system|popen|kill)\b|\.unlink\s*\(|\.rmdir\s*\(|"
+    r"send2trash|\bsubprocess\b|\bwinreg\b|\bctypes\b|\bshutil\.move\b")
+
+
+def python_risk(args: dict) -> Risk:
+    code = str(args.get("code") or "")
+    if not code and args.get("file"):
+        try:
+            path = resolve(str(args["file"]))
+            code = path.read_text(encoding="utf-8", errors="replace")[:200_000] if path.is_file() else ""
+        except (OSError, ValueError):
+            code = ""
+    return Risk.CRITICAL if _CRITICAL_PY.search(code) else Risk.SYSTEM
+
+
 def make_tools(sandbox: PythonSandbox) -> list[Tool]:
     def run_python(code: str = "", file: str = "", args: list[str] | None = None,
                    packages: list[str] | None = None, timeout: int = DEFAULT_TIMEOUT, cwd: str = "") -> str:
@@ -273,6 +291,7 @@ def make_tools(sandbox: PythonSandbox) -> list[Tool]:
             },
             risk=Risk.SYSTEM,
             func=run_python,
+            classify=python_risk,
             describe=describe_run,
         ),
     ]

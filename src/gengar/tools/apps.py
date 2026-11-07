@@ -262,7 +262,9 @@ def classify(args: dict) -> Risk:
         return Risk.READ
     if action == "open":
         return Risk.WRITE
-    return Risk.SYSTEM  # close: kaydedilmemiş iş kaybolabilir
+    if args.get("force"):
+        return Risk.CRITICAL  # zorla kapatma: kaydedilmemiş iş kesin kaybolur
+    return Risk.SYSTEM  # close: uygulama kaydetmeyi sorabilir
 
 
 def describe(args: dict) -> str:

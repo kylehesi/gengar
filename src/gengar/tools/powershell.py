@@ -58,8 +58,25 @@ _VERSION_QUERY = re.compile(r"^\s*[\w-]+(\.exe)?\s+--version\s*$", re.IGNORECASE
 _SAFE_STATIC = re.compile(r"\[math\]::(Round|Floor|Ceiling|Abs|Max|Min|Pow|Sqrt)\b", re.IGNORECASE)
 
 
+# Geri dönüşü zor komutlar: oturum izni olsa da her seferinde sorulur (Risk.CRITICAL). Kalıcı silme, içerik
+# temizleme, disk/biçimlendirme, kapatma/yeniden başlatma, süreç sonlandırma, kayıt defteri, kaldırma,
+# yürütme ilkesi. Kelime sınırıyla: "model" içindeki "del" eşleşmez.
+_CRITICAL = re.compile(
+    r"(?<![\w-])(remove-item|ri|rm|rmdir|rd|del|erase|clear-content|clear-item|clear-recyclebin|format-volume|"
+    r"format-disk|clear-disk|initialize-disk|remove-partition|stop-computer|restart-computer|shutdown|"
+    r"stop-process|kill|taskkill|reg|remove-itemproperty|set-itemproperty|new-itemproperty|uninstall-\w+|"
+    r"set-executionpolicy|bcdedit|diskpart|vssadmin|cipher|takeown|icacls|stop-service|disable-\w+)(?![\w-])"
+    r"|\bdelete\b|winget\s+uninstall|hklm:|hkcu:|registry::",
+    re.IGNORECASE)
+
+
 def classify(command: str) -> Risk:
-    """Komut yalnızca okuma yapıyorsa READ, aksi halde SYSTEM."""
+    """Komut yalnızca okuma yapıyorsa READ; geri dönüşü zorsa CRITICAL; aksi halde SYSTEM."""
+    risk = _classify(command)
+    return Risk.CRITICAL if risk == Risk.SYSTEM and _CRITICAL.search(command) else risk
+
+
+def _classify(command: str) -> Risk:
     # [math]::Round(...) gibi saf hesaplamalar güvenli; diğer .NET çağrıları değil.
     command = _SAFE_STATIC.sub("0", command)
     # "ollama --version", "git --version": sadece sürüm sorar.

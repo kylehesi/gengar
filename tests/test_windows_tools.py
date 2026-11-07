@@ -66,6 +66,7 @@ def test_apps_risk_levels():
     assert apps.classify({"action": "installed"}) == Risk.READ
     assert apps.classify({"action": "open"}) == Risk.WRITE
     assert apps.classify({"action": "close"}) == Risk.SYSTEM
+    assert apps.classify({"action": "close", "force": True}) == Risk.CRITICAL
 
 
 def test_installed_and_running_apps_read_only():

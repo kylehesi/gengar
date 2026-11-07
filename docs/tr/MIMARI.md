@@ -270,7 +270,7 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
 | `save_answer` | `files.py` | Önceki cevabı yeniden yazdırmadan, geçmişten birebir dosyaya kopyalar | değişiklik |
 | `delete_files`, `restore_files` | `recycle.py` | Geri dönüşüm kutusuna silme / geri yükleme | değişiklik (listeleme: okuma) |
 | `search_text` | `code.py` | Dosyalarda metin arama (grep gibi) | okuma |
-| `run_python` | `code.py` | Ayrı bir sanal ortamda Python çalıştırma | sistem |
+| `run_python` | `code.py` | Ayrı bir sanal ortamda Python çalıştırma | sistem; kod siliyor ya da program başlatıyorsa kritik |
 | `run_powershell` | `powershell.py` | Her şey için genel araç | komuta göre |
 | `remember`, `recall` | `memory/__init__.py` | Hafıza | okuma |
 
@@ -292,6 +292,17 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
     İçerik farkı asla tahmin edilmez. Gerçek hatalar yeniden oynatıldığında 11'in 7'si artık başarılı.
   - Yan bulgu: eski `edit_file` düzenlediği Windows dosyalarının satır sonlarını sessizce değiştiriyordu; dosya
     artık bayt olarak okunuyor.
+- **En zayıf araç `windows_ui` çıktı (2026-11-07 teşhisi, `evals/error_report.py`).** Gerçek kullanımda
+  çağrılarının %39'u hata verdi; diğer bütün araçlar %0–10 arasında. Model pencereyi bulana kadar tekrar tekrar
+  denedi, üç istek 15 adım sınırına takıldı. Bir oturumdaki 14 hatanın dağılımı:
+  - 6 × "pencere adı gerekli": Model pencereyi inceledi, sonraki tıklamada `window` vermeyi unuttu. Artık son
+    kullanılan pencere alınıyor.
+  - 5 × "eşleşen pencere yok": Edge başlığında görünmez bir sıfır genişlikli boşluk var (`Microsoft​Edge`),
+    bu yüzden "Microsoft Edge" hiç eşleşmiyordu. Başlıklar eşleştirmeden önce sadeleştiriliyor: görünmez karakterler
+    atılıyor, bütün tire türleri `-` oluyor. Sayfa açılıp başlık değişse de eski başlık pencereyi buluyor;
+    `edge` → `msedge.exe` de çalışıyor.
+  - Kalan 3'ü gerçek hata: web adresini pencere adı sanmak, açık olmayan bir sekme, birden çok "Play" düğmesi
+    (araç haklı olarak numara istiyor). 14 hatanın 11'i artık olmazdı.
 
 ---
 
@@ -411,15 +422,27 @@ Savunma **katmanlı** olmalı. Tek bir önleme güvenilmez.
 | Seviye | Örnek | Varsayılan davranış |
 |---|---|---|
 | `READ` (okuma) | dosya okuma, `Get-*` komutları | sorulmadan çalışır |
-| `WRITE` (değişiklik) | dosya yazma, ses ayarı | sorulur; "bu oturumda hep evet" denebilir |
-| `SYSTEM` (sistem) | silme, keyfi komut, uygulama kapatma | **her seferinde** sorulur |
+| `WRITE` (değişiklik) | dosya yazma, ses ayarı, uygulama açma | sorulur; "oturum boyunca sorma" denebilir |
+| `SYSTEM` (sistem) | keyfi komut, Python çalıştırma, pencerede tıklama/yazma, uygulama kapatma | sorulur; "oturum boyunca sorma" denebilir |
+| `CRITICAL` (kritik) | kalıcı silme (`Remove-Item`, `shutil.rmtree`), Windows/Program Files/Gengar'a yazma, kayıt defteri, kapatma, süreç sonlandırma, yerel ağa istek | oturum izni olsa da **her seferinde** sorulur |
+
+**Oturum izni (v0.0.9, 2026-11-07).** "Oturum boyunca izin ver" eskiden yalnızca `WRITE`'ı kapsıyordu. Gerçek
+bir oturumda kullanıcı bu izni model tarayıcı penceresine odaklanırken verdi. Ama aynı aracın her tıklaması ve
+yazması `SYSTEM` sayıldığı için 16 kez yeniden onay vermek zorunda kaldı. `SYSTEM` ayrıca iki farklı şeyi
+karıştırıyordu: "keyfi ama istenmiş" (tıklama, Python betiği) ve "geri dönüşü zor" (kalıcı silme, kayıt
+defteri). Artık bunlar ayrı seviyeler. Oturum izni bir aracın `WRITE` ve `SYSTEM` eylemlerini kapsıyor; `CRITICAL`
+her seferinde soruluyor. `/izin` verilen izinleri gösterir, `/izin sıfırla` geri alır.
 
 **2. PowerShell sınıflandırıcı** ([`tools/powershell.py`](../../src/gengar/tools/powershell.py) → `classify`).
 Aynı araç hem okuma hem silme yapabildiği için risk **komutun içeriğine** göre belirleniyor:
 
 - `Get-`, `Select-`, `Measure-` gibi sadece okuyan fiiller → `READ`
-- `>` (dosyaya yazma), `$(` (alt komut), `::` (.NET çağrısı), `.Delete(` gibi kalıplar → kesinlikle `SYSTEM`
+- `>` (dosyaya yazma), `$(` (alt komut), `::` (.NET çağrısı) gibi kalıplar → kesinlikle `READ` değil
 - **Emin olunamayan her şey `SYSTEM`.** Bilerek tutucu: yanlışlıkla sormak, yanlışlıkla silmekten iyidir.
+- Okuma olmayan bir komut silme, temizleme, biçimlendirme, kapatma, süreç sonlandırma ya da kayıt defteri
+  içeriyorsa (`Remove-Item`, `rm`, `del`, `Delete`, `Stop-Process`, `shutdown`, `reg`, `HKCU:` …) → `CRITICAL`.
+- `run_python` da aynı mantıkla: kodda `rmtree`, `os.remove`, `unlink`, `subprocess`, `winreg` ya da `ctypes`
+  geçiyorsa `CRITICAL`.
 
 **3. İzin modu** ([`core/permissions.py`](../../src/gengar/core/permissions.py)):
 - `normal`: okuma serbest, gerisi sorulur (varsayılan)
@@ -443,7 +466,8 @@ dosyaları Windows Geri Dönüşüm Kutusu'na gönderir, `restore_files` geri ge
   her gece yüzlerce çöp dosyayla dolmasın diye.
 
 **Ders:** Onay sormak tek güvenlik yolu değil. Eylemi **geri alınabilir** yapmak hem daha hızlı hem daha
-güvenli. Onay yorgunluğu, kullanıcının sonunda okumadan "evet"e basması demek.
+güvenli. Onay yorgunluğu, kullanıcının sonunda okumadan "evet"e basması demek. Yukarıdaki 16 tekrar tam
+olarak buydu: çok sık sorulan soru artık hiçbir şeyi korumaz.
 
 **6. Kayıt (audit log)** ([`core/audit.py`](../../src/gengar/core/audit.py)): Her kullanıcı mesajı ve her araç
 çağrısı `logs/audit-TARİH.jsonl` dosyasına yazılır: ne istendi, ne çalıştı, kim onayladı, çıktı ne oldu.

@@ -241,13 +241,13 @@ def restore_files(paths: list[str] | None = None) -> str:
 # --- araçlar ------------------------------------------------------------------------
 
 def _delete_risk(args: dict) -> Risk:
-    """Geri alınabilir silme "değişiklik"; Windows/Program Files altı yine her seferinde sorulur."""
+    """Geri alınabilir silme "değişiklik"; Windows/Program Files altı kritik (her seferinde sorulur)."""
     try:
         targets = [resolve(str(p)) for p in args.get("paths") or []]
     except (OSError, ValueError):
-        return Risk.SYSTEM
+        return Risk.CRITICAL
     if any(p.is_relative_to(r) for p in targets for r in _protected_roots()):
-        return Risk.SYSTEM
+        return Risk.CRITICAL
     return Risk.WRITE
 
 

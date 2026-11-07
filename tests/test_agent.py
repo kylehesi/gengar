@@ -71,7 +71,7 @@ def test_denied_action_is_reported_to_model(tmp_path):
     agent.run("yap", ui)
 
     assert agent.conversation.history[2]["content"] == DENIED
-    assert ("confirm", "system", Risk.SYSTEM, False) in ui.events
+    assert ("confirm", "system", Risk.SYSTEM, True) in ui.events
     assert not any(e[0] == "start" for e in ui.events)
     assert [e for e in audit_entries(agent) if e["event"] == "tool"][-1]["decision"] == "denied"
 
@@ -407,3 +407,18 @@ def test_buffer_same_index_different_ids_are_separate():
     buf.add(_TC(0, "x", "echo", "{}"))
     buf.add(_TC(0, "y", "echo", "{}"))
     assert [c.id for c in buf.finish()] == ["x", "y"]
+
+
+def test_session_grant_covers_system_actions_but_not_critical(tmp_path):
+    # 2026-11-07: "oturum boyunca izin ver" denmişti ama aynı aracın her tıklaması (sistem) yine soruldu.
+    ui_tool = Tool("ui", "UI.", {"type": "object", "properties": {"text": {"type": "string"}}}, Risk.SYSTEM, echo,
+                   classify=lambda a: Risk.CRITICAL if a.get("text") == "sil" else Risk.SYSTEM)
+    client = ScriptedClient([("", [call("ui", "c1", text="a")]), ("", [call("ui", "c2", text="b")]),
+                             ("", [call("ui", "c3", text="sil")]), ("Tamam.", [])])
+    agent = Agent(client, ToolRegistry([ui_tool]), PermissionPolicy("normal"), AuditLog(tmp_path),
+                  Conversation("SYS"), max_steps=10)
+    ui = RecordingUI(answers=["session", "yes"])
+    agent.run("yap", ui)
+    confirms = [e for e in ui.events if e[0] == "confirm"]
+    assert confirms == [("confirm", "ui", Risk.SYSTEM, True), ("confirm", "ui", Risk.CRITICAL, False)]
+    assert [e["decision"] for e in audit_entries(agent) if e["event"] == "tool"] == ["session", "auto", "yes"]

@@ -66,7 +66,7 @@ def test_python_file_argument_is_read(protected, monkeypatch):
 
 
 def test_writes_to_gengar_need_confirmation_each_time(protected):
-    assert files.write_risk({"path": str(protected / "src" / "a.py")}) == Risk.SYSTEM
+    assert files.write_risk({"path": str(protected / "src" / "a.py")}) == Risk.CRITICAL
     assert files.write_risk({"path": str(protected / "data" / "workspace" / "a.py")}) == Risk.WRITE
 
 
