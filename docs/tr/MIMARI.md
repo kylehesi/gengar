@@ -304,6 +304,23 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
     `edge` → `msedge.exe` de çalışıyor.
   - Kalan 3'ü gerçek hata: web adresini pencere adı sanmak, açık olmayan bir sekme, birden çok "Play" düğmesi
     (araç haklı olarak numara istiyor). 14 hatanın 11'i artık olmazdı.
+  - **Pencereler için göz (v0.0.12).** Öğe listesi tek başına bazı şeyleri gösteremiyor: adı olmayan simgeler,
+    birden çok "Play" düğmesinden hangisinin hangisi olduğu, hangi sekmenin açık olduğu.
+    - `inspect` artık pencerenin ekran görüntüsünü de döndürüyor. Her öğenin `[numarası]` görüntünün üstüne
+      çiziliyor (Set-of-Mark yöntemi). Böylece model gördüğü şeyi tıklayacağı numarayla eşleştirebiliyor.
+    - Pillow olmadan yapıldı ([`tools/winapi.py`](../../src/gengar/tools/winapi.py)):
+      - `PrintWindow` (`PW_RENDERFULLCONTENT` ile): başka bir pencerenin altında kalan pencere de yakalanıyor.
+      - `StretchBlt` ile yumuşak (halftone) küçültme, en fazla 1280 px.
+      - İşaretler GDI kalem ve yazı tipleriyle çiziliyor.
+      - PNG `zlib` ile kodlanıyor.
+    - Bir Gezgin penceresi için yaklaşık 0,05 sn.
+    - Etiketler kutunun sağ üst köşesinde. İlk denemede sol üstteydiler ve metnin başını kapatıyordu
+      ("Downloads" → "6ownloads").
+  - **Gizlilik:** Pencere görüntüsü kullanıcının ekranındaki her şeyi içerebilir (e-posta, mesaj). Bu yüzden
+    "özel" işaretleniyor ve yalnızca yerel modele gönderiliyor. API profili yerine metin listesini ve bir not
+    alıyor. Modelin kendi yazdığı sayfaların görüntüleri (`view_page`) özel değil.
+  - Görüntü `inspect`'in bir eksiğini de gösterdi: ağaç sırasıyla 80 öğede durduğu için Gezgin'de araç çubuğu
+    (New, Sort, View) numara almıyor. Henüz düzeltilmedi.
   - Pencere işleri doğası gereği çok adım istiyor (bak → tıkla → tekrar bak). Bir turda `windows_ui`
     kullanılınca o turun adım sınırı 15'ten 30'a çıkıyor (`ui_max_steps`). Diğer turlar 15'te kalıyor: sınırın
     görevi kısır döngüye giren modeli durdurmak.

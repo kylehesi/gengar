@@ -305,7 +305,6 @@ def _problems(events: list[dict]) -> tuple[list[str], list[str]]:
 
 # --- araç ---------------------------------------------------------------------
 
-MAX_SAVED = 40  # screens klasöründe tutulan en fazla ekran görüntüsü
 LOOK = ("Look at the screenshot as a demanding designer would: is all text readable (contrast, size), are the "
         "images real and fitting, is anything overlapping, cut off, empty or misaligned, does it look like a "
         "generic template, does it match what the user asked for? Fix real problems with edit_file and look "
@@ -329,17 +328,6 @@ def _target(path: str) -> tuple[str, str, Path | None]:
 
         raise ToolError(f"file not found: {f}. Give the path of the .html file (or an http(s) URL).")
     return f.as_uri(), str(f), f
-
-
-def _save(shot: Shot, folder: Path, name: str) -> Path:
-    folder.mkdir(parents=True, exist_ok=True)
-    stem = "".join(c if c.isalnum() else "_" for c in name)[:40] or "page"
-    out = folder / f"{time.strftime('%Y%m%d-%H%M%S')}_{stem}_{shot.part}.jpg"
-    out.write_bytes(shot.jpeg)
-    old = sorted(folder.glob("*.jpg"), key=lambda q: q.stat().st_mtime)[:-MAX_SAVED]
-    for q in old:
-        q.unlink(missing_ok=True)
-    return out
 
 
 def describe_shot(shot: Shot, shown: str, device: str, saved: Path) -> str:
@@ -373,9 +361,12 @@ def describe_shot(shot: Shot, shown: str, device: str, saved: Path) -> str:
     return "\n".join(lines)
 
 
-def make_tool(screens_dir: Path):
-    from .base import Risk, Tool, ToolError, ToolResult
+def make_tool(screens_dir: Path | None = None):
+    from .base import Risk, Tool, ToolError, ToolResult, save_screen, set_screens_dir
     from .web import is_private_url
+
+    if screens_dir is not None:
+        set_screens_dir(screens_dir)
 
     def view_page(path: str, device: str = "desktop", part: int = 1) -> str:
         if device not in DEVICES:
@@ -385,7 +376,8 @@ def make_tool(screens_dir: Path):
             shot = capture(url, device, int(part or 1))
         except PageViewError as e:
             raise ToolError(str(e)) from e
-        saved = _save(shot, screens_dir, local.stem if local else url.split("//", 1)[-1])
+        name = local.stem if local else url.split("//", 1)[-1]
+        saved = save_screen(shot.jpeg, f"{name}_{shot.part}", "jpg")
         return ToolResult(describe_shot(shot, shown, device, saved), images=[str(saved)])
 
     def classify(args: dict) -> Risk:

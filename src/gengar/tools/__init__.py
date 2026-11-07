@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from . import apps, code, files, guard, pageview, powershell, recycle, settings, system, ui, versions, web
-from .base import Risk, Tool, ToolError, ToolRegistry, ToolResult, set_working_dir
+from .base import Risk, Tool, ToolError, ToolRegistry, ToolResult, set_screens_dir, set_working_dir
 
 if TYPE_CHECKING:
     from ..config import Settings
@@ -24,6 +24,8 @@ def default_registry(config: Settings | None = None) -> ToolRegistry:
     set_working_dir(config.workspace)
     from ..config import PROJECT_ROOT
 
+    set_screens_dir(PROJECT_ROOT / "data" / "screens")
+
     # Gengar'ın kendi klasörü silinemez; çalışma alanı ve ölçüm görev klasörleri serbest.
     guard.configure(PROJECT_ROOT, [config.workspace, *(PROJECT_ROOT / "data" / d for d in ("bench", "bench2", "gen"))])
     sandbox = code.PythonSandbox(config.workspace, config.sandbox_venv)
@@ -32,7 +34,7 @@ def default_registry(config: Settings | None = None) -> ToolRegistry:
         versions.TOOL,
         *web.TOOLS,
         *files.TOOLS,
-        pageview.make_tool(PROJECT_ROOT / "data" / "screens"),
+        pageview.make_tool(),
         *recycle.TOOLS,
         *code.make_tools(sandbox),
         powershell.make_tool(lambda: str(sandbox.ensure().parent)),

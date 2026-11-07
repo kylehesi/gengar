@@ -319,13 +319,15 @@ class Agent:
         restore_think: str | None = None
         blocked = 0
         review_asked = False
-        vision = bool(getattr(getattr(self.client, "profile", None), "vision", False))
+        profile = getattr(self.client, "profile", None)
+        vision = bool(getattr(profile, "vision", False))
+        local = bool(getattr(profile, "is_local", False))  # pencere görüntüleri yalnızca yerel modele
         step, limit = 0, self.max_steps
         while step < limit:
             step += 1
             parts: list[str] = []
             thinking: list[str] = []
-            messages = self.conversation.messages(self._max_chars(), images=vision)
+            messages = self.conversation.messages(self._max_chars(), images=vision, private_images=local)
             for delta in self.client.stream_chat(messages, schemas):
                 ui.on_delta(delta)
                 if delta.kind == "text":

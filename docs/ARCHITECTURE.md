@@ -298,6 +298,19 @@ prompt, 20 tools):
     `msedge.exe` works too.
   - The remaining 3 are real mistakes (a URL used as a window name, a tab that was not open, several "Play"
     buttons, where the tool rightly asks for a number). 11 of 14 would no longer occur.
+  - **Eyes for windows (v0.0.12).** The control list alone cannot show icons without names, which of several
+    "Play" buttons is which, or which tab is open. `inspect` now also returns a screenshot of the window with
+    each control's `[number]` drawn on it (Set-of-Mark prompting), so the model can match what it sees to the
+    number it clicks. Built without Pillow: `PrintWindow` (with `PW_RENDERFULLCONTENT`, so a window covered by
+    another one is captured too), `StretchBlt` with halftone scaling to at most 1280 px, the marks drawn with GDI
+    pens and fonts, PNG encoded with `zlib` ([`tools/winapi.py`](../src/gengar/tools/winapi.py)). About 0.05 s
+    for an Explorer window. Labels go to the top-right corner of each box: in the first try they sat top-left
+    and covered the start of the text ("Downloads" read as "6ownloads").
+  - **Privacy:** a window screenshot can contain anything on the user's screen (mail, messages). It is marked
+    private and only sent to a local model; an API profile gets the text list and a note instead. Screenshots of
+    pages the model wrote itself (`view_page`) are not private.
+  - The screenshot also showed a gap in `inspect`: it stops at 80 controls in tree order, so in Explorer the
+    toolbar (New, Sort, View) gets no number. Not fixed yet.
   - Window work needs many steps by nature (look → click → look again). When `windows_ui` is used in a turn,
     that turn's step limit rises from 15 to 30 (`ui_max_steps`). Other turns keep 15: the limit is there to stop
     a model that is going in circles.

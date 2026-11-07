@@ -16,7 +16,7 @@ from typing import Any
 
 from . import winapi
 from .apps import fold
-from .base import Risk, Tool, ToolError
+from .base import Risk, Tool, ToolError, ToolResult, save_screen
 
 ACTIONS = ("list", "inspect", "focus", "click", "type", "keys")
 MAX_CONTROLS = 80
@@ -171,15 +171,39 @@ def _collect(win: winapi.Window) -> list[Any]:
     return found
 
 
+def _screenshot(win: winapi.Window, controls: list[Any]) -> tuple[str | None, str]:
+    """Pencerenin görüntüsü, öğeler numaralarıyla üstüne çizilmiş (Set-of-Mark). (dosya yolu, not)."""
+    marks = []
+    for i, c in enumerate(controls):
+        try:
+            r = c.BoundingRectangle
+            if r.right > r.left and r.bottom > r.top:
+                marks.append((str(i), (r.left, r.top, r.right, r.bottom)))
+        except Exception:  # öğe bu arada kaybolmuş olabilir
+            continue
+    try:
+        cap = winapi.capture_window(win.hwnd, marks)
+    except OSError as e:
+        return None, f"(No screenshot: {e}.)"
+    path = save_screen(cap.png, win.process.removesuffix(".exe"), "png")
+    return str(path), ("A screenshot of the window is attached below; each control has its [number] drawn on "
+                       "it in pink. Use it to see what the list cannot tell you (icons, layout, which tab or "
+                       "item is selected), then act by number.")
+
+
 def inspect(window: str) -> str:
     win = find_window(window)
     controls = _collect(win)
     _cache.hwnd, _cache.controls = win.hwnd, controls
+    shot, note = _screenshot(win, controls)
     if not controls:
-        return f"'{win.title}': no interactive controls found (the app may not support UI Automation)."
-    rows = [f"[{i}] {_label(c)}" for i, c in enumerate(controls)]
-    more = f"\n(first {MAX_CONTROLS} controls shown)" if len(controls) >= MAX_CONTROLS else ""
-    return f"Window '{win.title}' [{win.process}]:\n" + "\n".join(rows) + more
+        text = f"'{win.title}': no interactive controls found (the app may not support UI Automation)."
+    else:
+        rows = [f"[{i}] {_label(c)}" for i, c in enumerate(controls)]
+        more = f"\n(first {MAX_CONTROLS} controls shown)" if len(controls) >= MAX_CONTROLS else ""
+        text = f"Window '{win.title}' [{win.process}]:\n" + "\n".join(rows) + more
+    text = f"{text}\n{note}"
+    return ToolResult(text, images=[shot], private=True) if shot else text
 
 
 def _resolve(win: winapi.Window, target: str) -> Any:
@@ -334,7 +358,8 @@ TOOL = Tool(
     name="windows_ui",
     description=(
         "Operate app windows via UI Automation when no command does the job. list: open windows. "
-        "inspect: numbered controls of a window (always inspect before clicking). focus: bring to front. "
+        "inspect: numbered controls of a window plus a screenshot with the numbers drawn on them (always "
+        "inspect before clicking, and again to check the result). focus: bring to front. "
         "click: press control `target`. type: enter `text` into `target` or the focused field. "
         "keys: press shortcuts in `text`, e.g. 'ctrl+s', 'enter'."
     ),

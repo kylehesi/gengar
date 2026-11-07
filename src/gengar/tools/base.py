@@ -31,6 +31,38 @@ def set_working_dir(path: Path) -> None:
     _working_dir = path
 
 
+# Modele gösterilen ekran görüntüleri (view_page, windows_ui inspect) buraya kaydedilir; en yeni MAX_SCREENS tutulur.
+_screens_dir = Path.home() / "gengar-screens"
+MAX_SCREENS = 40
+_screen_seq = 0
+
+
+def set_screens_dir(path: Path) -> None:
+    global _screens_dir
+    _screens_dir = path
+
+
+def save_screen(data: bytes, name: str, ext: str) -> Path:
+    """Görüntüyü zaman damgalı bir dosyaya yazar, eski görüntüleri siler; dosya yolunu döndürür."""
+    import time
+
+    _screens_dir.mkdir(parents=True, exist_ok=True)
+    stem = "".join(c if c.isalnum() else "_" for c in name)[:40] or "screen"
+    # Ad hiç tekrar kullanılmaz (saniye + süreç içi sıra numarası): silinmiş eski bir görüntünün adı yeni
+    # görüntüye verilseydi, geçmişte o yolu tutan mesaj artık başka bir görüntüyü gösterirdi.
+    global _screen_seq
+    while True:
+        _screen_seq += 1
+        out = _screens_dir / f"{time.strftime('%Y%m%d-%H%M%S')}-{_screen_seq:04d}_{stem}.{ext}"
+        if not out.exists():
+            break
+    out.write_bytes(data)
+    shots = sorted((q for q in _screens_dir.iterdir() if q.suffix in (".jpg", ".png")), key=lambda q: q.stat().st_mtime)
+    for q in shots[:-MAX_SCREENS]:
+        q.unlink(missing_ok=True)
+    return out
+
+
 class Risk(IntEnum):
     """Bir eylemin riski. İzin katmanı neyin sorulacağına buna bakarak karar verir."""
 
@@ -57,10 +89,14 @@ class ToolResult(str):
     """
 
     images: list[str]
+    # private: kullanıcının ekranından alınan görüntü (pencereler: e-posta, mesaj… olabilir). Yalnızca yerel
+    # modele gönderilir; API modeline gitmez. Modelin kendi yazdığı web sayfasının görüntüsü gizli değildir.
+    private: bool
 
-    def __new__(cls, text: str, images: list[str] | None = None):
+    def __new__(cls, text: str, images: list[str] | None = None, private: bool = False):
         obj = super().__new__(cls, text)
         obj.images = list(images or [])
+        obj.private = private
         return obj
 
 
@@ -104,7 +140,7 @@ class Tool:
         images = getattr(result, "images", None)
         # Windows satır sonları (\r\n) modele boş satırlar gibi görünüyor ve token harcıyor.
         text = truncate(result.replace("\r\n", "\n").replace("\r", "\n"))
-        return ToolResult(text, images) if images else text
+        return ToolResult(text, images, getattr(result, "private", False)) if images else text
 
 
 def is_failure(output: str) -> bool:

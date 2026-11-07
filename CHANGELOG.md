@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.12](#0012---2026-11-07) | 2026-11-07 | Eyes for window work: `windows_ui inspect` returns a screenshot with each control's number drawn on it; window screenshots go to local models only |
 | [0.0.11](#0011---2026-11-07) | 2026-11-07 | The model's eyes: `view_page` renders a web page in headless Edge and shows the model a screenshot; Gengar asks it to look before finishing |
 | [0.0.10](#0010---2026-11-07) | 2026-11-07 | Web pages: broken images are reported to the model, real images via `web_search(images=true)`, design and PDF hints; 30 steps for window tasks |
 | [0.0.9](#009---2026-11-07) | 2026-11-07 | "Allow for this session" now really stops the questions; critical actions are still asked; `windows_ui` finds windows reliably |
@@ -17,6 +18,40 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.12] - 2026-11-07
+
+### Highlights
+- **The model can see the windows it operates.** Until now `inspect` gave only a list of controls. A list cannot
+  show icons without names, which of several "Play" buttons is which, or which tab is open, and window requests
+  failed far more often than anything else (39% of `windows_ui` calls in the 2026-11-07 session). Now `inspect`
+  also returns a screenshot of the window, with each control's `[number]` drawn on it (Set-of-Mark prompting).
+  The model can match what it sees to the number it clicks, and look again after a click to check the result.
+
+### Added
+- `winapi.capture_window`: window screenshot without Pillow, entirely in ctypes and the standard library.
+  - `PrintWindow` with `PW_RENDERFULLCONTENT`, so a window covered by another one is captured too. If that
+    fails, the visible screen area is copied.
+  - Halftone scaling with `StretchBlt` to at most 1280 px.
+  - Boxes and number labels drawn with GDI. The labels sit at the top-right corner: in the first try they sat
+    top-left and covered the start of the text ("6ownloads").
+  - PNG encoded with `zlib`.
+  - The thread is set to per-monitor DPI awareness, so control positions match the image at 125% scaling.
+  - About 0.05 s for an Explorer window. A minimized window gets the list and "No screenshot: the window is
+    minimized".
+- `ToolResult.private`: window screenshots can show anything on the user's screen, so they are only sent to a
+  local model. An API profile gets the text list and a note instead.
+- `base.save_screen`: one place for saving screenshots (`data/screens/`, newest 40). Names are never reused, so a
+  message in the history cannot end up pointing at a newer image.
+
+### Fixed
+- `test_registry_order_and_size` still expected 17 tools after `view_page` was added in 0.0.11. The test ran
+  only now; the expected count is 18.
+
+### Notes
+- The screenshot showed a gap in `inspect`: it stops at 80 controls in tree order, so in Explorer the toolbar
+  (New, Sort, View) gets no number. Not fixed yet.
+- Not measured on the model yet (the GPU is busy).
 
 ## [0.0.11] - 2026-11-07
 
