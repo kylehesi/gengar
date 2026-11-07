@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.11](#0011---2026-11-07) | 2026-11-07 | The model's eyes: `view_page` renders a web page in headless Edge and shows the model a screenshot; Gengar asks it to look before finishing |
 | [0.0.10](#0010---2026-11-07) | 2026-11-07 | Web pages: broken images are reported to the model, real images via `web_search(images=true)`, design and PDF hints; 30 steps for window tasks |
 | [0.0.9](#009---2026-11-07) | 2026-11-07 | "Allow for this session" now really stops the questions; critical actions are still asked; `windows_ui` finds windows reliably |
 | [0.0.8](#008---2026-11-07) | 2026-11-07 | Real-requests benchmark: 24 tasks from real use, request texts kept local; `--repeat`, `--suite` |
@@ -16,6 +17,49 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.11] - 2026-11-07
+
+### Highlights
+- **The model can see the pages it writes.** It used to write HTML and never see the result, then call a page with
+  13 broken images and a template gradient "great". Qwen3.5 9B can read images, so the new `view_page` tool
+  renders the page in a headless browser and puts the screenshot in front of the model, together with what went
+  wrong while loading. If the model writes a web page and tries to finish without looking at it, Gengar asks it
+  once to look and fix what it sees.
+
+### Added
+- `view_page` (`tools/pageview.py`): renders an `.html` file or an http(s) URL in headless Edge (throw-away
+  profile, `--disable-gpu`) over the Chrome DevTools Protocol, using aiohttp's websocket client (no new package).
+  - Desktop 1280 × 800 or phone 390 × 844; long pages come in parts of 1,800 px (`part=2`, …).
+  - The JPEG is scaled in the browser: 960 × 1350 px on desktop, roughly 1,300 image tokens.
+  - Reports images that do not load (local ones too), failed requests, JavaScript errors, and sideways
+    scrolling with the first element that sticks out.
+  - Screenshots are kept in `data/screens/` (the newest 40).
+  - Risk: read; a local-network URL is critical, as with `fetch_page`.
+  - On the graffiti page from 0.0.10: 1.9 s, 13 broken images found.
+- `ToolResult`: a tool result that carries images. It is a `str` subclass, so logging and failure checks are
+  unchanged.
+- The conversation sends images to the model in a user message right after the tool results. OpenAI-style
+  providers do not accept images inside a tool result, and tool results must follow the call without a gap.
+  - LiteLLM converts this into Ollama's `images` field; checked on the request body.
+  - Only the 2 newest images of the current turn are sent, and they count against the context budget.
+  - The history (and so the training data) keeps only the file path.
+- Profile option `vision = true` (local35, base4b, gemini). Profiles without it get the text diagnosis only,
+  with a note that the screenshot was not attached.
+- `[agent] review_pages = true`: a turn that wrote an `.html` file without looking at it gets one
+  "look at it with view_page before you finish" message. It works like the check for unbacked "created"
+  claims.
+
+### Changed
+- The web hint now says to look at the page with `view_page` before answering.
+- The document hint says how to install the library: `packages=["fpdf2"]`. The old wording ("packages: fpdf2,
+  …") read as if they were already installed. They are not, in the `run_python` sandbox or in Gengar's own
+  environment.
+
+### Notes
+- Not measured on the model yet: the GPU is busy. The next night run should compare the web tasks of the
+  real-requests set before and after.
+- The tool schema adds about 200 tokens to the fixed prefix.
 
 ## [0.0.10] - 2026-11-07
 

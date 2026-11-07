@@ -34,4 +34,4 @@ def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
     return Agent(client, tools, PermissionPolicy(permission_mode or settings.permission_mode),
                  AuditLog(settings.log_dir), conversation, max_steps=settings.max_steps,
                  memory=memory_system, think=think or settings.think, hints=settings.turn_hints,
-                 ui_max_steps=settings.ui_max_steps)
+                 ui_max_steps=settings.ui_max_steps, review_pages=settings.review_pages)

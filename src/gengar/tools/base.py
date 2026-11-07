@@ -49,6 +49,21 @@ class ToolError(Exception):
     """Aracın modele iletilecek, beklenen hatası (dosya yok, eşleşme yok vb.)."""
 
 
+class ToolResult(str):
+    """Görsel de taşıyan araç sonucu: metin + modele gösterilecek görüntü dosyaları (örn. view_page).
+
+    `str` alt sınıfı: araç sonucunu metin olarak işleyen her yer (kayıt, hata kontrolü) olduğu gibi çalışır;
+    görüntüler `images` içinde yolculuk eder ve Conversation onları modele giden mesaja ekler.
+    """
+
+    images: list[str]
+
+    def __new__(cls, text: str, images: list[str] | None = None):
+        obj = super().__new__(cls, text)
+        obj.images = list(images or [])
+        return obj
+
+
 @dataclass(frozen=True)
 class Tool:
     name: str
@@ -85,8 +100,11 @@ class Tool:
             inspect.signature(self.func).bind(**args)
         except TypeError as e:
             raise ToolError(f"geçersiz argümanlar: {e}") from e
+        result = self.func(**args)
+        images = getattr(result, "images", None)
         # Windows satır sonları (\r\n) modele boş satırlar gibi görünüyor ve token harcıyor.
-        return truncate(self.func(**args).replace("\r\n", "\n").replace("\r", "\n"))
+        text = truncate(result.replace("\r\n", "\n").replace("\r", "\n"))
+        return ToolResult(text, images) if images else text
 
 
 def is_failure(output: str) -> bool:

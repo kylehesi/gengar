@@ -261,6 +261,7 @@ prompt, 20 tools):
 | `web_search`, `fetch_page` | `web.py` | Web search, reading pages | read |
 | `read_file`, `list_directory`, `find_files` | `files.py` | Reading/searching files | read |
 | `write_file`, `edit_file` | `files.py` | Writing/editing files | write |
+| `view_page` | `pageview.py` | Renders a web page and shows the model a screenshot | read (local network: critical) |
 | `save_answer` | `files.py` | Copies an earlier answer to a file exactly, without the model retyping it | write |
 | `delete_files`, `restore_files` | `recycle.py` | Delete to / restore from the Recycle Bin | write (listing: read) |
 | `search_text` | `code.py` | Search text in files (like grep) | read |
@@ -319,9 +320,31 @@ prompt, 20 tools):
     Hints are not stored in the history, so they never reach training data.
   - System prompt: in Turkish "dosya" often means a folder ("create a *dosya* called Graffiti and put a PDF
     inside").
-  - What the system cannot fix is taste: a 9B model's design sense has a ceiling. The next step is to give it
-    eyes: render the page, show the screenshot to Qwen3.5 9B (it can read images) and let it criticise and fix
-    its own page.
+  - What the system cannot fix is taste: a 9B model's design sense has a ceiling. The next step was to give
+    it eyes (below).
+- **The model's eyes: `view_page` (v0.0.11).** The model wrote code and never saw the result, so it called a
+  broken page "great". Qwen3.5 9B can read images (`ollama show`: `vision`, a 456M image encoder), so it can now
+  look at its own page:
+  - **Rendering** ([`tools/pageview.py`](../src/gengar/tools/pageview.py)): Edge runs headless with a
+    throw-away profile and `--disable-gpu` (it does not touch the GPU). Gengar talks to it over the Chrome
+    DevTools Protocol with aiohttp's websocket client, so no new package is needed. Using CDP rather than the
+    `--screenshot` command-line flag lets the tool take a long page in parts of 1,800 px and collect what
+    happened while loading: images that do not load (local ones too), failed requests, JavaScript errors, and
+    sideways scrolling with the first element that sticks out. The viewport stays 1280 × 800 (phone:
+    390 × 844), so a `100vh` hero keeps its real height. The JPEG is scaled in the browser (0.75 on desktop,
+    960 × 1350 px, roughly 1,300 image tokens). On the graffiti page: 1.9 s, 13 broken images found.
+  - **Getting the image to the model:** a tool result can carry images (`ToolResult`, a `str` subclass, so
+    everything that treats results as text keeps working). The conversation stores only the file path
+    (`data/screens/`, last 40 kept). When messages are built, the image goes in a user message right after the
+    tool results: OpenAI-style providers do not accept images inside a tool result, and tool results must
+    follow the assistant's call without a gap. LiteLLM turns it into Ollama's `images` field (checked on the
+    request body). Only the 2 newest images of the current turn are sent and counted against the context
+    budget; older ones get "(The screenshot is no longer attached.)". A profile without `vision = true`
+    (Qwen3 8B, DeepSeek) gets the text diagnosis only.
+  - **Looking is not optional:** if a turn wrote an `.html` file and the model wants to finish without having
+    looked at it, Gengar asks it once to call `view_page` and fix what it sees (`[agent] review_pages`), like
+    the check for "created" claims without a write. The web hint also says to look before answering.
+  - Not measured on the model yet (the GPU is busy). The tool schema adds about 200 tokens to the fixed prefix.
 
 ---
 
@@ -614,6 +637,8 @@ means: find the information first, then answer from it.
 - [`tools/web.py`](../src/gengar/tools/web.py): `web_search` (search results via the ddgs library, with Bing as a
   fallback because only Bing worked on this network; `images=true` searches free images on Wikimedia Commons) and `fetch_page` (downloads a page and strips ads/menus;
   trafilatura, pypdf for PDFs).
+- [`tools/pageview.py`](../src/gengar/tools/pageview.py) → `view_page`: renders a page in headless Edge and
+  shows the model a screenshot (see "The model's eyes" in §3).
 - **Chunking:** a page can be ~20,000 characters and the context is limited. The page is split into chunks and
   the 5 most relevant ones are chosen with **BM25**, a classic word-overlap search score (with stemming for
   Turkish suffixes).

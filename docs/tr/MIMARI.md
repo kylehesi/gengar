@@ -267,6 +267,7 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
 | `web_search`, `fetch_page` | `web.py` | Web'de arama, sayfa okuma | okuma |
 | `read_file`, `list_directory`, `find_files` | `files.py` | Dosya okuma/arama | okuma |
 | `write_file`, `edit_file` | `files.py` | Dosya yazma/düzenleme | değişiklik |
+| `view_page` | `pageview.py` | Web sayfasını çizip ekran görüntüsünü modele gösterir | okuma (yerel ağ: kritik) |
 | `save_answer` | `files.py` | Önceki cevabı yeniden yazdırmadan, geçmişten birebir dosyaya kopyalar | değişiklik |
 | `delete_files`, `restore_files` | `recycle.py` | Geri dönüşüm kutusuna silme / geri yükleme | değişiklik (listeleme: okuma) |
 | `search_text` | `code.py` | Dosyalarda metin arama (grep gibi) | okuma |
@@ -327,8 +328,35 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
   - Sistem promptu: Türkçede "dosya" çoğu zaman klasör demek ("Graffiti adında bir dosya oluştur, içine PDF
     koy").
   - Sistemin düzeltemeyeceği şey zevk: 9B bir modelin tasarım anlayışının bir tavanı var. Sıradaki adım modele
-    göz vermek: sayfayı çizip ekran görüntüsünü Qwen3.5 9B'ye göstermek (görsel okuyabiliyor), kendi sayfasını
-    eleştirip düzeltmesine izin vermek.
+    göz vermekti (aşağıda).
+- **Modelin gözü: `view_page` (v0.0.11).** Model kod yazıyor ama sonucu hiç görmüyordu, bu yüzden bozuk bir
+  sayfaya "harika oldu" dedi. Qwen3.5 9B görsel okuyabiliyor (`ollama show`: `vision`, 456M parametrelik
+  görüntü kodlayıcı); artık kendi sayfasına bakabiliyor:
+  - **Çizim** ([`tools/pageview.py`](../../src/gengar/tools/pageview.py)): Edge görünmez (headless) modda,
+    geçici bir profille ve `--disable-gpu` ile açılıyor (ekran kartına dokunmuyor). Gengar onunla Chrome
+    DevTools Protokolü (CDP) üzerinden aiohttp'nin websocket istemcisiyle konuşuyor; yeni paket gerekmiyor.
+    Komut satırındaki `--screenshot` yerine CDP'nin iki faydası var:
+    - uzun sayfa 1.800 px'lik parçalar hâlinde çekilebiliyor;
+    - yükleme sırasında olanlar toplanabiliyor: açılmayan görseller (yereller dahil), başarısız istekler, JS
+      hataları, yana kaydırma ve taşan ilk öğe.
+    - Ekran 1280 × 800 kalıyor (telefon: 390 × 844); `100vh` bir başlık alanı gerçek yüksekliğini koruyor.
+    - JPEG tarayıcıda küçültülüyor (masaüstünde 0,75 → 960 × 1350 px, ~1.300 görüntü tokenı).
+    - Graffiti sayfasında: 1,9 sn, 13 bozuk görsel bulundu.
+  - **Görüntünün modele ulaşması:**
+    - Araç sonucu görsel taşıyabiliyor (`ToolResult`). `str` alt sınıfı olduğu için sonucu metin olarak işleyen
+      her yer çalışmaya devam ediyor.
+    - Sohbet geçmişinde yalnızca dosya yolu duruyor (`data/screens/`, son 40 görüntü tutuluyor).
+    - Mesajlar hazırlanırken görüntü, araç sonuçlarının hemen ardından bir kullanıcı mesajı olarak ekleniyor.
+      Nedeni: OpenAI biçimindeki sağlayıcılar araç sonucunun içinde görsel kabul etmiyor, araç sonuçları da
+      asistanın çağrısını boşluksuz izlemeli. LiteLLM bunu Ollama'nın `images` alanına çeviriyor (istek
+      gövdesinde doğrulandı).
+    - Yalnızca bu turun en yeni 2 görüntüsü gönderiliyor ve bağlam bütçesinden düşülüyor. Eskilerinin yerine
+      "(The screenshot is no longer attached.)" notu konuyor.
+    - `vision = true` olmayan profil (Qwen3 8B, DeepSeek) yalnızca metin teşhisini alıyor.
+  - **Bakmak isteğe bağlı değil:** Turda bir `.html` yazıldıysa ve model ona hiç bakmadan bitirmek isterse,
+    Gengar onu bir kez `view_page`'e yönlendiriyor (`[agent] review_pages`). Bu, yazma olmadan "oluşturdum"
+    iddiası kontrolüyle aynı mantık. Web ipucu da cevaplamadan önce bakmasını söylüyor.
+  - Model üzerinde henüz ölçülmedi (ekran kartı meşgul). Araç şeması sabit ön eke ~200 token ekliyor.
 
 ---
 
@@ -629,6 +657,8 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 - [`tools/web.py`](../../src/gengar/tools/web.py):
   - `web_search`: arama motoru sonuçları (ddgs kütüphanesi; bu ağda sadece Bing çalıştığı için yedek olarak Bing)
   - `fetch_page`: sayfayı indirir, reklam/menü gibi gereksiz kısımları atar (trafilatura; PDF için pypdf)
+- [`tools/pageview.py`](../../src/gengar/tools/pageview.py) → `view_page`: sayfayı görünmez Edge'de çizip ekran
+  görüntüsünü modele gösterir (bkz. §3 "Modelin gözü").
 - **Parçalama:** Sayfa ~20.000 karakter olabilir, bağlam sınırlı. Sayfa parçalara bölünüyor ve sorguyla en
   ilgili 5 parça **BM25** ile seçiliyor. BM25, kelime örtüşmesine dayalı klasik bir arama puanı; Türkçe
   ekler için kök alma da var.

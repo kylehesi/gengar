@@ -18,7 +18,7 @@ from ..tools.base import Risk, Tool, ToolError, ToolRegistry, is_failure
 from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
 from .permissions import PermissionPolicy
-from ..tools.files import previous_answers
+from ..tools.files import previous_answers, resolve
 from .router import is_document_request, is_save_request, is_web_request, needs_thinking
 
 if TYPE_CHECKING:
@@ -64,6 +64,7 @@ SAVE_HINT = ("[Gengar] Note for this request: the user wants to save something y
 WEB_HINT = ("[Gengar] Note for this request (web page):\n"
             "- Images: never invent image URLs. Get real ones with web_search(images=true) and use the returned "
             "URLs exactly. write_file reports images that do not load; fix them before answering.\n"
+            "- After writing the page, look at it with view_page and fix what looks wrong before answering.\n"
             "- Look: avoid the generic template look (purple/blue gradients, glowing text, emoji icons, a shadowed "
             "rounded card for everything). Pick 2-3 colours and a typeface that suit the topic (one display font "
             "from Google Fonts plus a readable body font), a clear hierarchy, real content first.\n"
@@ -71,8 +72,8 @@ WEB_HINT = ("[Gengar] Note for this request (web page):\n"
             "on a phone.")
 # PDF/Word/Excel/PowerPoint isteği (router.is_document_request).
 DOC_HINT = ("[Gengar] Note for this request (document): you can create real .pdf, .docx, .xlsx and .pptx files "
-            "with run_python (packages: fpdf2, python-docx, openpyxl, python-pptx); never say the format is "
-            "impossible. For Turkish characters in a PDF add a TTF font, e.g. fpdf2: "
+            "with run_python: pass packages=[\"fpdf2\"] (or python-docx, openpyxl, python-pptx) to install the "
+            "library first. Never say the format is impossible. For Turkish characters in a PDF add a TTF font, e.g. fpdf2: "
             "pdf.add_font('Arial', fname=r'C:\\Windows\\Fonts\\arial.ttf') and the bold file arialbd.ttf with "
             "style='B'.")
 # Kayıt dosyasına yazılan cevabın en fazla uzunluğu (karakter).
@@ -85,6 +86,12 @@ PROTECTED = ("Not executed: this would delete, move or overwrite something insid
              "folder ({root}) — matched: {path}. Gengar's files are protected. If the user meant one of their "
              "own folders, find it under their home folder (Desktop, Documents…) with find_files and use its "
              "absolute path.")
+# Turda .html yazıldı ama model ona hiç bakmadı (view_page): bitirmeden önce bir kez bakmaya yönlendirilir.
+REVIEW_PAGE = ("[Gengar] Before you finish: you wrote {pages} but have not looked at it. Call view_page to see how "
+               "it really looks, fix real problems (unreadable text, broken images, overlapping, cut-off or empty "
+               "areas, a layout that does not fit the request) with edit_file, then give your final answer.")
+_PAGE_WRITERS = {"write_file", "edit_file"}
+_PAGE_EXT = (".html", ".htm")
 REPEATED = ("Not executed: you just made this exact call and it failed. Repeating it will fail again. "
             "Read the previous error and change the command, the arguments, or the approach.")
 
@@ -171,7 +178,7 @@ class Agent:
     def __init__(self, client: LLMClient, tools: ToolRegistry, policy: PermissionPolicy,
                  audit: AuditLog, conversation: Conversation, max_steps: int = 15,
                  memory: MemorySystem | None = None, think: str = "auto", hints: bool = True,
-                 ui_max_steps: int = 30):
+                 ui_max_steps: int = 30, review_pages: bool = True):
         self.client = client
         self.hints = hints  # tur ipuçları (SAVE_HINT); ablasyon ölçümünde kapatılır
         self.tools = tools
@@ -183,6 +190,7 @@ class Agent:
         # kullanılınca sınır buna çıkar (2026-11-07: üç pencere isteği 15 adım sınırına takıldı).
         self.ui_max_steps = max(ui_max_steps, max_steps)
         self.memory = memory
+        self.review_pages = review_pages
         # Düşünme modu: "auto" (isteğe göre + zorlanınca aç), "on", "off"
         self.think = think
         self.last_turn: list[dict] = []  # son tamamlanan turun mesajları (/learn için)
@@ -190,6 +198,8 @@ class Agent:
         self._last_error = ""
         self._changed = False  # bu turda yazan/silen bir araç başarıyla çalıştı mı
         self._denied = False   # bu turda kullanıcı bir eylemi reddetti mi
+        self._pages_written: list[str] = []  # bu turda yazılan/düzenlenen .html dosyaları
+        self._pages_viewed: set[str] = set()  # bu turda view_page ile bakılanlar
 
     def _max_chars(self) -> int | None:
         ctx = self.client.context_tokens
@@ -207,6 +217,7 @@ class Agent:
         self._last_failed = None
         self._changed = False
         self._denied = False
+        self._pages_written, self._pages_viewed = [], set()
         self._set_thinking(user_text)
         context = self.memory.context_for(user_text) if self.memory else ""
         self.conversation.add_user(user_text)
@@ -307,12 +318,15 @@ class Agent:
         empty_retries = 0
         restore_think: str | None = None
         blocked = 0
+        review_asked = False
+        vision = bool(getattr(getattr(self.client, "profile", None), "vision", False))
         step, limit = 0, self.max_steps
         while step < limit:
             step += 1
             parts: list[str] = []
             thinking: list[str] = []
-            for delta in self.client.stream_chat(self.conversation.messages(self._max_chars()), schemas):
+            messages = self.conversation.messages(self._max_chars(), images=vision)
+            for delta in self.client.stream_chat(messages, schemas):
                 ui.on_delta(delta)
                 if delta.kind == "text":
                     parts.append(delta.text)
@@ -374,6 +388,13 @@ class Agent:
                     self.audit.record("unbacked_claim", text=text[:300])
                     self.conversation.add_user(CLAIMED)
                     continue
+                # Sayfa yazıldı ama hiç görülmedi: kod yazıp sonucu görmeden "harika oldu" demesin (2026-11-07).
+                unseen = self._unseen_pages()
+                if unseen and not review_asked:
+                    review_asked = True
+                    self.audit.record("page_review", pages=unseen)
+                    self.conversation.add_user(REVIEW_PAGE.format(pages=", ".join(unseen)))
+                    continue
                 return text
             failed = False
             if any(c.name in _MULTI_STEP_TOOLS for c in calls) and limit < self.ui_max_steps:
@@ -406,6 +427,25 @@ class Agent:
         note = f"(Adım sınırına ulaşıldı: {limit}. Devam etmek için 'devam et' yazın.)"
         self.conversation.add_assistant(note)
         return note
+
+    def _unseen_pages(self) -> list[str]:
+        if not (self.review_pages and self.tools.get("view_page")):
+            return []
+        return [p for p in dict.fromkeys(self._pages_written) if p not in self._pages_viewed]
+
+    def _track_pages(self, tool: Tool, args: dict) -> None:
+        """Yazılan ve bakılan web sayfalarını izler (REVIEW_PAGE için)."""
+        path = str(args.get("path") or "")
+        if tool.name not in _PAGE_WRITERS | {"view_page"} or not path or "://" in path:
+            return
+        try:
+            full = str(resolve(path))
+        except (OSError, ValueError):
+            return
+        if tool.name == "view_page":
+            self._pages_viewed.add(full)
+        elif full.lower().endswith(_PAGE_EXT):
+            self._pages_written.append(full)
 
     def _execute(self, call: ToolCall, ui: AgentUI) -> str:
         tool = self.tools.get(call.name)
@@ -464,5 +504,7 @@ class Agent:
                           ok=ok, seconds=round(time.perf_counter() - start, 2), output=output)
         if ok and not is_failure(output) and (risk >= Risk.WRITE or tool.name in _RECORDING_TOOLS):
             self._changed = True
+        if ok and not is_failure(output):
+            self._track_pages(tool, args)
         ui.on_tool_end(call, output, ok)
         return output

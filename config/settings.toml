@@ -37,6 +37,8 @@ keep_alive = "30m"    # model 30 dk boyunca VRAM'de kalsın; her soruda yeniden 
 model = "ollama_chat/qwen3.5:9b"
 description = "Yerel Qwen3.5 9B (Ollama, GPU) — Qwen3'ün halefi"
 reasoning_effort = "none"
+# Görsel okuyabiliyor (ollama show: "vision"): view_page ekran görüntüleri modele gönderilir.
+vision = true
 
 [llm.profiles.local35.options]
 # 16k bağlam: Ollama'da OLLAMA_FLASH_ATTENTION=1 ve OLLAMA_KV_CACHE_TYPE=q8_0 (kullanıcı ortam
@@ -50,6 +52,7 @@ keep_alive = "30m"
 model = "ollama_chat/qwen3.5:4b"
 description = "Eğitimsiz Qwen3.5 4B (karşılaştırma)"
 reasoning_effort = "none"
+vision = true
 
 [llm.profiles.base4b.options]
 num_ctx = 16384
@@ -68,6 +71,7 @@ keep_alive = "30m"
 # gemini-flash-latest ve en yeni sürümler ücretsiz katmanda sık sık "yoğun" (503) dönüyor;
 # 3.5-flash hızlı ve kararlı. Alternatifler: gemini-3.5-flash-lite, gemini-flash-lite-latest
 model = "gemini/gemini-3.5-flash"
+vision = true
 key_env = "GEMINI_API_KEY"
 description = "Google Gemini 3.5 Flash — ücretsiz kota ile geliştirme"
 # Ücretsiz katman: dakikada 5 istek. Gengar istekleri buna göre aralıklandırır.
@@ -101,6 +105,9 @@ required_models = ["qwen3.5:9b", "bge-m3"]
 max_steps = 15
 # Turda pencere aracı (windows_ui) kullanılınca sınır buna çıkar: bak → tıkla → tekrar bak döngüsü çok adım ister.
 ui_max_steps = 30
+# Turda bir web sayfası (.html) yazıldı ama model ona hiç bakmadıysa (view_page), bitirmeden önce bir kez
+# bakmaya yönlendirilir: kod yazıp sonucu hiç görmeden "harika oldu" demesin.
+review_pages = true
 # Düşünme modu: "off" (varsayılan), "on", ya da "auto" (kod/araştırma isteklerinin ilk adımında ve bir araç
 # hata verdikten sonraki tek adımda düşünür). Sohbette /think on|off|auto ile değişir.
 # Neden off: Qwen3.5 9B ile düşünme açıkken aynı işler 2–4 kat yavaş, araç hatası oranı aynı (%11 / %10),

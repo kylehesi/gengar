@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from . import apps, code, files, guard, powershell, recycle, settings, system, ui, versions, web
-from .base import Risk, Tool, ToolError, ToolRegistry, set_working_dir
+from . import apps, code, files, guard, pageview, powershell, recycle, settings, system, ui, versions, web
+from .base import Risk, Tool, ToolError, ToolRegistry, ToolResult, set_working_dir
 
 if TYPE_CHECKING:
     from ..config import Settings
@@ -32,10 +32,11 @@ def default_registry(config: Settings | None = None) -> ToolRegistry:
         versions.TOOL,
         *web.TOOLS,
         *files.TOOLS,
+        pageview.make_tool(PROJECT_ROOT / "data" / "screens"),
         *recycle.TOOLS,
         *code.make_tools(sandbox),
         powershell.make_tool(lambda: str(sandbox.ensure().parent)),
     ])
 
 
-__all__ = ["Risk", "Tool", "ToolError", "ToolRegistry", "default_registry"]
+__all__ = ["Risk", "Tool", "ToolError", "ToolRegistry", "ToolResult", "default_registry"]

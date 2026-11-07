@@ -25,6 +25,8 @@ class Profile:
     rpm: int = 0
     # Sağlayıcıya olduğu gibi iletilen ek parametreler (örn. Ollama num_ctx).
     options: dict = field(default_factory=dict)
+    # Model görsel okuyabiliyor mu (view_page ekran görüntüsü modele gönderilir mi).
+    vision: bool = False
 
     @property
     def is_local(self) -> bool:
@@ -61,6 +63,8 @@ class Settings:
     raw: dict = field(repr=False)
     # Tur ipuçları (örn. "önceki cevabı kaydet" → save_answer). Ölçümde etkisini görmek için kapatılabilir.
     turn_hints: bool = True
+    # Turda yazılan web sayfasına model hiç bakmadıysa, bitirmeden önce bir kez view_page'e yönlendirilir.
+    review_pages: bool = True
     chats_dir: Path = PROJECT_ROOT / "data" / "chats"
     recent_chats: int = 5
 
@@ -97,6 +101,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
             reasoning_effort=p.get("reasoning_effort"),
             rpm=int(p.get("rpm", 0)),
             options=dict(p.get("options", {})),
+            vision=bool(p.get("vision", False)),
         )
         for name, p in llm.get("profiles", {}).items()
     }
@@ -130,4 +135,5 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         raw=raw,
         chats_dir=PROJECT_ROOT / raw.get("chats", {}).get("dir", "data/chats"),
         recent_chats=int(raw.get("chats", {}).get("recent", 5)),
+        review_pages=bool(raw.get("agent", {}).get("review_pages", True)),
     )
