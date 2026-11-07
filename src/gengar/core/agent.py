@@ -19,7 +19,7 @@ from .audit import AuditLog
 from .conversation import CHARS_PER_TOKEN, Conversation
 from .permissions import PermissionPolicy
 from ..tools.files import previous_answers
-from .router import is_save_request, needs_thinking
+from .router import is_document_request, is_save_request, is_web_request, needs_thinking
 
 if TYPE_CHECKING:
     from ..memory import MemorySystem
@@ -60,6 +60,21 @@ TRUNCATED = ("(Gengar: Model yanıtı bağlam sınırına takılıp yarıda kesi
 SAVE_HINT = ("[Gengar] Note for this request: the user wants to save something you already wrote in an "
              "earlier answer. Call save_answer with just the file path (answers=N to include several earlier answers); it "
              "copies your answer exactly. Do not retype it with write_file.")
+# Web sayfası isteği (router.is_web_request): gerçek görseller ve hazır şablon görünümünden kaçınma.
+WEB_HINT = ("[Gengar] Note for this request (web page):\n"
+            "- Images: never invent image URLs. Get real ones with web_search(images=true) and use the returned "
+            "URLs exactly. write_file reports images that do not load; fix them before answering.\n"
+            "- Look: avoid the generic template look (purple/blue gradients, glowing text, emoji icons, a shadowed "
+            "rounded card for everything). Pick 2-3 colours and a typeface that suit the topic (one display font "
+            "from Google Fonts plus a readable body font), a clear hierarchy, real content first.\n"
+            "- One self-contained .html file with the CSS inside unless asked otherwise; semantic HTML; readable "
+            "on a phone.")
+# PDF/Word/Excel/PowerPoint isteği (router.is_document_request).
+DOC_HINT = ("[Gengar] Note for this request (document): you can create real .pdf, .docx, .xlsx and .pptx files "
+            "with run_python (packages: fpdf2, python-docx, openpyxl, python-pptx); never say the format is "
+            "impossible. For Turkish characters in a PDF add a TTF font, e.g. fpdf2: "
+            "pdf.add_font('Arial', fname=r'C:\\Windows\\Fonts\\arial.ttf') and the bold file arialbd.ttf with "
+            "style='B'.")
 # Kayıt dosyasına yazılan cevabın en fazla uzunluğu (karakter).
 MAX_LOGGED_ANSWER = 4000
 CLAIMED = ("[Gengar] Your answer says something was created, saved, changed or deleted, but nothing was "
@@ -127,6 +142,8 @@ _CLAIM = re.compile(
 )
 # Riski "okuma" olduğu hâlde kalıcı bir şey kaydeden araçlar (hafıza).
 _RECORDING_TOOLS = {"remember"}
+# Kullanılınca turun adım sınırını ui_max_steps'e çıkaran araçlar.
+_MULTI_STEP_TOOLS = {"windows_ui"}
 
 
 def _claims_change(text: str) -> bool:
@@ -153,7 +170,8 @@ class AgentUI(Protocol):
 class Agent:
     def __init__(self, client: LLMClient, tools: ToolRegistry, policy: PermissionPolicy,
                  audit: AuditLog, conversation: Conversation, max_steps: int = 15,
-                 memory: MemorySystem | None = None, think: str = "auto", hints: bool = True):
+                 memory: MemorySystem | None = None, think: str = "auto", hints: bool = True,
+                 ui_max_steps: int = 30):
         self.client = client
         self.hints = hints  # tur ipuçları (SAVE_HINT); ablasyon ölçümünde kapatılır
         self.tools = tools
@@ -161,6 +179,9 @@ class Agent:
         self.audit = audit
         self.conversation = conversation
         self.max_steps = max_steps
+        # Pencere işleri (windows_ui) doğası gereği çok adımlı: bak → tıkla → tekrar bak. Turda bu araç
+        # kullanılınca sınır buna çıkar (2026-11-07: üç pencere isteği 15 adım sınırına takıldı).
+        self.ui_max_steps = max(ui_max_steps, max_steps)
         self.memory = memory
         # Düşünme modu: "auto" (isteğe göre + zorlanınca aç), "on", "off"
         self.think = think
@@ -192,11 +213,17 @@ class Agent:
         self.audit.record("user", text=user_text, profile=self.client.profile.name)
         self.conversation.context = context
         # Bu tur için ipucu (geçmişe yazılmaz, sonraki turda kalkar): "önceki cevabı kaydet" isteği.
-        self.conversation.turn_note = ""
+        notes = []
         if (self.hints and self.tools.get("save_answer") and is_save_request(user_text)
                 and previous_answers(self.conversation.history, 1)):
-            self.conversation.turn_note = SAVE_HINT
-            self.audit.record("hint", name="save_answer")
+            notes.append(("save_answer", SAVE_HINT))
+        if self.hints and is_web_request(user_text):
+            notes.append(("web_page", WEB_HINT))
+        if self.hints and is_document_request(user_text):
+            notes.append(("document", DOC_HINT))
+        for name, _ in notes:
+            self.audit.record("hint", name=name)
+        self.conversation.turn_note = "\n\n".join(text for _, text in notes)
         try:
             answer = self._loop(ui)
         except LLMError as e:
@@ -280,7 +307,9 @@ class Agent:
         empty_retries = 0
         restore_think: str | None = None
         blocked = 0
-        for _ in range(self.max_steps):
+        step, limit = 0, self.max_steps
+        while step < limit:
+            step += 1
             parts: list[str] = []
             thinking: list[str] = []
             for delta in self.client.stream_chat(self.conversation.messages(self._max_chars()), schemas):
@@ -347,6 +376,9 @@ class Agent:
                     continue
                 return text
             failed = False
+            if any(c.name in _MULTI_STEP_TOOLS for c in calls) and limit < self.ui_max_steps:
+                limit = self.ui_max_steps
+                self.audit.record("step_limit", limit=limit)
             for call in calls:
                 sig = _signature(call)
                 if sig == self._last_failed:
@@ -371,7 +403,7 @@ class Agent:
                 return note
             self._think_next_step(failed, ui)
 
-        note = f"(Adım sınırına ulaşıldı: {self.max_steps}. Devam etmek için 'devam et' yazın.)"
+        note = f"(Adım sınırına ulaşıldı: {limit}. Devam etmek için 'devam et' yazın.)"
         self.conversation.add_assistant(note)
         return note
 

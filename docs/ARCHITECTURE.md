@@ -291,12 +291,37 @@ prompt, 20 tools):
   requests hit the 15-step limit. Of the 14 errors in one session:
   - 6 × "window name required": the model inspected a window, then forgot `window` in the next click. Now the
     last-used window is taken.
-  - 5 × "no matching window": Edge's title contains an invisible zero-width space (`Microsoft​Edge`), so
+  - 5 × "no matching window": Edge's title contains an invisible zero-width space (U+200B between `Microsoft` and `Edge`), so
     "Microsoft Edge" never matched. Titles are normalised before matching (invisible characters removed, all
     dash types → `-`). If a title changes after a page loads, an old title still finds the window, and `edge` →
     `msedge.exe` works too.
   - The remaining 3 are real mistakes (a URL used as a window name, a tab that was not open, several "Play"
     buttons, where the tool rightly asks for a number). 11 of 14 would no longer occur.
+  - Window work needs many steps by nature (look → click → look again). When `windows_ui` is used in a turn,
+    that turn's step limit rises from 15 to 30 (`ui_max_steps`). Other turns keep 15: the limit is there to stop
+    a model that is going in circles.
+- **Web pages and documents (diagnosis of 2026-11-07).** Asked to turn a guide into a website "with real
+  pictures, not AI slop", the 9B model wrote a page whose 13 images were all invented Unsplash URLs (13 × 404),
+  used the most common template gradient (`#667eea → #764ba2`), and then praised the "real photos". Asked for a
+  PDF it said "a PDF cannot be created in a text-based system" and wrote a .txt file. Part of this is the size of
+  the model, but part of it came from the system: nothing told the model that its page was broken, and it had no
+  way to find a real image. Fixes:
+  - **The tool checks its own output.** When `write_file` / `edit_file` writes a `.html` file, every image is
+    tried (`tools/pagecheck.py`, in parallel, a few seconds) and the images that do not load are added to the
+    tool result as a warning. On the real page: "13 of 13 images do not load", in 1.6 s.
+  - **Real images:** `web_search(images=true)` searches Wikimedia Commons (no key, free licences, direct links)
+    and returns working URLs with licence and author. Words are searched in the file title: a plain search for
+    "graffiti" put a photo of a pyramid first.
+  - **Turn hints** (like `save_answer`): a request to build or change a web page gets a short design brief for
+    that turn (real images only; no purple gradients, glow, emoji icons or a card for everything; colours and a
+    typeface that fit the topic). A request for a PDF, Word, Excel or PowerPoint file gets "you can make it with
+    `run_python` (fpdf2, python-docx, openpyxl, python-pptx)" plus how to get Turkish characters into a PDF.
+    Hints are not stored in the history, so they never reach training data.
+  - System prompt: in Turkish "dosya" often means a folder ("create a *dosya* called Graffiti and put a PDF
+    inside").
+  - What the system cannot fix is taste: a 9B model's design sense has a ceiling. The next step is to give it
+    eyes: render the page, show the screenshot to Qwen3.5 9B (it can read images) and let it criticise and fix
+    its own page.
 
 ---
 
@@ -322,7 +347,7 @@ In the literature this is **ReAct** (Reason + Act): the model thinks, acts, obse
 
 - `Agent.run(user_text)`: sets the thinking mode (section 7), adds relevant memories (section 9), sets the turn
   hint if any (section 7), runs `_loop()`, then checks "remember" requests and tries to learn a skill.
-- `Agent._loop()`: the loop above, at most `max_steps = 15` steps.
+- `Agent._loop()`: the loop above, at most `max_steps = 15` steps (30 in a turn that uses `windows_ui`).
 - `Agent._execute(call)`: a single tool call — tool exists? arguments valid JSON? **guard** → **risk →
   permission** → run → log.
 
@@ -587,7 +612,7 @@ means: find the information first, then answer from it.
 ### In Gengar
 
 - [`tools/web.py`](../src/gengar/tools/web.py): `web_search` (search results via the ddgs library, with Bing as a
-  fallback because only Bing worked on this network) and `fetch_page` (downloads a page and strips ads/menus;
+  fallback because only Bing worked on this network; `images=true` searches free images on Wikimedia Commons) and `fetch_page` (downloads a page and strips ads/menus;
   trafilatura, pypdf for PDFs).
 - **Chunking:** a page can be ~20,000 characters and the context is limited. The page is split into chunks and
   the 5 most relevant ones are chosen with **BM25**, a classic word-overlap search score (with stemming for

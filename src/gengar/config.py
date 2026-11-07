@@ -47,6 +47,7 @@ class Settings:
     timeout: float
     local_timeout: float
     max_steps: int
+    ui_max_steps: int
     think: str
     permission_mode: str
     log_dir: Path
@@ -115,6 +116,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         timeout=float(llm.get("timeout", 120)),
         local_timeout=float(llm.get("local_timeout", 600)),
         max_steps=int(raw.get("agent", {}).get("max_steps", 15)),
+        ui_max_steps=int(raw.get("agent", {}).get("ui_max_steps", 30)),
         think=raw.get("agent", {}).get("think", "auto"),
         permission_mode=raw.get("permissions", {}).get("mode", "normal"),
         log_dir=PROJECT_ROOT / raw.get("logs", {}).get("dir", "logs"),

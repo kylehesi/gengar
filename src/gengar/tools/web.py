@@ -36,13 +36,15 @@ UNTRUSTED_END = "<<<END OF WEB CONTENT>>>"
 
 # --- arama ----------------------------------------------------------------
 
-def web_search(query: str, max_results: int = 5, region: str = "wt-wt") -> str:
+def web_search(query: str, max_results: int = 5, region: str = "wt-wt", images: bool = False) -> str:
     from ddgs import DDGS  # ağır içe aktarma; sadece gerektiğinde
     from ddgs.exceptions import DDGSException
 
     if not query.strip():
         raise ToolError("arama sorgusu boş")
     max_results = max(1, min(int(max_results), 10))
+    if images:
+        return image_search(query, max_results)
     results, error = None, None
     # "auto" çalışan motoru kendisi seçer ama bazen yavaş bir motorda zaman aşımına düşer;
     # o zaman bir kez de doğrudan Bing denenir.
@@ -68,6 +70,64 @@ def web_search(query: str, max_results: int = 5, region: str = "wt-wt") -> str:
         return f"No results for '{query}'."
     return (f"{UNTRUSTED_START}\n" + "\n".join(rows) + f"\n{UNTRUSTED_END}\n"
             "Use fetch_page on the most relevant URL to read details.")
+
+
+# --- görsel arama (Wikimedia Commons) -----------------------------------------
+# 2026-11-07: model web sayfasına 13 Unsplash adresi uydurdu, hiçbiri açılmadı; gerçek görsel bulmanın bir yolu
+# yoktu. Commons: anahtar gerekmez, görseller özgür lisanslı ve doğrudan bağlanabilir. Kelimeler görsel
+# başlığında aranır (intitle:), yalnızca resim dosyaları (filetype:bitmap); "graffiti" düz aramada ilk sonuç
+# bir piramit fotoğrafıydı. Az sonuç gelirse düz aramaya dönülür.
+
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+# Wikimedia'nın robot politikası iletişim bilgisi içeren bir User-Agent istiyor; yoksa 403 döner.
+COMMONS_AGENT = "Gengar/1.0 (https://github.com/kylehesi/gengar)"
+
+
+def _commons(search: str, limit: int) -> list[dict]:
+    import httpx
+
+    params = {"action": "query", "format": "json", "generator": "search", "gsrsearch": search,
+              "gsrnamespace": "6", "gsrlimit": str(limit), "prop": "imageinfo", "iiprop": "url|size|extmetadata",
+              "iiurlwidth": "1000", "iiextmetadatafilter": "LicenseShortName|Artist|ImageDescription"}
+    r = httpx.get(COMMONS_API, params=params, headers={"User-Agent": COMMONS_AGENT}, timeout=20)
+    r.raise_for_status()
+    pages = r.json().get("query", {}).get("pages", {}).values()
+    return sorted((p for p in pages if p.get("imageinfo")), key=lambda p: p.get("index", 0))
+
+
+def _plain(html: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html or "")).strip()
+
+
+def image_search(query: str, max_results: int = 5) -> str:
+    words = [w for w in re.findall(r"[^\W_]+(?:-[^\W_]+)*", query) if len(w) > 1]
+    attempts = [" ".join(f"intitle:{w}" for w in words), query] if len(words) > 0 else [query]
+    pages: list[dict] = []
+    try:
+        for search in attempts:
+            found = _commons(f"{search} filetype:bitmap", max_results)
+            if len(found) > len(pages):
+                pages = found
+            if len(pages) >= min(3, max_results):
+                break
+    except Exception as e:
+        raise ToolError(f"görsel araması yapılamadı ({type(e).__name__}): {e}") from e
+    if not pages:
+        return f"No free images found for '{query}'. Try fewer or English keywords."
+    rows = []
+    for i, p in enumerate(pages, 1):
+        info = p["imageinfo"][0]
+        meta = info.get("extmetadata", {})
+        license_ = _plain(meta.get("LicenseShortName", {}).get("value", "")) or "see source"
+        author = _plain(meta.get("Artist", {}).get("value", ""))[:60] or "unknown"
+        title = p.get("title", "").removeprefix("File:").rsplit(".", 1)[0]
+        url = (info.get("thumburl") or info.get("url", "")).split("?utm_")[0]  # izleme parametreleri gereksiz
+        rows.append(f"{i}. {title}\n   image: {url}\n   {info.get('thumbwidth') or info.get('width')}x"
+                    f"{info.get('thumbheight') or info.get('height')}, license: {license_}, author: {author}\n"
+                    f"   source: {info.get('descriptionurl', '')}")
+    return (f"{UNTRUSTED_START}\n" + "\n".join(rows) + f"\n{UNTRUSTED_END}\n"
+            "These image URLs work; use them exactly as given. Credit author and license near the image "
+            "(e.g. a small caption).")
 
 
 # --- adres güvenliği --------------------------------------------------------
@@ -275,12 +335,13 @@ TOOLS = [
                 "query": {"type": "string", "description": "English often gives better results."},
                 "max_results": {"type": "integer", "description": "1-10 (default 5)."},
                 "region": {"type": "string", "description": "'wt-wt' (default) or 'tr-tr'."},
+                "images": {"type": "boolean", "description": "true: free images with working URLs."},
             },
             "required": ["query"],
         },
         risk=Risk.READ,
         func=web_search,
-        describe=lambda a: str(a.get("query", "")),
+        describe=lambda a: str(a.get("query", "")) + (" (görsel)" if a.get("images") else ""),
     ),
     Tool(
         name="fetch_page",

@@ -147,7 +147,16 @@ def write_file(path: str, content: str) -> str:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8", newline="")
     verb = "üzerine yazıldı" if existed else "oluşturuldu"
-    return f"{p} {verb} ({_human(p.stat().st_size)})"
+    return f"{p} {verb} ({_human(p.stat().st_size)})" + _page_warning(p, content)
+
+
+def _page_warning(p: Path, content: str) -> str:
+    """Web sayfasıysa açılmayan görselleri bildir (bkz. pagecheck)."""
+    if p.suffix.lower() not in (".html", ".htm"):
+        return ""
+    from .pagecheck import check_page
+
+    return check_page(p, content)
 
 
 # --- edit_file: üç kademeli eşleştirme ------------------------------------------------------
@@ -246,7 +255,7 @@ def edit_file(path: str, old_text: str, new_text: str) -> str:
                             or " Önce read_file ile dosyanın tam metnine bakın."))
         note += " (satır başı/sonu boşluk farkı yok sayıldı; girinti dosyaya göre ayarlandı)"
     p.write_text(result.replace("\n", "\r\n") if crlf else result, encoding="utf-8", newline="")
-    return f"{p} düzenlendi{note}"
+    return f"{p} düzenlendi{note}" + _page_warning(p, result)
 
 
 def _protected_roots() -> list[Path]:

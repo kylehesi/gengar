@@ -297,12 +297,38 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
   denedi, üç istek 15 adım sınırına takıldı. Bir oturumdaki 14 hatanın dağılımı:
   - 6 × "pencere adı gerekli": Model pencereyi inceledi, sonraki tıklamada `window` vermeyi unuttu. Artık son
     kullanılan pencere alınıyor.
-  - 5 × "eşleşen pencere yok": Edge başlığında görünmez bir sıfır genişlikli boşluk var (`Microsoft​Edge`),
+  - 5 × "eşleşen pencere yok": Edge başlığında görünmez bir sıfır genişlikli boşluk var (`Microsoft` ile `Edge` arasında U+200B),
     bu yüzden "Microsoft Edge" hiç eşleşmiyordu. Başlıklar eşleştirmeden önce sadeleştiriliyor: görünmez karakterler
     atılıyor, bütün tire türleri `-` oluyor. Sayfa açılıp başlık değişse de eski başlık pencereyi buluyor;
     `edge` → `msedge.exe` de çalışıyor.
   - Kalan 3'ü gerçek hata: web adresini pencere adı sanmak, açık olmayan bir sekme, birden çok "Play" düğmesi
     (araç haklı olarak numara istiyor). 14 hatanın 11'i artık olmazdı.
+  - Pencere işleri doğası gereği çok adım istiyor (bak → tıkla → tekrar bak). Bir turda `windows_ui`
+    kullanılınca o turun adım sınırı 15'ten 30'a çıkıyor (`ui_max_steps`). Diğer turlar 15'te kalıyor: sınırın
+    görevi kısır döngüye giren modeli durdurmak.
+- **Web sayfaları ve belgeler (2026-11-07 teşhisi).** Bir rehberi "gerçek görselli, AI slop olmayan" bir siteye
+  dönüştürmesi istendiğinde 9B model 13 görselin hepsini uydurma Unsplash adresleriyle yazdı (13 × 404). En
+  bilinen şablon degradesini (`#667eea → #764ba2`) kullandı, sonra "gerçek fotoğraflar" diye övündü. PDF
+  istendiğinde "text tabanlı sistemde PDF oluşturulamaz" deyip .txt yazdı. Bunun bir kısmı modelin boyutundan,
+  bir kısmı sistemden: modele sayfasının bozuk olduğunu söyleyen yoktu, gerçek görsel bulmanın da bir yolu yoktu.
+  Düzeltmeler:
+  - **Araç kendi çıktısını kontrol ediyor.** `write_file` / `edit_file` bir `.html` yazınca her görsel deneniyor
+    (`tools/pagecheck.py`, paralel, birkaç saniye). Açılmayanlar araç sonucuna uyarı olarak ekleniyor. Gerçek
+    sayfada: "13 görselin 13'ü açılmıyor", 1,6 saniyede.
+  - **Gerçek görseller:** `web_search(images=true)` Wikimedia Commons'ta arıyor (anahtar yok, özgür lisans,
+    doğrudan bağlantı) ve lisans ve yazarla birlikte çalışan adresler döndürüyor. Kelimeler dosya başlığında
+    aranıyor: düz "graffiti" araması ilk sırada bir piramit fotoğrafı getiriyordu.
+  - **Tur ipuçları** (`save_answer`'daki gibi):
+    - Web sayfası yapma/değiştirme isteği o tur için kısa bir tasarım yönergesi alıyor: yalnızca gerçek görsel;
+      mor degrade, parlayan yazı, emoji ikon ya da her şey için kart yok; konuya uyan renkler ve yazı tipi.
+    - PDF, Word, Excel ya da PowerPoint isteği "`run_python` ile yapabilirsin (fpdf2, python-docx, openpyxl,
+      python-pptx)" notunu ve PDF'e Türkçe karakterin nasıl gireceğini alıyor.
+    - İpuçları geçmişe yazılmıyor, eğitim verisine girmiyor.
+  - Sistem promptu: Türkçede "dosya" çoğu zaman klasör demek ("Graffiti adında bir dosya oluştur, içine PDF
+    koy").
+  - Sistemin düzeltemeyeceği şey zevk: 9B bir modelin tasarım anlayışının bir tavanı var. Sıradaki adım modele
+    göz vermek: sayfayı çizip ekran görüntüsünü Qwen3.5 9B'ye göstermek (görsel okuyabiliyor), kendi sayfasını
+    eleştirip düzeltmesine izin vermek.
 
 ---
 
@@ -331,7 +357,7 @@ Buna literatürde **ReAct** (Reason + Act) deniyor: model düşünür, eyleme ge
   2. Hafızadan ilgili bilgileri ekler (bölüm 9).
   3. `_loop()` çalıştırır.
   4. Bitince "hatırla" kontrolü yapar ve beceri öğrenmeyi dener.
-- `Agent._loop()`: yukarıdaki döngü. En fazla `max_steps = 15` adım.
+- `Agent._loop()`: yukarıdaki döngü. En fazla `max_steps = 15` adım (`windows_ui` kullanılan turda 30).
 - `Agent._execute(call)`: tek bir araç çağrısı. Sıra:
   1. Araç var mı?
   2. Argümanlar geçerli JSON mu?

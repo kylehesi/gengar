@@ -422,3 +422,16 @@ def test_session_grant_covers_system_actions_but_not_critical(tmp_path):
     confirms = [e for e in ui.events if e[0] == "confirm"]
     assert confirms == [("confirm", "ui", Risk.SYSTEM, True), ("confirm", "ui", Risk.CRITICAL, False)]
     assert [e["decision"] for e in audit_entries(agent) if e["event"] == "tool"] == ["session", "auto", "yes"]
+
+
+@pytest.mark.parametrize("tool_name,finished", [("windows_ui", True), ("echo", False)])
+def test_window_tasks_get_more_steps(tmp_path, tool_name, finished):
+    # 2026-11-07: pencere istekleri 15 adım sınırına takıldı; windows_ui kullanılınca sınır ui_max_steps'e çıkar.
+    tool = Tool(tool_name, "T.", {"type": "object", "properties": {"text": {"type": "string"}}}, Risk.READ, echo)
+    steps = [("", [call(tool_name, f"c{i}", text=str(i))]) for i in range(7)] + [("Bitti.", [])]
+    agent = Agent(ScriptedClient(steps), ToolRegistry([tool]), PermissionPolicy("normal"), AuditLog(tmp_path),
+                  Conversation("SYS"), max_steps=5, ui_max_steps=10)
+    answer = agent.run("yap", RecordingUI())
+    assert (answer.strip() == "Bitti.") is finished
+    if not finished:
+        assert "Adım sınırına ulaşıldı: 5" in answer

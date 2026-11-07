@@ -99,6 +99,8 @@ required_models = ["qwen3.5:9b", "bge-m3"]
 [agent]
 # Tek bir istekte modelin en fazla kaç tur araç kullanabileceği.
 max_steps = 15
+# Turda pencere aracı (windows_ui) kullanılınca sınır buna çıkar: bak → tıkla → tekrar bak döngüsü çok adım ister.
+ui_max_steps = 30
 # Düşünme modu: "off" (varsayılan), "on", ya da "auto" (kod/araştırma isteklerinin ilk adımında ve bir araç
 # hata verdikten sonraki tek adımda düşünür). Sohbette /think on|off|auto ile değişir.
 # Neden off: Qwen3.5 9B ile düşünme açıkken aynı işler 2–4 kat yavaş, araç hatası oranı aynı (%11 / %10),

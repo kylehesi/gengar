@@ -65,12 +65,12 @@ _cache = _Cache()
 # --- pencere bulma --------------------------------------------------------
 # 2026-11-07 gerçek oturumda windows_ui çağrılarının %39'u hata verdi (diğer araçlar %0-10). Üç neden:
 # 1) Model inspect'ten sonraki tıklamada `window` vermeyi unuttu (12 kez) → son kullanılan pencere.
-# 2) Edge başlığında "Microsoft​Edge" (görünmez sıfır genişlikli boşluk) var; "Microsoft Edge" hiç
+# 2) Edge başlığında "Microsoft\u200bEdge" (görünmez sıfır genişlikli boşluk) var; "Microsoft Edge" hiç
 #    eşleşmiyordu → görünmez karakterler ve tire türleri eşleştirmeden önce temizlenir.
 # 3) Sayfa açılınca başlık değişti, model eski başlıkla aradı → daha önce görülen başlıklar da eşleşir.
 
-_INVISIBLE = re.compile("[­​-‏‪-‮⁠-⁤﻿]")
-_DASHES = re.compile("[‐-―−]")
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+_DASHES = re.compile("[\u2010-\u2015\u2212]")
 # Kullanıcının/modelin söylediği ad → süreç adı (.exe'siz)
 PROCESS_ALIASES = {
     "edge": "msedge", "microsoft edge": "msedge", "chrome": "chrome", "google chrome": "chrome",

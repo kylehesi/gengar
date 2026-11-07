@@ -33,4 +33,5 @@ def build_agent(settings: Settings, client: LLMClient, *, memory: bool = True,
     tools.register(files.make_save_answer(lambda: conversation.history), before="write_file")
     return Agent(client, tools, PermissionPolicy(permission_mode or settings.permission_mode),
                  AuditLog(settings.log_dir), conversation, max_steps=settings.max_steps,
-                 memory=memory_system, think=think or settings.think, hints=settings.turn_hints)
+                 memory=memory_system, think=think or settings.think, hints=settings.turn_hints,
+                 ui_max_steps=settings.ui_max_steps)

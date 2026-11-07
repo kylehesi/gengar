@@ -93,10 +93,24 @@ def test_repl_confirmation_prompt(tmp_path):
     repl, out = make_repl(steps, tmp_path, answers=["belki", "h"])
     repl.ask("not defterini kapat")
     text = out.getvalue()
-    assert "Onay gerekiyor (sistem)" in text
+    assert "Onay gerekiyor (kritik)" in text
     assert "Stop-Process -Name notepad" in text
-    assert "[o]turum" not in text  # sistem eylemine oturum izni verilmez
+    assert "her seferinde sorulur" in text  # kritik eyleme oturum izni verilmez
     assert "denied" in repl.agent.conversation.history[2]["content"]
+
+
+def test_repl_offers_session_grant_for_system_actions(tmp_path):
+    # 2026-11-07: tıklama/komut gibi sistem eylemlerine de "oturum boyunca" denebilmeli.
+    # Komut gerçekten çalışır: diske hiçbir şey yazmayan ama ">" yüzünden "sistem" sayılan bir komut.
+    steps = [("", [call("run_powershell", command="Get-Date > $null")]), ("Tamam.", [])]
+    repl, out = make_repl(steps, tmp_path, answers=["o"])
+    prompts = []
+    read = repl.read
+    repl.read = lambda prompt: prompts.append(prompt) or read(prompt)  # seçenekler ekrana değil girdi satırına
+    repl.ask("tarihi al")
+    assert "Onay gerekiyor (sistem)" in out.getvalue()
+    assert "[o]turum boyunca run_powershell için sorma" in prompts[0]
+    assert "run_powershell" in repl.agent.policy.session_grants
 
 
 def test_repl_hides_thinking_by_default(tmp_path):

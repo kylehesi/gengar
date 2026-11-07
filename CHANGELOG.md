@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.10](#0010---2026-11-07) | 2026-11-07 | Web pages: broken images are reported to the model, real images via `web_search(images=true)`, design and PDF hints; 30 steps for window tasks |
 | [0.0.9](#009---2026-11-07) | 2026-11-07 | "Allow for this session" now really stops the questions; critical actions are still asked; `windows_ui` finds windows reliably |
 | [0.0.8](#008---2026-11-07) | 2026-11-07 | Real-requests benchmark: 24 tasks from real use, request texts kept local; `--repeat`, `--suite` |
 | [0.0.7](#007---2026-10-29) | 2026-10-29 | A denied action is not asked again in the same request with a different tool |
@@ -15,6 +16,49 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.10] - 2026-11-07
+
+### Highlights
+- **The model now sees when its web page is broken.** Asked to turn a guide into a website "with real
+  pictures, not AI slop", the model put 13 invented Unsplash URLs into the page (all 13 return 404), used the
+  most common template gradient, and praised its "real photos". Nothing had told it the images were broken, and
+  it had no way to find real ones. Now `write_file` / `edit_file` try every image of an `.html` file and report
+  the ones that do not load (on that page: 13 of 13, in 1.6 s), and `web_search(images=true)` returns real,
+  freely licensed images that load.
+
+### Added
+- `tools/pagecheck.py`: image check for written web pages (`<img src>` and CSS `url(...)`, remote URLs in
+  parallel, local files next to the page). No warning when no address can be reached (offline). Local-network
+  addresses are never requested.
+- `web_search(images=true)`: free images from Wikimedia Commons with a working URL, size, licence and author.
+  Words are matched in the file title (`intitle:`), image files only; a plain search for "graffiti" returned a
+  pyramid first. Wikimedia requires a User-Agent with contact information, so it names the project's GitHub page.
+- Turn hints for this turn only (not stored in the history, so not in training data):
+  - a request to build or change a web page gets a short design brief: real images only; no purple gradients,
+    glowing text, emoji icons or a card for everything; colours and a typeface that suit the topic;
+  - a request for a PDF, Word, Excel or PowerPoint file gets "you can create it with `run_python` (fpdf2,
+    python-docx, openpyxl, python-pptx)" and how to get Turkish characters into a PDF. The model had answered
+    "a PDF cannot be created in a text-based system" and written a .txt file.
+
+### Changed
+- Step limit: a turn that uses `windows_ui` may take 30 steps instead of 15 (`[agent] ui_max_steps`). Three
+  window requests had hit the limit; window work needs look → click → look again.
+- System prompt: in Turkish "dosya" often means a folder (the user asked for a "dosya" named Graffiti with a
+  PDF inside; the model wrote a file called Graffiti.txt).
+
+### Fixed
+- A REPL test ran a real PowerShell command, so writing it created an empty `C:\x\Plan` folder on this PC.
+  The test now uses a command that writes nothing. An older test that checked the confirmation prompt never
+  looked at the prompt text (the choices go to the input line, not the screen), so it could not fail; it now
+  reads the input line.
+
+### Notes
+- Not measured on the benchmark yet (the GPU is busy). The real-requests set has web-page tasks
+  (`real_hello_vscode`, `real_bio_page`, `real_deslop`); they now get the web hint.
+- Fixed prefix: about +20 tokens (the "dosya" rule and the `images` parameter); not re-measured.
+- What the system cannot fix is taste. Planned next step: let the model look at a screenshot of its own page
+  (Qwen3.5 9B can read images) and fix what it sees.
 
 ## [0.0.9] - 2026-11-07
 
