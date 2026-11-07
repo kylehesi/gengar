@@ -700,6 +700,40 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 - **Ölçüm artefaktı:** "dosyayı klasörün yanına yazma" hatası, ölçüm klasörlerinin dosya adı gibi görünen adlarından
   (`save_answer_md_7`) kaynaklanıyordu; gerçekçi klasör adlarıyla (`write_to_folder`) hiç görülmedi.
 
+### Gerçek istekler seti (v0.0.8)
+
+Yukarıdaki aileler düzgün cümlelerle yazılmış. Gerçek kullanım farklı: kısa, gündelik, yazım hatalı, çok turlu
+("açmadın.", "estoya'da yapsak?"). [`evals/families/real.py`](../../evals/families/real.py) kullanıcının Ekim
+ayındaki gerçek isteklerinden 24 görev kuruyor
+(`bench2.py --suite real --split all --repeat 3`, bkz. [`evals/real/README.md`](../../evals/real/README.md)).
+
+| Grup | Görev | Örnek kontrol |
+|---|---|---|
+| Uygulamalar | 5 | Görev **sırasında** bir VS Code penceresi açıldı mı (`AppWatch`); tarayıcı soru sormadan açıldı mı |
+| Klasörler | 7 | Yazım hatalı istenen ayar kullanıcı dosyasında değişti mi, oyunun varsayılan dosyası duruyor mu; Türkçe ay klasörleri yeniden adlandırıldı mı (yeniden oluşturulmadı: işaret dosyası kaybolmamalı); silinenler Geri Dönüşüm Kutusu'nda mı |
+| Kaydetme | 2 | 4 turlu sohbet: dosya 1…N kesintisiz numaralı ("16'dan devam et") |
+| Bilgi | 5 | Devam sorusundaki "estoya" Estonya olarak anlaşıldı mı; zararlı istek araçsız reddedildi mi |
+| Fikirler | 2 | Üçüncü cevap ilk ikisindeki fikirleri tekrar etmiyor ve kategorilere ayrılmış |
+| Web sayfası | 3 | "AI slop" sayfasında hayalet emojisi, parlayan yazı ve yazı tipi kalktı mı, indirilen bir görsel kullanılıyor mu |
+
+- **Gizlilik:** İstek metinleri kullanıcının kendi cümleleri. Bu yüzden bilgisayarda kalıyorlar
+  (`evals/real/private/prompts.json`, gitignore). Depoda yalnızca başlangıç durumları ve kontroller var.
+- **Gerçek hiçbir şeye dokunulmuyor.**
+  - "Masaüstü" yerine görev klasörü kullanılıyor.
+  - Yazan görevler `task_only` onayıyla koşuyor; görev klasörü dışına yazma reddediliyor. Ayar görevi gerçek oyun
+    ayarını değiştiremez.
+  - Uygulama görevleri yalnızca görev sırasında açılan pencerelere bakıyor ve sadece onları kapatıyor.
+  - Gerçek oyunu başlatan görev (`real_cs2_launch`) yalnızca adıyla istenirse çalışıyor.
+- **Üç tekrar:** Tek koşuda görevlerin ~%15'i rastlantıyla değişiyor. 24 görevde tek bir değişiklik 4 puan oynatır.
+- **Bölünme elle yapıldı**, gruplar içinde dengeli: 11 dev, 12 test. `real_split_months` dev'de, çünkü
+  v0.0.5/v0.0.6 düzeltmeleri tam o oturum üzerinde denendi.
+- **Yalnızca ölçüm için.** Bu dökümler asla eğitim verisi olmuyor (`export_sft` yalnızca `purpose=train` okur).
+  Set eğitmek için zaten çok küçük. Görevi şu:
+  - eğitimden önce ve sonra modeli karşılaştıran cetvel olmak;
+  - eğitim verisinin hangi hataları kapsaması gerektiğini göstermek.
+- **Kontroller model olmadan test ediliyor** (`tests/test_real_family.py`). Bu testler daha ilk koşudan önce bir
+  ölçüm hatası yakaladı: Windows'ta `write_text` CRLF yazıyor, dokunulmamış ayar dosyası "değişmiş" görünüyordu.
+
 ---
 
 ## 11. Damıtma ve eğitim

@@ -12,3 +12,6 @@ __pycache__/
 logs/*
 !logs/.gitkeep
 data/
+
+# Gerçek istekler ölçüm setinin metinleri: kullanıcının kendi cümleleri, yalnızca bu bilgisayarda
+evals/real/private/

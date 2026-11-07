@@ -55,7 +55,8 @@ class Task:
     difficulty: int = 1              # 1 kolay, 2 orta, 3 zor (çok adımlı)
     # Onay politikası: "auto" (tehlikeli görünen hayır), "trust" (hepsi evet),
     # "deny" (hepsi hayır), görev klasörü içindeki silmelere izin veren "sandbox",
-    # ya da yalnızca görev klasörü içindeki eylemlere izin veren "task_only".
+    # yalnızca görev klasörü içindeki eylemlere izin veren "task_only", ya da buna ek olarak uygulama
+    # açmaya da izin veren "task_apps".
     approval: str = "auto"
     memory: bool = False
     cleanup: Callable[[], None] | None = None
@@ -68,6 +69,14 @@ class Task:
     # prompt bir listeyse: True → hepsi AYNI sohbette sırayla (çok turlu sohbet);
     # False → her biri yeni sohbet, ortak hafızayla (memory_fact ailesi).
     same_chat: bool = False
+    # True: check, son cevap yerine BÜTÜN turların cevaplarını liste olarak alır (örn. "ikinci turda
+    # ilk turdaki fikirleri tekrar etmedi mi?").
+    multi_answer: bool = False
+    # Görev başlamadan hemen önce çalışır (örn. hangi pencerelerin zaten açık olduğunu not etmek; görevler
+    # en başta toplu kurulduğu için bu iş make() içinde yapılamaz).
+    setup: Callable[[], None] | None = None
+    # True: yalnızca --only ile adı verilirse çalışır (örn. gerçek bir oyunu başlatan görev).
+    opt_in: bool = False
 
 
 @dataclass
@@ -77,6 +86,8 @@ class Family:
     make: Callable[[random.Random, Path], Task]
     instances: int = 2
     test_only: bool = False
+    opt_in: bool = False
+    split: str | None = None         # sabit bölünme ("dev"/"test"); verilmezse görev kimliğinden
 
 
 def variant(rng: random.Random, options: list | tuple):
@@ -129,7 +140,8 @@ def build_tasks(families: list[Family], seed: int = 1000, base: Path = BENCH_ROO
             root.mkdir(parents=True)
             t = fam.make(rng, root)
             t.id, t.family, t.category, t.root = task_id, fam.name, fam.category, root
-            t.split = "test" if fam.test_only else split_for(task_id)
+            t.split = "test" if fam.test_only else fam.split or split_for(task_id)
+            t.opt_in = t.opt_in or fam.opt_in
             tasks.append(t)
     return tasks
 
@@ -207,7 +219,9 @@ class QuietRepl(Repl):
             return "no"
         if self.approval == "sandbox" and self.root and str(self.root).lower() in summary.lower():
             return "yes"  # görev klasörüyle sınırlı silme vb.
-        if self.approval == "task_only":
+        if self.approval == "task_apps" and tool.name == "apps" and summary.startswith("aç"):
+            return "yes"  # uygulama açmaya izin; geri kalan her şey task_only gibi
+        if self.approval in ("task_only", "task_apps"):
             # Yalnızca görev klasörü içindeki eylemler: model kullanıcının klasörlerine (Masaüstü, Belgeler)
             # yazamasın (2026-10-20: save_answer_md ölçümünde iki kez istenmeden yazdı).
             # Ayraçla birlikte: "…\gorev.md" (klasörün YANI) "…\gorev" metnini içerir ama içeride değildir.
@@ -246,17 +260,21 @@ class Result:
     error: str = ""
     answer: str = ""
     tools: list[str] = field(default_factory=list)
+    rep: int = 0                     # --repeat ile kaçıncı tekrar
 
 
 def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path | None,
-             meta: dict[str, Any]) -> Result:
+             meta: dict[str, Any], rep: int = 0) -> Result:
     # Hafıza gerçek kullanımdaki gibi hep açık (araç seti aynı olsun), ama her görevin kendi boş
     # hafıza dosyası var: görevler birbirini etkilemez. Hafıza görevlerinde oturumlar bu dosyayı paylaşır.
     # Dosya görev klasörünün DIŞINDA: içeride olsaydı dosya sayma/taşıma görevlerine karışıyordu.
     s = replace(settings, memory_db=task.root.parent / "_hafiza" / f"{task.id}.db")
     prompts = task.prompt if isinstance(task.prompt, list) else [task.prompt]
+    if task.setup:
+        task.setup()
     start = time.perf_counter()
     answer, error, calls, steps, tools, sessions = "", "", 0, 0, [], []
+    answers: list[str] = []
     worked: list[str] = []  # başarıyla sonuçlanan araç çağrıları (require_tools bunlara bakar)
     agent = None
     for i, p in enumerate(prompts):
@@ -272,6 +290,7 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
             error = str(e)
         except Exception as e:  # ölçüm devam etsin
             error = f"{type(e).__name__}: {e}"
+        answers.append(answer)
         if task.same_chat and i < len(prompts) - 1:
             continue  # aynı sohbet sürüyor: istatistik ve döküm sohbet bitince bir kez
         hist = agent.conversation.history
@@ -285,7 +304,7 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
                          "messages": hist})
     elapsed = time.perf_counter() - start
     try:
-        ok, note = task.check(answer)
+        ok, note = task.check(answers if task.multi_answer else answer)
     except Exception as e:
         ok, note = False, f"doğrulama hatası: {type(e).__name__}: {e}"
     ok, note = apply_tool_limit(task, bool(ok), str(note), tools, worked)
@@ -297,9 +316,9 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         except Exception:
             pass
     result = Result(task.id, task.family, task.category, task.split, task.difficulty, bool(ok), str(note),
-                    round(elapsed, 1), calls, steps, error, answer.strip()[:400], tools)
+                    round(elapsed, 1), calls, steps, error, answer.strip()[:400], tools, rep)
     if traj_file:
-        record = {**meta, "task_id": task.id, "family": task.family, "category": task.category,
+        record = {**meta, "task_id": task.id, "rep": rep, "family": task.family, "category": task.category,
                   "split": task.split, "difficulty": task.difficulty, "ok": result.ok, "note": result.note,
                   "seconds": result.seconds, "error": error, "sessions": sessions}
         with traj_file.open("a", encoding="utf-8") as f:

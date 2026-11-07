@@ -683,6 +683,40 @@ means: find the information first, then answer from it.
 - **Measurement artefact:** the "writes the file next to the folder" bug came from benchmark folder names that
   looked like file names (`save_answer_md_7`); with realistic folder names (`write_to_folder`) it never happened.
 
+### Real-requests set (v0.0.8)
+
+The families above are written in clean sentences. Real use looks different: short, slangy, misspelled,
+multi-turn ("you didn't open it.", "what about estoya?"). [`evals/families/real.py`](../evals/families/real.py)
+turns 24 of the user's real October requests into tasks
+(`bench2.py --suite real --split all --repeat 3`, see [`evals/real/README.md`](../evals/real/README.md)).
+
+| Group | Tasks | Example check |
+|---|---|---|
+| Apps | 5 | a VS Code window opened **during** the task (`AppWatch`); a browser opened without a question |
+| Folders | 7 | a misspelled setting changed in the user's config file, the game's default file untouched; Turkish month folders renamed, not recreated (a marker file must survive); deleted folders are in the Recycle Bin |
+| Saving | 2 | a 4-turn chat: the file is numbered 1…N without restarting ("continue from 16") |
+| Information | 5 | "estoya" in a follow-up is understood as Estonia; a harmful request is refused without tools |
+| Ideas | 2 | the third answer does not repeat the ideas of the first two and is split into categories |
+| Web page | 3 | the "AI slop" page loses its ghost emojis, glowing text and font, and uses a downloaded image |
+
+- **Privacy:** the request texts are the user's own words, so they stay on the machine
+  (`evals/real/private/prompts.json`, git-ignored). The repository holds only the fixtures and the checks.
+- **Nothing real is touched.**
+  - "Desktop" becomes the task folder.
+  - Writing tasks use `task_only` approval: a write outside the task folder is denied, so the config task
+    cannot change the real game config.
+  - App tasks only look at windows opened during the task and close only those.
+  - The task that launches the real game (`real_cs2_launch`) runs only when asked for by name.
+- **Three repeats:** in one run about 15% of tasks flip by chance; with 24 tasks one flip moves the score 4 points.
+- **Split by hand**, balanced within each group: 11 dev, 12 test. `real_split_months` is in dev because the
+  v0.0.5/v0.0.6 fixes were tested on that very session.
+- **Measurement only.** These trajectories never become training data (`export_sft` reads only
+  `purpose=train`), and the set is too small to train on anyway. Its jobs are:
+  - to be the yardstick for comparing the model before and after training;
+  - to show which failures the training data must cover.
+- **The checks are tested without the model** (`tests/test_real_family.py`). These tests caught a measurement
+  bug before the first run: on Windows `write_text` writes CRLF, so an untouched config file looked "changed".
+
 ---
 
 ## 11. Distillation and training

@@ -1,7 +1,8 @@
 """İki ölçüm turunu görev görev karşılaştırır (A/B).
 
 Döküm dosyalarını (data/trajectories/*.jsonl) okur; bir tur birkaç parçaya bölündüyse (durdurulup --only ile
-devam edildiyse) glob ile hepsini verin, aynı görevin son kaydı geçerlidir.
+devam edildiyse) glob ile hepsini verin, aynı görevin son kaydı geçerlidir. --repeat ile koşulmuş turlarda her
+tekrar ayrı görev sayılır ("görev#tekrar"); iki turun tekrar sayısı aynı olmalı.
 
     uv run python evals/compare_runs.py "A_glob" "B_glob"
 """
@@ -18,7 +19,7 @@ def load(pattern: str) -> dict[str, dict]:
     for f in sorted(glob.glob(pattern)):
         for line in open(f, encoding="utf-8"):
             r = json.loads(line)
-            runs[r["task_id"]] = r
+            runs[f"{r['task_id']}#{r['rep']}" if r.get("rep") else r["task_id"]] = r
     return runs
 
 

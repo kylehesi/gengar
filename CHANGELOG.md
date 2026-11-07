@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.8](#008---2026-11-07) | 2026-11-07 | Real-requests benchmark: 24 tasks from real use, request texts kept local; `--repeat`, `--suite` |
 | [0.0.7](#007---2026-10-29) | 2026-10-29 | A denied action is not asked again in the same request with a different tool |
 | [0.0.6](#006---2026-10-29) | 2026-10-29 | Fewer unnecessary questions: a system prompt rule, replay-tested; same pass rate, 18% faster on the affected tasks |
 | [0.0.5](#005---2026-10-29) | 2026-10-29 | "Announce and stop" fix: up to two nudges per turn, also after tool use; replay-tested on a real session |
@@ -13,6 +14,35 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.8] - 2026-11-07
+
+### Highlights
+- **A benchmark built from real use.** 24 tasks adapted from the author's own October requests: short, slangy,
+  misspelled, multi-turn ("you didn't open it.", "what about estoya?"). Each task recreates the situation where
+  Gengar failed or nearly failed (apps not opened, an unnecessary question, a typo not understood, a long
+  answer not saved, a config value changed in the wrong file, deleting in the wrong folder) and checks the
+  outcome automatically. Not run yet; the first run (3 repeats) is planned for when the GPU is free.
+
+### Added
+- `evals/families/real.py`: fixtures and checks for the 24 tasks (apps, folders, saving, information, ideas,
+  web page). App tasks look only at windows opened during the task and close only those (`AppWatch`). Writing
+  tasks are limited to the task folder. Launching the real game is opt-in. Split by hand, balanced per group:
+  11 dev, 12 test.
+- The request texts are **not** in the repository: they stay in `evals/real/private/prompts.json`
+  (git-ignored). `evals/real/README.md` describes the format.
+- `bench2.py --suite real` selects the set; `--repeat N` runs every task N times, rebuilding its files each time,
+  and prints how many repeats each task passed. `compare_runs.py` keeps repeats apart.
+- Framework: `Task.setup` (runs just before the task), `Task.multi_answer` (the check sees every turn's answer),
+  `opt_in` tasks, fixed `Family.split`, and `task_apps` approval (opening apps allowed, writes only in the task
+  folder).
+- `tests/test_real_family.py`: every check is tested against hand-made right and wrong outcomes, without a model.
+
+### Notes
+- These tests found a measurement bug before the first run: on Windows `write_text` writes CRLF line endings,
+  so the check saw an untouched config file as "changed".
+- The set is measurement only: it is too small to train on, and its trajectories are never exported as training
+  data (`export_sft` reads only `purpose=train`).
 
 ## [0.0.7] - 2026-10-29
 
