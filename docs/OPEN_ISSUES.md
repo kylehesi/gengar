@@ -132,3 +132,66 @@ likely an infinite loop) kept running for **1.5 hours** and locked the benchmark
 (`taskkill /T`, the whole process tree) works, but once the Gengar process that enforces it dies, nothing stops
 the child. Closing the window has the same effect. Candidate fix: put child processes in a Windows **Job
 Object** (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), so Windows closes them all when Gengar exits.
+
+---
+
+# Plan items that slipped (listed 2026-11-11)
+
+These were agreed in the 5-phase plan (2026-10-26) or proposed later, but have not been done. They are not bugs;
+they are listed here so they are not lost. The order below is the agreed order of work.
+
+## 7. Before/after measurement for v0.0.8 – v0.0.12
+
+The real-requests set (v0.0.8) ran for the first time on 2026-11-11, **after** the fixes of v0.0.9 – v0.0.12 (session
+grants, window matching, web page checks, image search, `view_page`, window screenshots). So that run is a
+**baseline**, not a before/after comparison: it cannot show what those fixes changed. If the effect matters (for the
+report, or to decide whether to keep the screenshots), run the same set on an older version in a git worktree, but
+only for the groups the fixes target (`--only real_web,real_apps`), to save GPU time (~2 h for the whole set).
+Same rule as issue 4: compare runs made at the same commit except for the change being measured.
+
+## 8. BFCL subset: measuring general tool calling (and forgetting)
+
+Planned in phase 2, never done. Our own benchmarks only measure Gengar's 18 tools. Training a 4B model only on
+Gengar data risks **catastrophic forgetting**: it gets better at our tasks and worse at everything else (general
+knowledge, Turkish, deciding that no tool is needed, refusing). A subset of the Berkeley Function Calling
+Leaderboard (BFCL), including its "irrelevance" category (the right answer is to call no tool), measured **before and
+after** training shows whether that happened. Needed before phase 3 training starts, so there is a "before" number.
+
+## 9. Mixing public datasets into the training data (phase 3)
+
+Not started. The plan is not to train only on data we generate: mixing general data in keeps the model from
+forgetting what it knew (see 8). Agreed list (2026-10-26):
+
+| Dataset | Why |
+|---|---|
+| Toucan, Nemotron-Agentic | general multi-step tool use, not only our tools |
+| When2Call, xLAM-irrelevance | when **not** to call a tool |
+| turkish-tool-calling | tool calls from Turkish requests |
+| Aya (Turkish part) | general Turkish conversation, so the language does not degrade |
+| self-oss-instruct | code |
+
+Avoid non-commercial licences (APIGen-MT, xLAM-2 models). Each download needs the user's approval (size first).
+Open questions: the mix ratio (own data vs public), converting each dataset to our chat template and tool format,
+and the token length limit on Kaggle (issue 5: `MAX_LEN`).
+
+## 10. Kaggle training rerun
+
+The last full run ran out of GPU memory on GPU 1 at step 45/168 (2026-10-20). The notebook was changed afterwards
+(`max_memory` {0: 6 GiB, 1: 5 GiB}, 1 epoch, checkpoint every 10 steps) but has not been rerun. The old training
+data predates v0.0.2 (old tools, old prompt) and should not be used. Order: regenerate data with the current system
+(night, GPU) + public mix (9) → rerun → measure the student on our sets and BFCL (8), at the same commit (4).
+
+## 11. `windows_ui inspect` stops at 80 controls
+
+Seen on the first window screenshot (v0.0.12): `inspect` walks the UI tree in order and stops at 80 controls, so in
+File Explorer the list rows used them all and the toolbar (New, Sort, View) got no number. The model sees those
+buttons in the screenshot but cannot click them by number, and a name lookup re-collects the same 80. Candidate fix:
+collect more (e.g. 200) and list the most useful first: toolbars, menus, tabs and buttons before list rows, or
+collapse long runs of list items. Watch the token cost (~15 tokens per row).
+
+## 12. Small items
+
+- `cls` / `clear` typed without a slash should clear the screen in the REPL (users type them out of habit).
+- Orphaned child processes: see issue 6 (Job Object).
+- Trying a separate code model (proposed in v0.0.10): needs a download (ask first) and a night run; only worth it
+  if the real-requests set shows that code/web tasks stay weak with the screenshots.

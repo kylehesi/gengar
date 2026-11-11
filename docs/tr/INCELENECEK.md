@@ -147,3 +147,95 @@ döngü) **1,5 saat** çalışmaya devam etti ve ölçüm klasörünü kilitledi
 süreç ağacı) doğru çalışıyor, ama onu uygulayan Gengar süreci ölünce alt süreci durduracak kimse kalmıyor.
 Kullanıcı pencereyi kapatırsa da olur. Çözüm adayı: alt süreçleri Windows **Job Object**'e
 (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) bağlamak; Gengar ölünce Windows hepsini kapatır.
+
+---
+
+# Gözden kaçan plan maddeleri (2026-11-11'de listelendi)
+
+Bunlar 5 aşamalı planda (2026-10-26) kararlaştırılmış ya da sonradan önerilmiş, ama yapılmamış işler. Hata
+değiller; kaybolmasınlar diye burada duruyorlar. Aşağıdaki sıra, kararlaştırdığımız çalışma sırası.
+
+## 7. v0.0.8 – v0.0.12 için önce/sonra ölçümü
+
+Gerçek istekler seti (v0.0.8) ilk kez 2026-11-11'de koştu. Bu koşu v0.0.9 – v0.0.12 düzeltmelerinden **sonra**
+yapıldı (oturum izni, pencere eşleştirme, web sayfası kontrolü, görsel arama, `view_page`, pencere görüntüleri).
+Yani bu koşu bir **başlangıç çizgisi**, önce/sonra karşılaştırması değil: o düzeltmelerin neyi değiştirdiğini
+gösteremez.
+
+Etki önemliyse (rapor için ya da görüntüleri tutup tutmamaya karar vermek için), aynı set eski bir sürümde git
+worktree ile koşulur. Ekran kartı süresinden tasarruf için yalnızca düzeltmelerin hedeflediği gruplar koşulur
+(`--only real_web,real_apps`); bütün set ~2 saat sürüyor. Kural 4. maddedeki gibi: karşılaştırılan koşular,
+ölçülen değişiklik dışında aynı commit'te yapılmalı.
+
+## 8. BFCL alt kümesi: genel araç çağırmayı (ve unutmayı) ölçmek
+
+2. aşamada planlanmıştı, hiç yapılmadı. Kendi ölçüm setlerimiz yalnızca Gengar'ın 18 aracını ölçüyor.
+
+4B modeli yalnızca Gengar verisiyle eğitmek **felaket unutma** (catastrophic forgetting) riski taşıyor: model
+bizim işlerde iyileşir, geri kalan her şeyde kötüleşir. Etkilenebilecekler:
+- genel bilgi;
+- Türkçe;
+- araç gerekmediğine karar verebilmek;
+- reddedebilmek.
+
+Berkeley Function Calling Leaderboard'un (BFCL) bir alt kümesi bunun olup olmadığını gösterir. Alt kümeye
+"irrelevance" kategorisi de dahil edilmeli (doğru cevabın hiçbir araç çağırmamak olduğu sorular). Ölçüm eğitimden
+**önce ve sonra** yapılmalı. 3. aşama eğitimi başlamadan önce gerekli, ki bir "önce" sayısı olsun.
+
+## 9. Eğitim verisine hazır veri setleri karıştırmak (3. aşama)
+
+Başlamadı. Plan yalnızca kendi ürettiğimiz veriyle eğitmemek: genel veri karıştırmak, modelin bildiklerini
+unutmasını önlüyor (bkz. 8). Kararlaştırılan liste (2026-10-26):
+
+| Veri seti | Neden |
+|---|---|
+| Toucan, Nemotron-Agentic | genel, çok adımlı araç kullanımı; yalnızca bizim araçlarımız değil |
+| When2Call, xLAM-irrelevance | ne zaman araç **çağırmaması** gerektiği |
+| turkish-tool-calling | Türkçe isteklerden araç çağırma |
+| Aya (Türkçe kısmı) | genel Türkçe sohbet, dil bozulmasın |
+| self-oss-instruct | kod |
+
+Ticari olmayan lisanslardan kaçınılacak (APIGen-MT, xLAM-2 modelleri). Her indirme için kullanıcının onayı
+alınacak (önce boyut söylenerek).
+
+Açık sorular:
+- karışım oranı (kendi verimiz / hazır veri);
+- her veri setinin bizim sohbet şablonumuza ve araç biçimimize çevrilmesi;
+- Kaggle'daki token uzunluğu sınırı (5. madde: `MAX_LEN`).
+
+## 10. Kaggle eğitimini yeniden koşmak
+
+Son tam koşu, GPU 1'de bellek yetmediği için 168 adımın 45.'sinde durdu (2026-10-20). Not defteri sonradan
+değiştirildi ama yeniden koşulmadı:
+- `max_memory` {0: 6 GiB, 1: 5 GiB};
+- 1 epoch;
+- her 10 adımda kontrol noktası.
+
+Eski eğitim verisi v0.0.2'den önceye ait (eski araçlar, eski prompt); kullanılmamalı.
+
+Sıra:
+1. Mevcut sistemle veriyi yeniden üret (gece, ekran kartı).
+2. Hazır veri setlerini karıştır (9).
+3. Eğitimi yeniden koş.
+4. Öğrenciyi kendi setlerimizde ve BFCL'de (8) ölç, aynı commit'te (4).
+
+## 11. `windows_ui inspect` 80 öğede duruyor
+
+İlk pencere görüntüsünde görüldü (v0.0.12). `inspect` arayüz ağacını sırayla geziyor ve 80 öğede duruyor.
+Gezgin'de 80 öğenin hepsini liste satırları kullandı; araç çubuğu düğmeleri (New, Sort, View) numara almadı. Model
+bu düğmeleri görüntüde görüyor ama numarayla tıklayamıyor. Adla aramak da yine aynı 80 öğeyi topluyor.
+
+Çözüm adayları:
+- daha fazla öğe toplamak (örn. 200);
+- en işe yarayanları önce listelemek: araç çubukları, menüler, sekmeler ve düğmeler liste satırlarından önce gelsin;
+- uzun liste öğesi dizilerini kısaltmak.
+
+Token maliyetine dikkat: satır başına ~15 token.
+
+## 12. Küçük işler
+
+- REPL'de eğik çizgisiz yazılan `cls` / `clear` ekranı temizlesin (alışkanlıkla yazılıyor).
+- Yetim kalan alt süreçler: 6. madde (Job Object).
+- Kod için ayrı bir model denemek (v0.0.10'da önerildi): indirme (önce sorulacak) ve bir gece koşusu gerekiyor.
+  Yalnızca gerçek istekler seti, ekran görüntülerine rağmen kod/web görevlerinin zayıf kaldığını gösterirse
+  değer.

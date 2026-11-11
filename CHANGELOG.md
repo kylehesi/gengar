@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.13](#0013---2026-11-11) | 2026-11-11 | Open issues: plan items that slipped (BFCL, public data mix, Kaggle rerun, before/after measurement, 80-control limit) |
 | [0.0.12](#0012---2026-11-07) | 2026-11-07 | Eyes for window work: `windows_ui inspect` returns a screenshot with each control's number drawn on it; window screenshots go to local models only |
 | [0.0.11](#0011---2026-11-07) | 2026-11-07 | The model's eyes: `view_page` renders a web page in headless Edge and shows the model a screenshot; Gengar asks it to look before finishing |
 | [0.0.10](#0010---2026-11-07) | 2026-11-07 | Web pages: broken images are reported to the model, real images via `web_search(images=true)`, design and PDF hints; 30 steps for window tasks |
@@ -18,6 +19,21 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.13] - 2026-11-11
+
+### Changed
+- `docs/OPEN_ISSUES.md` (and the Turkish `docs/tr/INCELENECEK.md`) now list plan items that were agreed but not
+  done, in the agreed order of work. These are issues 7–12:
+  - a before/after measurement for v0.0.8 – v0.0.12 (the first real-requests run is a baseline);
+  - a BFCL subset to measure general tool calling and catastrophic forgetting before and after training;
+  - mixing public datasets into the training data;
+  - the Kaggle rerun;
+  - the 80-control limit of `windows_ui inspect`;
+  - small items (`cls`/`clear`, trying a code model).
+
+### Notes
+- No code changes.
 
 ## [0.0.12] - 2026-11-07
 
