@@ -128,7 +128,12 @@ def build_tasks(families: list[Family], seed: int = 1000, base: Path = BENCH_ROO
     """
     if base.exists():
         shutil.rmtree(base, ignore_errors=True)
-    base.mkdir(parents=True)
+    if base.exists() and any(base.iterdir()):
+        # Windows açık dosyayı silmez (örn. kapatılmamış bir veritabanı, ölçümün açtığı bir uygulama). Eski
+        # dosyalar yeni görevlere karışmasın: açık bir hata ver.
+        left = ", ".join(sorted(str(p.relative_to(base)) for p in base.rglob("*") if p.is_file())[:5])
+        raise RuntimeError(f"{base} temizlenemedi, kilitli dosyalar kaldı: {left}. Onları tutan programı kapatın.")
+    base.mkdir(parents=True, exist_ok=True)
     tasks = []
     for fam in families:
         for i in range(instances if instances is not None else fam.instances):
@@ -277,10 +282,12 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
     answers: list[str] = []
     worked: list[str] = []  # başarıyla sonuçlanan araç çağrıları (require_tools bunlara bakar)
     agent = None
+    agents = []  # görev sonunda hafıza veritabanları kapatılır (açık dosya Windows'ta silinemez → --repeat çöküyordu)
     for i, p in enumerate(prompts):
         if agent is None or not task.same_chat:
             agent = build_agent(s, client, memory=True,
                                 permission_mode="trust" if task.approval == "trust" else "normal")
+            agents.append(agent)
             if agent.memory:
                 agent.memory.auto_learn = False  # ölçüm sırasında beceri öğrenme kapalı (görevler birbirini etkilemesin)
             repl = QuietRepl(s, agent, approval=task.approval, root=task.root)
@@ -303,6 +310,9 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         sessions.append({"system": agent.conversation.system_message, "tools": agent.tools.schemas(),
                          "messages": hist})
     elapsed = time.perf_counter() - start
+    for a in agents:
+        if a.memory:
+            a.memory.store.close()
     try:
         ok, note = task.check(answers if task.multi_answer else answer)
     except Exception as e:
@@ -324,6 +334,17 @@ def run_task(task: Task, settings: Settings, client: LLMClient, traj_file: Path 
         with traj_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
     return result
+
+
+def result_from_record(record: dict[str, Any]) -> Result:
+    """Döküm dosyasındaki bir kayıttan Result (yarıda kalan ölçüme --resume ile devam ederken)."""
+    msgs = [m for s in record.get("sessions", []) for m in s.get("messages", [])]
+    tools = [tc["function"]["name"] for m in msgs for tc in (m.get("tool_calls") or [])]
+    answer = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "assistant"), "")
+    return Result(record["task_id"], record["family"], record["category"], record["split"], record["difficulty"],
+                  bool(record["ok"]), record.get("note", ""), record.get("seconds", 0.0), len(tools),
+                  sum(1 for m in msgs if m.get("role") == "assistant"), record.get("error", ""),
+                  answer.strip()[:400], tools, record.get("rep", 0))
 
 
 def apply_tool_limit(task: Task, ok: bool, note: str, tools: list[str],

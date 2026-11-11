@@ -18,6 +18,7 @@ Her çalıştırmanın dökümü data/trajectories/<zaman>_<etiket>.jsonl dosyas
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import replace
 from datetime import datetime
@@ -27,7 +28,8 @@ sys.stdout.reconfigure(errors="replace", line_buffering=True)  # arka planda ça
 sys.path.insert(0, str(Path(__file__).parent))
 
 from families import all_families, real  # noqa: E402
-from framework import TRAJ_ROOT, build_tasks, gengar_commit, run_task, save_results, summarize  # noqa: E402
+from framework import (TRAJ_ROOT, build_tasks, gengar_commit, result_from_record, run_task,  # noqa: E402
+                       save_results, summarize)
 from gengar.config import load_env, load_settings  # noqa: E402
 from gengar.llm import LLMClient  # noqa: E402
 
@@ -44,6 +46,8 @@ def main() -> None:
     ap.add_argument("--suite", choices=["base", "real"], default="base",
                     help="base: sentetik görev aileleri; real: gerçek istekler seti")
     ap.add_argument("--repeat", type=int, default=1, help="her görevi kaç kez koş")
+    ap.add_argument("--resume", default="",
+                    help="yarıda kalan ölçümün döküm dosyası (.jsonl): bitmiş görev+tekrarlar atlanır, aynı dosyaya eklenir")
     ap.add_argument("--no-hints", action="store_true",
                     help="tur ipuçlarını kapat (ablasyon: ipucunun etkisini ölçmek için)")
     args = ap.parse_args()
@@ -86,14 +90,24 @@ def main() -> None:
             "suite": args.suite, "repeat": args.repeat}
     TRAJ_ROOT.mkdir(parents=True, exist_ok=True)
     traj = TRAJ_ROOT / f"{datetime.now():%Y%m%d_%H%M%S}_{args.split}_{profile}{'_' + args.tag if args.tag else ''}.jsonl"
+    results = []
+    if args.resume:
+        traj = Path(args.resume)
+        records = [json.loads(line) for line in traj.read_text(encoding="utf-8").splitlines() if line.strip()]
+        results = [result_from_record(r) for r in records]
+        print(f"Devam: {len(results)} koşu zaten bitmiş ({traj.name})")
+    done = {(r.id, r.rep) for r in results}
     times = f" × {args.repeat} tekrar" if args.repeat > 1 else ""
     print(f"Ölçüm v2: {label} — {len(tasks)} görev{times}, model {client.profile.model}\nDöküm: {traj}\n")
 
-    results = []
     for rep in range(args.repeat):
+        if all((t.id, rep) in done for t in tasks):
+            continue
         if rep:
             tasks = select()
         for i, t in enumerate(tasks, 1):
+            if (t.id, rep) in done:
+                continue
             tag = f"{rep + 1}. tekrar, " if args.repeat > 1 else ""
             print(f"[{tag}{i}/{len(tasks)}] [{t.category}/{t.id}] z{t.difficulty}")
             r = run_task(t, settings, client, traj, meta, rep=rep)

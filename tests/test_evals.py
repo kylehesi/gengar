@@ -114,3 +114,31 @@ def test_correct_actions_pass(tmp_path):
     for p in t.root.glob("*.tmp"):
         p.unlink()
     assert t.check("silindi")[0]
+
+
+def test_build_tasks_reports_locked_leftovers(tmp_path):
+    # 2026-11-11: --repeat çöktü; görevlerin hafıza veritabanları açık kalmıştı, Windows silemedi.
+    base = tmp_path / "bench"
+    (base / "_hafiza").mkdir(parents=True)
+    locked = (base / "_hafiza" / "x.db").open("w")
+    try:
+        with pytest.raises(RuntimeError, match="kilitli dosyalar"):
+            build_tasks([files.FAMILIES[0]], base=base)
+    finally:
+        locked.close()
+    assert build_tasks([files.FAMILIES[0]], base=base)  # kilit kalkınca çalışır
+
+
+def test_result_from_record():
+    from framework import result_from_record
+
+    rec = {"task_id": "t_0", "family": "f", "category": "c", "split": "dev", "difficulty": 1, "ok": True,
+           "note": "tamam", "seconds": 3.5, "error": "", "rep": 2,
+           "sessions": [{"messages": [
+               {"role": "user", "content": "x"},
+               {"role": "assistant", "content": "", "tool_calls": [{"id": "1", "function": {"name": "read_file"}}]},
+               {"role": "tool", "content": "..."},
+               {"role": "assistant", "content": " bitti "}]}]}
+    r = result_from_record(rec)
+    assert (r.id, r.rep, r.ok, r.tools, r.tool_calls, r.steps, r.answer) == \
+        ("t_0", 2, True, ["read_file"], 1, 2, "bitti")

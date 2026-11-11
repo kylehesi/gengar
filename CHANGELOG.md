@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.14](#0014---2026-11-11) | 2026-11-11 | Benchmark: `--repeat` no longer crashes between repeats (memory databases are closed); `--resume` continues a broken run |
 | [0.0.13](#0013---2026-11-11) | 2026-11-11 | Open issues: plan items that slipped (BFCL, public data mix, Kaggle rerun, before/after measurement, 80-control limit) |
 | [0.0.12](#0012---2026-11-07) | 2026-11-07 | Eyes for window work: `windows_ui inspect` returns a screenshot with each control's number drawn on it; window screenshots go to local models only |
 | [0.0.11](#0011---2026-11-07) | 2026-11-07 | The model's eyes: `view_page` renders a web page in headless Edge and shows the model a screenshot; Gengar asks it to look before finishing |
@@ -19,6 +20,23 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.14] - 2026-11-11
+
+### Fixed
+- `bench2 --repeat` crashed when the second repeat started. This is the first real-requests run (2026-11-11);
+  the crash came after all 23 tasks of repeat 1. Each task opens its own memory database
+  (`data/bench2/_hafiza/*.db`), and `run_task` never closed it. Windows does not delete open files, so
+  rebuilding the task folders for the next repeat failed with `FileExistsError`. A single run never noticed,
+  because the folders are only rebuilt at the start. `run_task` now closes the memory database of every agent it
+  built.
+- `build_tasks` gives a clear error naming the locked files if old files cannot be removed, instead of a
+  `FileExistsError` or, worse, mixing old files into new tasks.
+
+### Added
+- `bench2 --resume FILE.jsonl` continues a broken run: task+repeat pairs already in the trajectory file are
+  skipped and new runs are appended to the same file. The final summary covers old and new runs. Repeat 1 of
+  the first real-requests run was kept this way, so its 23 tasks did not have to run again.
 
 ## [0.0.13] - 2026-11-11
 
