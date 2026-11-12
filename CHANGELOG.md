@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.19](#0019---2026-11-12) | 2026-11-12 | Child processes of `run_python` and `run_powershell` end when Gengar ends (Windows Job Object) |
 | [0.0.18](#0018---2026-11-12) | 2026-11-12 | `inspect` numbers toolbars before long lists; `cls`/`clear` clear the screen |
 | [0.0.17](#0017---2026-11-12) | 2026-11-12 | Wikipedia opens again in `fetch_page`: Wikimedia sites get a User-Agent that names Gengar, as their policy asks |
 | [0.0.16](#0016---2026-11-12) | 2026-11-12 | Gengar fixes from the first real-requests run: web search no longer fails on `wt.wikipedia.org`, `create_folders`, VS Code and browser names, `save_answer` keeps .txt |
@@ -24,6 +25,28 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.19] - 2026-11-12
+
+### Fixed
+- **Scripts started by the model outlived Gengar** (open issue 6). The timeout kills the whole process tree,
+  but only while Gengar runs. On 2026-10-26 a script with an endless loop ran for 1.5 hours after the
+  benchmark was stopped and locked the benchmark folder. Closing the window had the same effect.
+  - New [`tools/jobs.py`](src/gengar/tools/jobs.py): child processes go into a Windows Job Object with
+    `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. Windows closes the job when Gengar exits or dies, and its processes
+    with it.
+  - `run_python` uses a whole-tree job. The venv's `python.exe` is a launcher that starts the real
+    interpreter as a child, so covering only the direct child would have missed the script.
+  - `run_powershell` covers only `powershell.exe` itself (`SILENT_BREAKAWAY_OK`). Apps it opens with
+    `Start-Process` stay open, so closing Gengar never closes a window the user asked for, with its unsaved
+    work.
+  - If a process cannot be added (very old Windows), the tool still runs; only this guarantee is missing.
+
+### Added
+- `tests/test_jobs.py` uses real processes (small sleeping Python processes, no windows). Closing a tree job
+  ends the child and the grandchild. Closing a direct job ends the child, and the grandchild survives.
+- Checked end to end by hand: a process started an endless loop through `jobs.adopt` and was then killed
+  with `taskkill /F` (not the tree). The loop and its children were gone.
 
 ## [0.0.18] - 2026-11-12
 

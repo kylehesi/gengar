@@ -133,6 +133,14 @@ likely an infinite loop) kept running for **1.5 hours** and locked the benchmark
 the child. Closing the window has the same effect. Candidate fix: put child processes in a Windows **Job
 Object** (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), so Windows closes them all when Gengar exits.
 
+**Fixed (v0.0.19)** ([`tools/jobs.py`](../src/gengar/tools/jobs.py)):
+- **`run_python`:** the script and everything it starts are in a job that ends with Gengar. The whole tree is
+  needed, because the venv's `python.exe` is a launcher that starts the real interpreter as a child.
+- **`run_powershell`:** only `powershell.exe` itself is in a job (`SILENT_BREAKAWAY_OK`). Apps it opens with
+  `Start-Process` stay open, so closing Gengar never closes a window the user asked for, with its unsaved work.
+- **Checked end to end:** a "Gengar" process started an endless loop through `jobs.adopt` and was then killed
+  with `taskkill /F` (not the tree). The loop and its children were gone.
+
 ---
 
 # Plan items that slipped (listed 2026-11-11)
@@ -199,6 +207,6 @@ name.
 - ~~`cls` / `clear` typed without a slash should clear the screen in the REPL (users type them out of habit).~~
   **Fixed (v0.0.18):** `cls`, `clear` and `/cls` clear the screen, and the chat goes on. `exit` and `quit`
   without a slash quit.
-- Orphaned child processes: see issue 6 (Job Object).
+- ~~Orphaned child processes: see issue 6 (Job Object).~~ Fixed in v0.0.19.
 - Trying a separate code model (proposed in v0.0.10): needs a download (ask first) and a night run; only worth it
   if the real-requests set shows that code/web tasks stay weak with the screenshots.

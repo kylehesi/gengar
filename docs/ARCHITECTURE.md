@@ -266,8 +266,8 @@ prompt, 20 tools):
 | `save_answer` | `files.py` | Copies an earlier answer to a file exactly, without the model retyping it | write |
 | `delete_files`, `restore_files` | `recycle.py` | Delete to / restore from the Recycle Bin | write (listing: read) |
 | `search_text` | `code.py` | Search text in files (like grep) | read |
-| `run_python` | `code.py` | Run Python in a separate virtual environment | system; critical if the code deletes or starts programs |
-| `run_powershell` | `powershell.py` | General-purpose tool | depends on the command |
+| `run_python` | `code.py` | Run Python in a separate virtual environment. The script and everything it starts are in a Windows Job Object and end when Gengar ends (`jobs.py`) | system; critical if the code deletes or starts programs |
+| `run_powershell` | `powershell.py` | General-purpose tool. `powershell.exe` ends when Gengar ends; apps it opened (`Start-Process`) stay open | depends on the command |
 | `remember`, `recall` | `memory/__init__.py` | Memory | read |
 
 ### Why

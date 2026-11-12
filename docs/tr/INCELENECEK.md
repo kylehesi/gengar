@@ -148,6 +148,15 @@ süreç ağacı) doğru çalışıyor, ama onu uygulayan Gengar süreci ölünce
 Kullanıcı pencereyi kapatırsa da olur. Çözüm adayı: alt süreçleri Windows **Job Object**'e
 (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) bağlamak; Gengar ölünce Windows hepsini kapatır.
 
+**Düzeltildi (v0.0.19)** ([`tools/jobs.py`](../../src/gengar/tools/jobs.py)):
+- **`run_python`:** Betik ve başlattığı her şey, Gengar'la birlikte kapanan bir job'da. Bütün ağaç gerekiyor,
+  çünkü venv'deki `python.exe` asıl yorumlayıcıyı alt süreç olarak başlatan bir yönlendirici.
+- **`run_powershell`:** Yalnızca `powershell.exe`'nin kendisi job'da (`SILENT_BREAKAWAY_OK`). `Start-Process` ile
+  açtığı uygulamalar açık kalıyor; Gengar kapanınca kullanıcının istediği bir pencere kaydedilmemiş işiyle
+  birlikte kapanmasın.
+- **Uçtan uca denendi:** Bir "Gengar" süreci `jobs.adopt` ile sonsuz döngü başlattı, sonra `taskkill /F` ile
+  (ağaç değil) öldürüldü. Döngü ve alt süreçleri de kapandı.
+
 ---
 
 # Gözden kaçan plan maddeleri (2026-11-11'de listelendi)
@@ -244,7 +253,7 @@ Adla arama toplanan öğelerin hepsine bakıyor: numarası olmayan bir satır ad
 - ~~REPL'de eğik çizgisiz yazılan `cls` / `clear` ekranı temizlesin (alışkanlıkla yazılıyor).~~
   **Düzeltildi (v0.0.18):** `cls`, `clear` ve `/cls` ekranı temizliyor, sohbet sürüyor. Eğik çizgisiz `exit` ve
   `quit` çıkıyor.
-- Yetim kalan alt süreçler: 6. madde (Job Object).
+- ~~Yetim kalan alt süreçler: 6. madde (Job Object).~~ v0.0.19'da düzeltildi.
 - Kod için ayrı bir model denemek (v0.0.10'da önerildi): indirme (önce sorulacak) ve bir gece koşusu gerekiyor.
   Yalnızca gerçek istekler seti, ekran görüntülerine rağmen kod/web görevlerinin zayıf kaldığını gösterirse
   değer.

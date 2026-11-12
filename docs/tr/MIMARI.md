@@ -272,8 +272,8 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
 | `save_answer` | `files.py` | Önceki cevabı yeniden yazdırmadan, geçmişten birebir dosyaya kopyalar | değişiklik |
 | `delete_files`, `restore_files` | `recycle.py` | Geri dönüşüm kutusuna silme / geri yükleme | değişiklik (listeleme: okuma) |
 | `search_text` | `code.py` | Dosyalarda metin arama (grep gibi) | okuma |
-| `run_python` | `code.py` | Ayrı bir sanal ortamda Python çalıştırma | sistem; kod siliyor ya da program başlatıyorsa kritik |
-| `run_powershell` | `powershell.py` | Her şey için genel araç | komuta göre |
+| `run_python` | `code.py` | Ayrı bir sanal ortamda Python çalıştırma. Betik ve başlattığı her şey bir Windows Job Object'te; Gengar kapanınca onlar da kapanır (`jobs.py`) | sistem; kod siliyor ya da program başlatıyorsa kritik |
+| `run_powershell` | `powershell.py` | Her şey için genel araç. Gengar kapanınca `powershell.exe` de kapanır; onun açtığı uygulamalar (`Start-Process`) açık kalır | komuta göre |
 | `remember`, `recall` | `memory/__init__.py` | Hafıza | okuma |
 
 ### Neden böyle

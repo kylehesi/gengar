@@ -18,6 +18,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from . import jobs
 from .base import Risk, Tool, ToolError
 from .files import resolve
 from .powershell import _kill_tree
@@ -154,6 +155,9 @@ class PythonSandbox:
         proc = subprocess.Popen([str(python), str(script), *map(str, args)], cwd=workdir,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
                                 env=env, creationflags=subprocess.CREATE_NO_WINDOW)
+        # Gengar ölürse betik ve açtığı her şey de kapansın (venv python.exe asıl yorumlayıcıyı alt süreç
+        # olarak başlatır; bu yüzden bütün ağaç).
+        jobs.adopt(proc, tree=True)
         try:
             out, err = proc.communicate(timeout=timeout)
             status = f"exit code: {proc.returncode}"

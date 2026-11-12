@@ -14,6 +14,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from . import jobs
 from .base import Risk, Tool, ToolError, working_dir
 
 DEFAULT_TIMEOUT = 60
@@ -199,6 +200,8 @@ def run_powershell(command: str, timeout: int = DEFAULT_TIMEOUT, cwd: str | None
         cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_env(path_prepend or []),
         stdin=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
     )
+    # Gengar ölürse powershell.exe de kapansın; onun açtığı uygulamalar (Start-Process) açık kalır.
+    jobs.adopt(proc, tree=False)
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
