@@ -20,6 +20,20 @@ Output: `data\sft\gengar_sft_train.jsonl`, `data\sft\gengar_sft_val.jsonl`. In t
 reasoning" should be at least 75% (Unsloth's recommendation, so Qwen3.5 keeps its thinking ability).
 Benchmark trajectories (dev/test) never enter training; the converter only takes `purpose=train` records.
 
+### Public data in the mix (not yet downloaded)
+[`training/public_mix.py`](public_mix.py) converts rows of seven public datasets into the same format, so the
+student does not forget general tool calling and Turkish: Toucan, When2Call, xLAM-irrelevance, two Turkish
+tool-calling sets, the Turkish part of Aya, and self-oss-instruct.
+- Each converter turns one row into one example, or `None` if the row cannot be used. Toucan's
+  `tool_call`/`tool_response` roles become `tool_calls` + `tool` messages. Python type names (`str, optional`,
+  `List[int]`) become JSON Schema.
+- xLAM-irrelevance has no assistant reply. Its examples are marked `needs_reply`: the teacher writes the
+  no-tool answer, as in data generation.
+- `bfcl_leaks()` finds training questions that are the same as, or very close to, the BFCL subset
+  (`evals/bfcl.py`). Drop them before training, or the "after" number is inflated.
+- The datasets, licences, sizes and proposed samples are in [OPEN_ISSUES 9](../docs/OPEN_ISSUES.md). Downloads
+  wait for the user's approval.
+
 ## 3. Training on Kaggle
 1. kaggle.com → Datasets → **New Dataset** → upload the two `.jsonl` files from `data\sft` (e.g. `gengar-sft`).
 2. Code → **New Notebook** → File → Import Notebook → `training\gengar_qwen35_4b_kaggle.ipynb`.

@@ -210,6 +210,11 @@ proposed sample per dataset. Waiting for the user's approval before any download
   dropped. Otherwise the "after" number would be inflated.
 - **Ratio (proposal):** public data about 30 % of the training set. Enough to keep general skills, not so much
   that Gengar's own behaviour is diluted. To be checked with BFCL before and after.
+- **Converters ready (v0.0.23):** [`training/public_mix.py`](../training/public_mix.py), with `bfcl_leaks()`.
+  Tried on 20 real rows of each of six sets through the row API, without storing them: 120/120 converted.
+- **Note on When2Call:** its `train_sft` part has **only** no-call answers (asking for missing information, "I
+  can't do that"). It teaches asking, and Gengar's prompt forbids unnecessary questions (v0.0.6), so keep its
+  share small.
 
 ## 10. Kaggle training rerun
 

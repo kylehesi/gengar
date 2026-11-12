@@ -20,6 +20,20 @@ uv run python evals\export_sft.py "data\trajectories\gen_*seed5000*.jsonl" --out
 örnek" en az %75 olmalı (Unsloth önerisi; Qwen3.5'in düşünme yeteneği korunsun).
 Ölçüm dökümleri (dev/test) asla eğitime girmez; dönüştürücü yalnızca `purpose=train` kayıtları alır.
 
+### Karışımdaki hazır veri (henüz indirilmedi)
+[`training/public_mix.py`](../../training/public_mix.py), yedi açık veri setinin satırlarını aynı biçime çeviriyor;
+öğrenci genel araç çağırmayı ve Türkçeyi unutmasın diye: Toucan, When2Call, xLAM-irrelevance, iki Türkçe araç
+çağırma seti, Aya'nın Türkçe kısmı ve self-oss-instruct.
+- Her dönüştürücü bir satırı bir örneğe çeviriyor; satır kullanılamıyorsa `None`. Toucan'ın
+  `tool_call`/`tool_response` rolleri `tool_calls` + `tool` mesajlarına dönüşüyor. Python tip adları
+  (`str, optional`, `List[int]`) JSON Schema'ya çevriliyor.
+- xLAM-irrelevance'ta asistan cevabı yok. Bu örnekler `needs_reply` diye işaretleniyor; araçsız cevabı veri
+  üretimindeki gibi öğretmen yazıyor.
+- `bfcl_leaks()`, BFCL alt kümesiyle (`evals/bfcl.py`) aynı ya da çok yakın eğitim sorularını buluyor. Bunlar
+  eğitimden önce atılmalı; yoksa "sonra" sayısı şişer.
+- Veri setleri, lisanslar, boyutlar ve önerilen örneklemler [INCELENECEK 9](INCELENECEK.md)'da. İndirmeler
+  kullanıcının onayını bekliyor.
+
 ## 3. Kaggle'da eğitim
 1. kaggle.com → Datasets → **New Dataset** → `data\sft` içindeki iki `.jsonl` dosyasını yükleyin
    (ad örn. `gengar-sft`).

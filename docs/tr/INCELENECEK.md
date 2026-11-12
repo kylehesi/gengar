@@ -241,6 +241,12 @@ bekleniyor.
   Yoksa "sonra" sayısı şişer.
 - **Oran (öneri):** Hazır veri eğitim setinin yaklaşık %30'u. Genel becerileri korumaya yetecek kadar, Gengar'ın
   kendi davranışını sulandırmayacak kadar. BFCL'de önce/sonra ile kontrol edilecek.
+- **Dönüştürücüler hazır (v0.0.23):** [`training/public_mix.py`](../../training/public_mix.py), `bfcl_leaks()` ile
+  birlikte. Altı setin her birinden satır arayüzüyle alınan 20 gerçek satırda (kaydedilmeden) denendi:
+  120/120 dönüştü.
+- **When2Call notu:** `train_sft` kısmında **yalnızca** araç çağırmayan cevaplar var (eksik bilgiyi sormak,
+  "bunu yapamam"). Soru sormayı öğretiyor; Gengar'ın promptu ise gereksiz soruyu yasaklıyor (v0.0.6). Payı küçük
+  tutulmalı.
 
 ## 10. Kaggle eğitimini yeniden koşmak
 

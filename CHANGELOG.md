@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.23](#0023---2026-11-12) | 2026-11-12 | Converters from seven public datasets to the training format, and a BFCL leak check |
 | [0.0.22](#0022---2026-11-12) | 2026-11-12 | The "announced but did not do it" nudge no longer misses answers that end with an emoji |
 | [0.0.21](#0021---2026-11-12) | 2026-11-12 | Open issues: survey of the public datasets for the training mix (exact sets, licences, sizes, proposed samples); nothing downloaded |
 | [0.0.20](#0020---2026-11-12) | 2026-11-12 | BFCL subset harness: general tool calling and forgetting, measured before and after training |
@@ -28,6 +29,32 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.23] - 2026-11-12
+
+### Added
+- **[`training/public_mix.py`](training/public_mix.py)** converts rows of seven public datasets into the format
+  of `evals/export_sft.py` (open issue 9):
+  - Toucan's `tool_call`/`tool_response` roles become `tool_calls` and `tool` messages. An assistant text
+    followed by calls becomes one message, and back-to-back calls share one message. Broken flows are
+    dropped: an unanswered call, a run that ends on a tool, an unreadable call.
+  - Python type names from When2Call and xLAM (`str, optional`, `List[int]`, a flat parameter dict) become
+    JSON Schema. A parameter without "optional" is required.
+  - xLAM-irrelevance has no assistant reply, so its examples are marked `needs_reply` for the teacher to
+    answer. No template replies are made up.
+  - Converters for the two Turkish tool-calling sets, the Turkish part of Aya and self-oss-instruct.
+  - `bfcl_leaks()` finds training questions equal or very close to the BFCL questions (`evals/bfcl.py`). A
+    word-overlap pre-filter keeps it fast; then difflib ratio ≥ 0.9.
+- `tests/test_public_mix.py` (18 tests) uses small fake rows that copy each dataset's format, so no one
+  else's data enters the repository.
+- Tried by hand on 20 real rows from each of six datasets, through the Hugging Face row API without storing
+  them: 120/120 converted.
+
+### Notes
+- Found while surveying: When2Call's `train_sft` part contains only no-call answers (asking for missing
+  information, "I can't do that"). It teaches asking questions, and Gengar's prompt forbids unnecessary ones,
+  so its share should stay small.
+- Nothing downloaded; that waits for the user's approval.
 
 ## [0.0.22] - 2026-11-12
 
