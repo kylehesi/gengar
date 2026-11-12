@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.20](#0020---2026-11-12) | 2026-11-12 | BFCL subset harness: general tool calling and forgetting, measured before and after training |
 | [0.0.19](#0019---2026-11-12) | 2026-11-12 | Child processes of `run_python` and `run_powershell` end when Gengar ends (Windows Job Object) |
 | [0.0.18](#0018---2026-11-12) | 2026-11-12 | `inspect` numbers toolbars before long lists; `cls`/`clear` clear the screen |
 | [0.0.17](#0017---2026-11-12) | 2026-11-12 | Wikipedia opens again in `fetch_page`: Wikimedia sites get a User-Agent that names Gengar, as their policy asks |
@@ -25,6 +26,37 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.20] - 2026-11-12
+
+### Added
+- **[`evals/bfcl.py`](evals/bfcl.py): a subset of the Berkeley Function Calling Leaderboard** (open issue 8).
+  Our own sets only measure Gengar's tools. Training on Gengar data alone risks catastrophic forgetting:
+  better at our tasks, worse at general tool calling and at seeing that no tool fits. This subset measures
+  that before and after training.
+  - 260 questions in 7 categories:
+    - one call (`simple_python`, `live_simple`);
+    - choosing among functions (`multiple`);
+    - several calls at once (`parallel`, `parallel_multiple`);
+    - not calling a tool (`irrelevance`, `live_irrelevance`).
+  - The data is downloaded from one pinned commit of the BFCL repository (Apache-2.0) into `data/bfcl/`
+    (git-ignored). Questions are sampled with a fixed seed per category, so "before" and "after" see the same
+    questions.
+  - The model sees only each question's functions, not Gengar's prompt or tools, and thinking is off. Dotted
+    names (`math.factorial`) are sent as `math_factorial` and mapped back.
+  - The check is a simplified version of BFCL's AST check: function name, no unexpected parameters, required
+    parameters present, and every value among the accepted ones (strings ignore case, spaces and
+    punctuation; an integer counts as a float). Parallel calls may come in any order. Call accuracy and
+    no-call accuracy are reported separately. Results go to `evals/results/*_bfcl_*.json`, trajectories to
+    `data/bfcl/runs/`.
+- `tests/test_bfcl.py` tests the schema conversion, the check and the run loop with a fake model. It also
+  passes the ground truth of every question in these categories through the check. That test found
+  `live_simple` answers with an empty accepted list (`[]`) for a parameter. Read literally, nothing could
+  pass, so `[]` now means "omitted or an empty list".
+
+### Notes
+- Not run on the model yet: the GPU is busy with the second real-requests run. Next: the "before" numbers for
+  `local35` (teacher) and `base4b` (untrained student).
 
 ## [0.0.19] - 2026-11-12
 

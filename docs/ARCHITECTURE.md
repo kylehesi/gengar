@@ -829,6 +829,38 @@ turns 24 of the user's real October requests into tasks
     of the run: 30 decisions changed, all from "no" to "yes", all inside the task folder; none changed the
     other way.
 
+### BFCL subset: general tool calling and forgetting (v0.0.20)
+
+Our own sets only measure Gengar's tools. A model trained only on Gengar data can get better at our tasks and
+worse at everything else (**catastrophic forgetting**). [`evals/bfcl.py`](../evals/bfcl.py) measures a subset of
+the Berkeley Function Calling Leaderboard (BFCL, Apache-2.0) **before and after** training.
+
+| Category | Questions | What it measures |
+|---|---|---|
+| `simple_python`, `live_simple` | 40 + 40 | one call to the one given function |
+| `multiple` | 40 | choosing the right function among several |
+| `parallel`, `parallel_multiple` | 30 + 30 | several calls in one answer |
+| `irrelevance`, `live_irrelevance` | 40 + 40 | **not** calling a tool when none fits |
+
+- **Fixed data:** files are downloaded from one pinned commit of the BFCL repository into `data/bfcl/`
+  (git-ignored), and the questions are sampled with a fixed seed per category. "Before" and "after" use the
+  same 260 questions. `live_*` questions come from real users; the others were written.
+- **Setup:** the model sees only the question's own functions, not Gengar's prompt or tools (BFCL's native
+  function-calling setup). Thinking is off, as in Gengar. Function names with dots (`math.factorial`) are sent
+  as `math_factorial` and mapped back.
+- **Check:** a simplified version of BFCL's AST check. It looks at:
+  - the function name;
+  - unexpected parameters (not allowed);
+  - required parameters (must be present);
+  - each value, which must be one of the accepted values. Strings ignore case, spaces and punctuation; an
+    integer is accepted for a float.
+
+  In parallel answers the order does not matter. Two numbers are reported separately: **call accuracy** and
+  **no-call accuracy**.
+- **The check is tested on the data itself** (`tests/test_bfcl.py`): the ground truth of every question in these
+  categories passes its own check. This test found that some `live_simple` answers list no accepted value
+  (`[]`) for a parameter. Read literally, no answer could pass, so `[]` is read as "omitted or an empty list".
+
 ---
 
 ## 11. Distillation and training

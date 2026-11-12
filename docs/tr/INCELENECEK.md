@@ -191,6 +191,10 @@ Berkeley Function Calling Leaderboard'un (BFCL) bir alt kümesi bunun olup olmad
 "irrelevance" kategorisi de dahil edilmeli (doğru cevabın hiçbir araç çağırmamak olduğu sorular). Ölçüm eğitimden
 **önce ve sonra** yapılmalı. 3. aşama eğitimi başlamadan önce gerekli, ki bir "önce" sayısı olsun.
 
+**Düzenek hazır (v0.0.20):** [`evals/bfcl.py`](../../evals/bfcl.py); 7 kategoride 260 soru, veri tek bir BFCL
+commit'ine sabit (bkz. MIMARI §10, "BFCL alt kümesi"). `local35` (öğretmen) ve `base4b` (eğitilmemiş öğrenci)
+için "önce" sayısı henüz ekran kartında ölçülmedi.
+
 ## 9. Eğitim verisine hazır veri setleri karıştırmak (3. aşama)
 
 Başlamadı. Plan yalnızca kendi ürettiğimiz veriyle eğitmemek: genel veri karıştırmak, modelin bildiklerini

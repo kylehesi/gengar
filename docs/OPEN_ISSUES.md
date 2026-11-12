@@ -165,6 +165,10 @@ knowledge, Turkish, deciding that no tool is needed, refusing). A subset of the 
 Leaderboard (BFCL), including its "irrelevance" category (the right answer is to call no tool), measured **before and
 after** training shows whether that happened. Needed before phase 3 training starts, so there is a "before" number.
 
+**Harness ready (v0.0.20):** [`evals/bfcl.py`](../evals/bfcl.py), 260 questions in 7 categories, data pinned to one
+BFCL commit (see ARCHITECTURE §10, "BFCL subset"). The "before" number for `local35` (the teacher) and `base4b` (the
+untrained student) is still to be measured on the GPU.
+
 ## 9. Mixing public datasets into the training data (phase 3)
 
 Not started. The plan is not to train only on data we generate: mixing general data in keeps the model from

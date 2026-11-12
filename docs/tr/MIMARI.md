@@ -865,6 +865,39 @@ ayındaki gerçek isteklerinden 24 görev kuruyor
     çağrısının hepsi yeni kuralla yeniden değerlendirildi: 30 karar değişti. Hepsi "hayır"dan "evet"e ve hepsi
     görev klasörünün içinde; ters yönde değişen yok.
 
+### BFCL alt kümesi: genel araç çağırma ve unutma (v0.0.20)
+
+Kendi setlerimiz yalnızca Gengar'ın araçlarını ölçüyor. Yalnızca Gengar verisiyle eğitilen model bizim işlerde
+iyileşip geri kalan her şeyde kötüleşebilir (**felaket unutma**, catastrophic forgetting).
+[`evals/bfcl.py`](../../evals/bfcl.py), Berkeley Function Calling Leaderboard'un (BFCL, Apache-2.0) bir alt
+kümesini eğitimden **önce ve sonra** ölçer.
+
+| Kategori | Soru | Neyi ölçüyor |
+|---|---|---|
+| `simple_python`, `live_simple` | 40 + 40 | verilen tek işleve tek çağrı |
+| `multiple` | 40 | birkaç işlev arasından doğrusunu seçmek |
+| `parallel`, `parallel_multiple` | 30 + 30 | tek cevapta birden çok çağrı |
+| `irrelevance`, `live_irrelevance` | 40 + 40 | uygun araç yokken araç **çağırmamak** |
+
+- **Sabit veri:** Dosyalar BFCL deposunun sabitlenmiş tek bir commit'inden `data/bfcl/`'ye (gitignore)
+  indiriliyor; sorular her kategori için sabit tohumla seçiliyor. "Önce" ve "sonra" aynı 260 soruyu kullanıyor.
+  `live_*` sorular gerçek kullanıcılardan, diğerleri yazılmış.
+- **Kurulum:** Model yalnızca sorunun kendi işlevlerini görüyor; Gengar'ın promptunu ve araçlarını görmüyor
+  (BFCL'in yerel araç çağırma kurulumu). Düşünme Gengar'daki gibi kapalı. Noktalı işlev adları
+  (`math.factorial`) `math_factorial` olarak gönderilip geri çevriliyor.
+- **Kontrol:** BFCL'in AST denetiminin sadeleştirilmiş hali. Baktığı şeyler:
+  - işlev adı;
+  - beklenmeyen parametre (olmamalı);
+  - zorunlu parametreler (olmalı);
+  - her değer kabul edilen değerlerden biri olmalı. Metinde büyük/küçük harf, boşluk ve noktalama yok
+    sayılıyor; ondalık yerine tam sayı kabul ediliyor.
+
+  Paralel cevaplarda sıra önemsiz. İki sayı ayrı raporlanıyor: **çağrı doğruluğu** ve **çağırmama doğruluğu**.
+- **Kontrol verinin kendisiyle test ediliyor** (`tests/test_bfcl.py`): bu kategorilerdeki her sorunun doğru
+  cevabı kendi kontrolünden geçiyor. Bu test, bazı `live_simple` cevaplarında bir parametrenin kabul listesinin
+  boş (`[]`) olduğunu buldu. Olduğu gibi okunsa hiçbir cevap geçemezdi; bu yüzden `[]` "verilmemiş ya da boş
+  liste" diye okunuyor.
+
 ---
 
 ## 11. Damıtma ve eğitim
