@@ -607,7 +607,7 @@ wheels = [
 
 [[package]]
 name = "gengar"
-version = "0.0.16"
+version = "0.0.17"
 source = { editable = "." }
 dependencies = [
     { name = "ddgs" },

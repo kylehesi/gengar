@@ -19,6 +19,7 @@ from collections import Counter
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from .. import __version__
 from .apps import fold
 from .base import Risk, Tool, ToolError
 
@@ -94,8 +95,21 @@ def web_search(query: str, max_results: int = 5, region: str = "wt-wt", images: 
 # bir piramit fotoğrafıydı. Az sonuç gelirse düz aramaya dönülür.
 
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
-# Wikimedia'nın robot politikası iletişim bilgisi içeren bir User-Agent istiyor; yoksa 403 döner.
-COMMONS_AGENT = "Gengar/1.0 (https://github.com/kylehesi/gengar)"
+# Wikimedia'nın User-Agent politikası (meta.wikimedia.org/wiki/User-Agent_policy): otomatik istemci kendini
+# adı ve iletişim bilgisiyle (adres ya da e-posta) tanıtmalı; tarayıcı taklidi yapan istemcilere 403 dönüyor.
+# Görsel aramada (Commons) baştan beri böyleydi; sayfa okumada (fetch_page) 2026-11-12'den beri.
+COMMONS_AGENT = f"Gengar/{__version__} (https://github.com/kylehesi/gengar)"
+WIKIMEDIA_SITES = ("wikipedia.org", "wikimedia.org", "wiktionary.org", "wikibooks.org", "wikiquote.org",
+                   "wikisource.org", "wikiversity.org", "wikivoyage.org", "wikidata.org", "wikinews.org",
+                   "mediawiki.org")
+
+
+def user_agent(url: str) -> str:
+    """Wikimedia sitelerinde politikaya uygun, kendini tanıtan ad; diğer sitelerde tarayıcı biçimi."""
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower()
+    if any(host == s or host.endswith("." + s) for s in WIKIMEDIA_SITES):
+        return COMMONS_AGENT
+    return USER_AGENT
 
 
 def _commons(search: str, limit: int) -> list[dict]:
@@ -179,8 +193,10 @@ def download(url: str) -> Page:
     if not re.match(r"^https?://", url):
         url = "https://" + url
     try:
+        # 2026-11-11 ölçümü: Vikipedi sayfaları (tr ve en) 7 koşuda HTTP 403 verdi; model eski ya da yanlış
+        # kaynaklara yöneldi, bir koşuda bilgi uydurdu.
         with httpx.Client(follow_redirects=True, timeout=15,
-                          headers={"User-Agent": USER_AGENT, "Accept-Language": "tr,en;q=0.8"}) as client:
+                          headers={"User-Agent": user_agent(url), "Accept-Language": "tr,en;q=0.8"}) as client:
             with client.stream("GET", url) as resp:
                 resp.raise_for_status()
                 ctype = resp.headers.get("content-type", "").lower()

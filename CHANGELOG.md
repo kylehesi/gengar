@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.17](#0017---2026-11-12) | 2026-11-12 | Wikipedia opens again in `fetch_page`: Wikimedia sites get a User-Agent that names Gengar, as their policy asks |
 | [0.0.16](#0016---2026-11-12) | 2026-11-12 | Gengar fixes from the first real-requests run: web search no longer fails on `wt.wikipedia.org`, `create_folders`, VS Code and browser names, `save_answer` keeps .txt |
 | [0.0.15](#0015---2026-11-12) | 2026-11-12 | Benchmark fixes from the first real-requests run: deletion checks no longer need the Recycle Bin; the task-folder approval rule understands every way a path is written |
 | [0.0.14](#0014---2026-11-11) | 2026-11-11 | Benchmark: `--repeat` no longer crashes between repeats (memory databases are closed); `--resume` continues a broken run |
@@ -22,6 +23,21 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.17] - 2026-11-12
+
+### Fixed
+- **`fetch_page` got HTTP 403 from Wikipedia (tr and en) in 7 of 69 runs** of the first real-requests run.
+  The model then turned to old or wrong sources and once made up facts (`real_fossil`). The request used a
+  browser-like User-Agent with "Gengar/0.1" at the end. The Wikimedia User-Agent policy asks automated
+  clients to name themselves with contact information, and Wikimedia refuses browser look-alikes. On
+  Wikimedia sites (Wikipedia, Commons, Wikidata, Wiktionary and the other projects) `fetch_page` now sends
+  `Gengar/<version> (https://github.com/kylehesi/gengar)`, as the Commons image search already did. Other
+  sites are unchanged. Checked once by hand: the page that failed in the benchmark opens.
+
+### Notes
+- The 403s from Bulbapedia, Fandom and pokestats.gg (test tasks) are bot protection on those sites. They are
+  left alone.
 
 ## [0.0.16] - 2026-11-12
 

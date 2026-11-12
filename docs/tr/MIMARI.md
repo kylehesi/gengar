@@ -673,8 +673,15 @@ Buna kabaca **RAG** (retrieval-augmented generation) deniyor: önce bilgiyi bul,
 ### Gengar'da
 
 - [`tools/web.py`](../../src/gengar/tools/web.py):
-  - `web_search`: arama motoru sonuçları (ddgs kütüphanesi; bu ağda sadece Bing çalıştığı için yedek olarak Bing)
-  - `fetch_page`: sayfayı indirir, reklam/menü gibi gereksiz kısımları atar (trafilatura; PDF için pypdf)
+  - `web_search`: arama motoru sonuçları (ddgs kütüphanesi). Motorlarının çoğu otomatik istemcilere boş sonuç
+    dönüyor ve hangilerinin çalıştığı dakikadan dakikaya değişiyor; bu yüzden hata veren ya da boş dönen arama
+    bir kez de `us-en` bölgesiyle deneniyor. Bölgesiz (`wt-wt`) aramada Vikipedi motor listesinden çıkarılıyor:
+    ddgs yoksa var olmayan `wt.wikipedia.org`'a soruyordu (v0.0.16). `images=true` Wikimedia Commons'ta serbest
+    görsel arar.
+  - `fetch_page`: sayfayı indirir, reklam/menü gibi gereksiz kısımları atar (trafilatura; PDF için pypdf).
+    Wikimedia sitelerinde (Vikipedi, Commons, Wikidata…) istek, Wikimedia'nın User-Agent politikasının
+    istediği gibi Gengar'ın adını ve proje adresini söylüyor; tarayıcı taklidi yapan ad HTTP 403 alıyordu
+    (v0.0.17). Diğer sitelere tarayıcı biçiminde ad gidiyor.
 - [`tools/pageview.py`](../../src/gengar/tools/pageview.py) → `view_page`: sayfayı görünmez Edge'de çizip ekran
   görüntüsünü modele gösterir (bkz. §3 "Modelin gözü").
 - **Parçalama:** Sayfa ~20.000 karakter olabilir, bağlam sınırlı. Sayfa parçalara bölünüyor ve sorguyla en

@@ -148,6 +148,26 @@ def test_web_search_retries_with_us_region(monkeypatch):
     assert calls == [("tr-tr", "auto"), ("us-en", "auto")]
 
 
+@pytest.mark.parametrize("url,wikimedia", [
+    ("https://tr.wikipedia.org/wiki/%C4%B0nsan%C4%B1n_evrimi", True),
+    ("en.wikipedia.org/wiki/Jebel_Irhoud", True),
+    ("https://commons.wikimedia.org/wiki/File:x.jpg", True),
+    ("https://www.wikidata.org/wiki/Q1", True),
+    ("https://notwikipedia.org/x", False),          # alan adının sonu değil, tamamı/alt alanı eşleşmeli
+    ("https://wikipedia.org.evil.com/x", False),
+    ("https://www.nature.com/articles/x", False),
+])
+def test_user_agent_per_site(url, wikimedia):
+    from gengar import __version__
+
+    agent = web.user_agent(url)
+    if wikimedia:
+        # Wikimedia politikası: ad + iletişim (adres); tarayıcı taklidi 403 alıyordu (2026-11-11, 7 koşu)
+        assert agent == f"Gengar/{__version__} (https://github.com/kylehesi/gengar)"
+    else:
+        assert agent == web.USER_AGENT
+
+
 def test_regionless_search_skips_wikipedia():
     # "wt-wt" ile ddgs'nin Vikipedi motoru wt.wikipedia.org'a gidiyordu (yok; sertifika hatası, 7 koşu).
     from ddgs.engines import ENGINES

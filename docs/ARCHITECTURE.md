@@ -648,9 +648,14 @@ means: find the information first, then answer from it.
 
 ### In Gengar
 
-- [`tools/web.py`](../src/gengar/tools/web.py): `web_search` (search results via the ddgs library, with Bing as a
-  fallback because only Bing worked on this network; `images=true` searches free images on Wikimedia Commons) and `fetch_page` (downloads a page and strips ads/menus;
-  trafilatura, pypdf for PDFs).
+- [`tools/web.py`](../src/gengar/tools/web.py):
+  - `web_search`: search results via the ddgs library. Most of its engines return nothing to automated
+    clients, and which ones work changes from minute to minute, so a failed or empty search is tried once more
+    with region `us-en`. Without a region (`wt-wt`) Wikipedia is left out of the engine list: ddgs would ask
+    `wt.wikipedia.org`, which does not exist (v0.0.16). `images=true` searches free images on Wikimedia Commons.
+  - `fetch_page`: downloads a page and strips ads and menus (trafilatura; pypdf for PDFs). On Wikimedia sites
+    (Wikipedia, Commons, Wikidata…) the request names Gengar and the project address, as the Wikimedia
+    User-Agent policy asks; a browser-like name got HTTP 403 (v0.0.17). Other sites get a browser-like name.
 - [`tools/pageview.py`](../src/gengar/tools/pageview.py) → `view_page`: renders a page in headless Edge and
   shows the model a screenshot (see "The model's eyes" in §3).
 - **Chunking:** a page can be ~20,000 characters and the context is limited. The page is split into chunks and
