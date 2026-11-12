@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.16](#0016---2026-11-12) | 2026-11-12 | Gengar fixes from the first real-requests run: web search no longer fails on `wt.wikipedia.org`, `create_folders`, VS Code and browser names, `save_answer` keeps .txt |
 | [0.0.15](#0015---2026-11-12) | 2026-11-12 | Benchmark fixes from the first real-requests run: deletion checks no longer need the Recycle Bin; the task-folder approval rule understands every way a path is written |
 | [0.0.14](#0014---2026-11-11) | 2026-11-11 | Benchmark: `--repeat` no longer crashes between repeats (memory databases are closed); `--resume` continues a broken run |
 | [0.0.13](#0013---2026-11-11) | 2026-11-11 | Open issues: plan items that slipped (BFCL, public data mix, Kaggle rerun, before/after measurement, 80-control limit) |
@@ -21,6 +22,40 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.16] - 2026-11-12
+
+Gengar bugs found in the dev failures of the first real-requests run (2026-11-11).
+
+### Fixed
+- **`web_search` failed in 7 of 69 runs** with a certificate error from `wt.wikipedia.org`.
+  - ddgs's "auto" search asks Wikipedia first and takes the language from the region. With the default
+    region `wt-wt` (no region) that is `wt.wikipedia.org`, which does not exist.
+  - When no engine returned results, ddgs raised that last error and the whole search failed. Most engines
+    return nothing to automated clients, and which ones work changes from minute to minute.
+  - For `wt-wt` the search now uses all enabled engines except Wikipedia; Wikipedia pages still come back
+    through the other engines.
+- **The second search attempt never did anything.** It used the "bing" backend, but ddgs 9.x disabled Bing
+  and silently falls back to "auto" for an unknown name. The same search ran twice. The second attempt now
+  uses region `us-en`, and it also runs after "no results" (before, "no results" ended the search at once).
+- **"vs code" and "vscode" did not find VS Code** (the Start menu name is "Visual Studio Code"). Both are
+  aliases now. `apps installed` uses aliases too, so `installed vscode` finds it.
+
+### Added
+- **`create_folders`:** creates many folders (with parents) in one call. In "split it into month folders"
+  the model had no folder tool. It wrote 12 empty, extensionless *files* with `write_file`, one call each,
+  and hit the 15-step limit. Every path is shown in the approval prompt, and a path under Windows or
+  Program Files makes the call critical, as with `write_file`. There are 19 tools now.
+- **`write_file` refuses an empty file without an extension** (except dot names like `.gitkeep`). The error
+  points to `create_folders`.
+- **`apps open tarayıcı` / `browser`** opens the first installed browser, in order: Chrome, Edge, Firefox,
+  Opera, Brave, Vivaldi. As an alias it would have matched Chrome and Edge together, and the answer
+  "several apps match" makes the model ask. In the request "open chrome, or whatever there is, don't ask",
+  it asked in 2 of 3 runs.
+
+### Changed
+- `save_answer` keeps a .txt extension when it redirects "X.txt" into the folder X (`X\kayit.txt`).
+  Before, it always wrote `kayit.md`, though the user had asked for a Notepad file.
 
 ## [0.0.15] - 2026-11-12
 

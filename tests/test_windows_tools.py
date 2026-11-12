@@ -33,9 +33,50 @@ def names(hits):
     ("edge", ["Microsoft Edge"]),
     ("dosya gezgini", ["File Explorer"]),
     ("photoshop", []),
+    ("vs code", ["Visual Studio Code"]),   # Başlat menüsündeki ad "Visual Studio Code" (2026-11-11 ölçümü)
+    ("vscode", ["Visual Studio Code"]),
+    ("tarayıcı", ["Microsoft Edge"]),      # kurulu ilk tarayıcı (Chrome yok)
+    ("browser", ["Microsoft Edge"]),
 ])
 def test_find_apps(query, expected):
     assert names(find_apps(query, APPS)) == expected
+
+
+def test_browser_prefers_first_installed():
+    both = APPS + [StartApp("Google Chrome", "Chrome"), StartApp("Firefox", "Firefox")]
+    assert names(find_apps("tarayıcı", both)) == ["Google Chrome"]  # "birden fazla eşleşiyor" değil
+    assert names(find_apps("tarayıcı", [StartApp("Not Defteri", "Notepad")])) == []
+
+
+def test_installed_uses_aliases(monkeypatch):
+    import winreg
+
+    class Key:
+        def __init__(self, names=()):
+            self.names = list(names)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    progs = ["Microsoft Visual Studio Code (User)", "Mozilla Firefox (x64 en-US)", "Blender"]
+    root = Key(progs)
+    monkeypatch.setattr(apps, "_UNINSTALL_KEYS", [(None, "x")])
+    monkeypatch.setattr(winreg, "OpenKey", lambda k, p: root if k is None else Key([p]))
+    monkeypatch.setattr(winreg, "QueryInfoKey", lambda k: (len(k.names),))
+    monkeypatch.setattr(winreg, "EnumKey", lambda k, i: k.names[i])
+
+    def value(k, field):
+        if field == "DisplayName":
+            return (k.names[0], 1)
+        raise OSError
+
+    monkeypatch.setattr(winreg, "QueryValueEx", value)
+    assert "Visual Studio Code" in apps.installed_apps("vscode")
+    out = apps.installed_apps("tarayıcı")
+    assert "Firefox" in out and "Blender" not in out
 
 
 def test_ambiguous_app_returns_candidates(monkeypatch):
@@ -160,4 +201,4 @@ def test_registry_order_and_size():
     reg = default_registry()
     names = [t.name for t in reg]
     assert names[0] == "system_info" and names[-1] == "run_powershell"
-    assert len(reg) == 18  # +delete_files, restore_files (geri dönüşüm kutusu), view_page
+    assert len(reg) == 19  # +delete_files, restore_files (geri dönüşüm kutusu), view_page, create_folders

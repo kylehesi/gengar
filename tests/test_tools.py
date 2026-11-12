@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -152,6 +153,41 @@ def test_write_read_edit_roundtrip(tmp_path):
     assert "2\tiki" in files.read_file(str(f), line_numbers=True)
     files.edit_file(str(f), "iki", "İKİ")
     assert f.read_text(encoding="utf-8") == "bir\nİKİ\nüç\n"
+
+
+def test_create_folders(tmp_path):
+    months = [str(tmp_path / "Aylar" / f"{i:02d} {m}") for i, m in enumerate(["Ocak", "Şubat", "Mart"], 1)]
+    out = files.create_folders(months + [months[0]])  # tekrar eden yol bir kez
+    assert out.startswith("3 klasör oluşturuldu:")
+    assert all(Path(m).is_dir() for m in months)
+    assert "1 klasör oluşturuldu, 3 zaten vardı" in files.create_folders(months + [str(tmp_path / "Aylar" / "04 Nisan")])
+    (tmp_path / "dosya").write_text("x", encoding="utf-8")
+    with pytest.raises(ToolError, match="dosya var"):
+        files.create_folders([str(tmp_path / "yeni"), str(tmp_path / "dosya")])
+    assert not (tmp_path / "yeni").exists()  # hiçbiri oluşturulmadı
+    with pytest.raises(ToolError, match="verilmedi"):
+        files.create_folders([])
+
+
+def test_create_folders_risk_and_summary(tmp_path):
+    tool = default_registry().get("create_folders")
+    args = {"paths": [str(tmp_path / "a"), str(tmp_path / "b")]}
+    assert tool.risk_for(args) == Risk.WRITE
+    assert tool.summary(args).splitlines() == args["paths"]  # onay sorusunda her yol görünür
+    import os
+    windows = os.environ["SystemRoot"]
+    assert tool.risk_for({"paths": [str(tmp_path / "a"), windows + "\\Gengar"]}) == Risk.CRITICAL
+
+
+def test_write_file_refuses_empty_extensionless(tmp_path):
+    # 2026-11-11: "aylara böl" denince model 12 boş, uzantısız DOSYA açtı.
+    with pytest.raises(ToolError, match="create_folders"):
+        files.write_file(str(tmp_path / "Ocak"), "")
+    assert not (tmp_path / "Ocak").exists()
+    files.write_file(str(tmp_path / ".gitkeep"), "")  # noktalı ad: bilinen boş dosya
+    files.write_file(str(tmp_path / "bos.txt"), "")
+    files.write_file(str(tmp_path / "Makefile"), "all:\n\techo hi\n")  # içerik varsa uzantısız dosya serbest
+    assert (tmp_path / "Makefile").is_file()
 
 
 def test_write_file_fixes_flat_escaped_newlines(tmp_path):

@@ -260,13 +260,14 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
 | Araç | Dosya | Ne yapar | Risk |
 |---|---|---|---|
 | `system_info` | `system.py` | RAM, disk, CPU, pil, ağ, işletim sistemi | okuma |
-| `apps` | `apps.py` | Uygulama aç/kapat, yüklü sürümleri listele | eyleme göre: listele okuma, aç değişiklik, kapat sistem |
+| `apps` | `apps.py` | Uygulama aç/kapat, yüklü sürümleri listele. Takma adlar (`vscode` → Visual Studio Code); `tarayıcı`/`browser` kurulu ilk tarayıcıyı açar | eyleme göre: listele okuma, aç değişiklik, kapat sistem |
 | `settings` | `settings.py` | Tema, ses, parlaklık | oku: okuma, değiştir: değişiklik |
 | `windows_ui` | `ui.py`, `winapi.py` | Pencereler, tıklama, yazma | eyleme göre okuma/değişiklik/sistem |
 | `software_version` | `versions.py` | Yazılımın en güncel sürümü (resmi kaynaklardan) | okuma |
 | `web_search`, `fetch_page` | `web.py` | Web'de arama, sayfa okuma | okuma |
 | `read_file`, `list_directory`, `find_files` | `files.py` | Dosya okuma/arama | okuma |
-| `write_file`, `edit_file` | `files.py` | Dosya yazma/düzenleme | değişiklik |
+| `write_file`, `edit_file` | `files.py` | Dosya yazma/düzenleme. Boş ve uzantısız `write_file` reddedilir (klasör kastediliyordu) | değişiklik |
+| `create_folders` | `files.py` | Tek çağrıda çok sayıda klasör (örn. 12 ay klasörü) | değişiklik |
 | `view_page` | `pageview.py` | Web sayfasını çizip ekran görüntüsünü modele gösterir | okuma (yerel ağ: kritik) |
 | `save_answer` | `files.py` | Önceki cevabı yeniden yazdırmadan, geçmişten birebir dosyaya kopyalar | değişiklik |
 | `delete_files`, `restore_files` | `recycle.py` | Geri dönüşüm kutusuna silme / geri yükleme | değişiklik (listeleme: okuma) |

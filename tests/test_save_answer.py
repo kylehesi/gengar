@@ -103,6 +103,11 @@ def test_save_answer_next_to_folder_goes_inside(tmp_path):
                {"role": "user", "content": "gorev klasörüne kaydet"}]
     files.make_save_answer(lambda: history).run({"path": str(tmp_path / "gorev.md")})
     assert (tmp_path / "gorev" / "kayit.md").exists() and not (tmp_path / "gorev.md").exists()
+    # "not defterine kaydet" → model "gorev.txt" yazar: uzantı korunur (2026-11-11'de kayit.md oluyordu)
+    files.make_save_answer(lambda: history).run({"path": str(tmp_path / "gorev.txt")})
+    assert (tmp_path / "gorev" / "kayit.txt").exists()
+    # metin dışı uzantı: .md (kayit.md zaten var → kayit_2.md)
+    assert files.answer_target(str(tmp_path / "gorev.pdf")) == tmp_path / "gorev" / "kayit_2.md"
 
 
 def test_summary_shows_real_target(tmp_path):

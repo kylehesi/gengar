@@ -143,6 +143,12 @@ def write_file(path: str, content: str) -> str:
         # YANINA "X.md" yazıyordu. Yönlendirme yapılmaz (kullanıcı bilerek yanına isteyebilir), açıkça söylenir.
         raise ToolError(f"{p} bir klasör, dosya değil. Klasörün içine yazmak için dosya adını ekleyin, "
                         f"örn. {p / 'kayit.md'}")
+    if not content.strip() and not p.suffix and not p.name.startswith(".") and not p.exists():
+        # "Aylara böl" isteğinde model 12 ay klasörü yerine write_file ile 12 boş, uzantısız DOSYA açtı ve
+        # adım sınırına takıldı (2026-11-11 ölçümü). Uzantısız boş dosya neredeyse hiç istenmez (.gitkeep
+        # gibi noktalı adlar hariç).
+        raise ToolError(f"'{p.name}' uzantısız ve içerik boş: klasör mü isteniyor? Klasör için create_folders "
+                        "kullanın (tek çağrıda hepsi). Boş bir dosya gerekiyorsa uzantı verin (örn. .txt).")
     existed = p.exists()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8", newline="")
@@ -258,6 +264,36 @@ def edit_file(path: str, old_text: str, new_text: str) -> str:
     return f"{p} düzenlendi{note}" + _page_warning(p, result)
 
 
+MAX_FOLDERS = 200
+
+
+def create_folders(paths: list[str]) -> str:
+    """Klasörleri (ara klasörleriyle) oluşturur; zaten olanlara dokunmaz."""
+    if not paths:
+        raise ToolError("klasör yolu verilmedi")
+    if len(paths) > MAX_FOLDERS:
+        raise ToolError(f"tek seferde en fazla {MAX_FOLDERS} klasör")
+    targets = list(dict.fromkeys(resolve(p) for p in paths))
+    files = [str(p) for p in targets if p.exists() and not p.is_dir()]
+    if files:
+        raise ToolError("Hiçbir şey oluşturulmadı. Bu adlarda dosya var, klasör açılamaz: " + ", ".join(files[:5]))
+    made = [p for p in targets if not p.exists()]
+    for p in targets:
+        p.mkdir(parents=True, exist_ok=True)
+    out = [f"{len(made)} klasör oluşturuldu" + (f", {len(targets) - len(made)} zaten vardı" if len(made) < len(targets)
+                                               else "") + ":"]
+    out += [f"- {p}" for p in made[:40]]
+    if len(made) > 40:
+        out.append(f"... ve {len(made) - 40} tane daha")
+    return "\n".join(out)
+
+
+def folders_risk(args: dict) -> Risk:
+    paths = args.get("paths") or []
+    risks = [write_risk({"path": str(p)}) for p in paths] if isinstance(paths, list) else [Risk.CRITICAL]
+    return Risk.CRITICAL if Risk.CRITICAL in risks else Risk.WRITE
+
+
 def _protected_roots() -> list[Path]:
     roots = [os.environ.get(v) for v in ("SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData")]
     return [Path(r).resolve() for r in roots if r]
@@ -341,6 +377,21 @@ TOOLS = [
         describe=lambda a: f"{a.get('path', '')} ({len(str(a.get('content', '')))} karakter)",
     ),
     Tool(
+        name="create_folders",
+        description="Create folders (with missing parent folders) in one call, e.g. 12 month folders. "
+                    "Existing folders are left as they are.",
+        parameters={
+            "type": "object",
+            "properties": {"paths": {"type": "array", "items": {"type": "string"}}},
+            "required": ["paths"],
+        },
+        risk=Risk.WRITE,
+        func=create_folders,
+        classify=folders_risk,
+        # Onay sorusunda (ve ölçümün izin kuralında) her yol görünsün.
+        describe=lambda a: "\n".join(map(str, a.get("paths") or [])),
+    ),
+    Tool(
         name="edit_file",
         description="Replace old_text with new_text in a text file.",
         parameters={
@@ -382,15 +433,19 @@ def answer_target(path: str) -> Path:
     dosyanın gerçekten gideceği yeri görür.
     """
     p = resolve(path)
+    ext = ".md"
     if not p.exists() and p.suffix and p.with_suffix("").is_dir():
         # "X klasörüne kaydet" → model "X.md" yazıyor (X klasörünün YANINA); niyet X'in içi.
+        # İstenen metin uzantısı korunur: "not defteri" için X.txt → X\kayit.txt (eskiden hep .md oluyordu).
+        if p.suffix.lower() in (".txt", ".md"):
+            ext = p.suffix.lower()
         p = p.with_suffix("")
     if p.is_dir() or path.rstrip().endswith(("\\", "/")):
         # "X klasörüne kaydet" denince model sık sık sadece klasör yolunu veriyor: içine kayit.md yaz.
-        p = p / "kayit.md"
+        p = p / f"kayit{ext}"
         n = 2
         while p.exists():
-            p = p.with_name(f"kayit_{n}.md")
+            p = p.with_name(f"kayit_{n}{ext}")
             n += 1
     return p
 

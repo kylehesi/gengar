@@ -131,30 +131,62 @@ def test_web_search_formats_results(monkeypatch):
     assert out.startswith(UNTRUSTED_START)
 
 
-def test_web_search_falls_back_to_bing(monkeypatch):
+def test_web_search_retries_with_us_region(monkeypatch):
     import ddgs
 
-    backends = []
+    calls = []
 
     class FlakyDDGS:
         def text(self, query, **kwargs):
-            backends.append(kwargs["backend"])
-            if kwargs["backend"] == "auto":
+            calls.append((kwargs["region"], kwargs["backend"]))
+            if len(calls) == 1:
                 raise TimeoutError("operation timed out")
             return [{"title": "T", "href": "https://t.com", "body": "b"}]
 
     monkeypatch.setattr(ddgs, "DDGS", FlakyDDGS)
-    assert "https://t.com" in web.web_search("x")
-    assert backends == ["auto", "bing"]
+    assert "https://t.com" in web.web_search("x", region="tr-tr")
+    assert calls == [("tr-tr", "auto"), ("us-en", "auto")]
+
+
+def test_regionless_search_skips_wikipedia():
+    # "wt-wt" ile ddgs'nin Vikipedi motoru wt.wikipedia.org'a gidiyordu (yok; sertifika hatası, 7 koşu).
+    from ddgs.engines import ENGINES
+
+    backends = web._backends("wt-wt").split(",")
+    assert "wikipedia" not in backends
+    assert set(backends) == set(ENGINES["text"]) - {"wikipedia"}
+    assert all(b in ENGINES["text"] for b in backends)  # kapalı motor (bing) yok: sessizce "auto"ya dönülmesin
+    assert web._backends("tr-tr") == "auto"
 
 
 def test_web_search_no_results(monkeypatch):
     import ddgs
     from ddgs.exceptions import DDGSException
 
+    regions = []
+
     class EmptyDDGS:
         def text(self, query, **kwargs):
+            regions.append(kwargs["region"])
             raise DDGSException("No results found.")
 
     monkeypatch.setattr(ddgs, "DDGS", EmptyDDGS)
     assert "No results" in web.web_search("asdfghjkl")
+    assert regions == ["wt-wt", "us-en"]  # "sonuç yok"ta da bir kez daha denenir (motorlar dalgalı)
+
+
+def test_web_search_second_try_after_no_results(monkeypatch):
+    import ddgs
+    from ddgs.exceptions import DDGSException
+
+    class Flaky:
+        n = 0
+
+        def text(self, query, **kwargs):
+            Flaky.n += 1
+            if Flaky.n == 1:
+                raise DDGSException("No results found.")
+            return [{"title": "T", "href": "https://t.com", "body": "b"}]
+
+    monkeypatch.setattr(ddgs, "DDGS", Flaky)
+    assert "https://t.com" in web.web_search("x")

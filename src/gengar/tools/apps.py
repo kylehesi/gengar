@@ -25,6 +25,8 @@ import psutil
 from . import winapi
 from .base import Risk, Tool, ToolError
 
+BROWSERS = ["google chrome", "microsoft edge", "firefox", "opera", "brave", "vivaldi"]
+
 # Türkçe ↔ İngilizce sık kullanılan uygulama adları. Anahtar ve değerler sadeleştirilmiş (fold) biçimde.
 ALIASES = {
     "notepad": ["not defteri"],
@@ -51,6 +53,22 @@ ALIASES = {
     "photos": ["fotograflar"],
     "saat": ["clock"],
     "clock": ["saat"],
+    # "vs code'u aç": Başlat menüsündeki ad "Visual Studio Code"; "vs code"/"vscode" hiçbir şeyle eşleşmiyordu
+    # (2026-11-11 gerçek istekler ölçümü).
+    "vs code": ["visual studio code"],
+    "vscode": ["visual studio code"],
+    "vs kod": ["visual studio code"],
+}
+
+# Bir tür uygulama ("tarayıcı aç"): listedeki sırayla, kurulu olan İLKİ. Takma ad gibi hepsini eşleştirseydik
+# Chrome ve Edge kurulu bir bilgisayarda "birden fazla uygulama eşleşiyor" çıkardı ve model yine sorardı
+# ("chrome yoksa ne varsa aç, sorma": 2026-11-11 ölçümünde 3 koşunun 2'sinde sordu).
+ANY_OF = {
+    "tarayici": BROWSERS,
+    "web tarayici": BROWSERS,
+    "internet tarayici": BROWSERS,
+    "browser": BROWSERS,
+    "web browser": BROWSERS,
 }
 
 _TR = str.maketrans("çğıİöşüÇĞÖŞÜ", "cgiiosucgosu")
@@ -88,6 +106,11 @@ def start_apps(refresh: bool = False) -> list[StartApp]:
 
 def find_apps(query: str, apps: list[StartApp]) -> list[StartApp]:
     """Sorguya en iyi uyan uygulamalar; tek ve net bir eşleşme varsa tek elemanlı liste."""
+    if fold(query) in ANY_OF:
+        for name in ANY_OF[fold(query)]:
+            if len(hits := find_apps(name, apps)) == 1:
+                return hits
+        return []
     terms = [fold(query)]
     terms += [fold(a) for a in ALIASES.get(terms[0], [])]
     names = {app: fold(app.name) for app in apps}
@@ -214,6 +237,8 @@ _UNINSTALL_KEYS = [
 
 def installed_apps(query: str = "") -> str:
     found: dict[str, str] = {}
+    q = fold(query)
+    terms = [q] + [fold(a) for a in ALIASES.get(q, []) + ANY_OF.get(q, [])]  # "vscode" → Visual Studio Code
     for root, path in _UNINSTALL_KEYS:
         try:
             key = winreg.OpenKey(root, path)
@@ -230,7 +255,7 @@ def installed_apps(query: str = "") -> str:
                             version = ""
                 except OSError:
                     continue
-                if not query or fold(query) in fold(name):
+                if not query or any(t in fold(name) for t in terms):
                     found.setdefault(name, version)
     if not found:
         return f"No installed program matches '{query}'." if query else "No programs found."
@@ -277,7 +302,8 @@ def describe(args: dict) -> str:
 TOOL = Tool(
     name="apps",
     description=(
-        "open: start an app by name ('Not Defteri', 'chrome') or open a file/folder path, URL or "
+        "open: start an app by name ('Not Defteri', 'chrome'; 'tarayıcı' = first installed browser) or open a "
+        "file/folder path, URL or "
         "'ms-settings:...' page. close: close an app's windows (force=true kills it). running: open windows. "
         "installed: installed programs and versions (name filters)."
     ),

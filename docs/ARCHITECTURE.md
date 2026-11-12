@@ -254,13 +254,14 @@ prompt, 20 tools):
 | Tool | File | What it does | Risk |
 |---|---|---|---|
 | `system_info` | `system.py` | RAM, disks, CPU, battery, network, OS | read |
-| `apps` | `apps.py` | Open/close apps, list installed versions | by action: list read, open write, close system |
+| `apps` | `apps.py` | Open/close apps, list installed versions. Aliases (`vscode` → Visual Studio Code); `tarayıcı`/`browser` opens the first installed browser | by action: list read, open write, close system |
 | `settings` | `settings.py` | Theme, volume, brightness | get: read, set: write |
 | `windows_ui` | `ui.py`, `winapi.py` | Windows, clicking, typing | by action: read/write/system |
 | `software_version` | `versions.py` | Latest version of software (official sources) | read |
 | `web_search`, `fetch_page` | `web.py` | Web search, reading pages | read |
 | `read_file`, `list_directory`, `find_files` | `files.py` | Reading/searching files | read |
-| `write_file`, `edit_file` | `files.py` | Writing/editing files | write |
+| `write_file`, `edit_file` | `files.py` | Writing/editing files. An empty, extensionless `write_file` is refused (it was meant as a folder) | write |
+| `create_folders` | `files.py` | Create many folders in one call (e.g. 12 month folders) | write |
 | `view_page` | `pageview.py` | Renders a web page and shows the model a screenshot | read (local network: critical) |
 | `save_answer` | `files.py` | Copies an earlier answer to a file exactly, without the model retyping it | write |
 | `delete_files`, `restore_files` | `recycle.py` | Delete to / restore from the Recycle Bin | write (listing: read) |

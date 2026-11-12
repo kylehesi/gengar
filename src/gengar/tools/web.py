@@ -36,6 +36,18 @@ UNTRUSTED_END = "<<<END OF WEB CONTENT>>>"
 
 # --- arama ----------------------------------------------------------------
 
+def _backends(region: str) -> str:
+    """ddgs motor listesi. "auto" metin aramasında önce Vikipedi'yi sorar ve dili bölgeden alır: bölgesiz
+    "wt-wt" → wt.wikipedia.org (böyle bir site yok, sertifika hatası). Hiçbir motor sonuç vermeyince ddgs son
+    motorun hatasını fırlattığı için arama tamamen düşüyordu (2026-11-11 ölçümü: 69 koşunun 7'sinde). Bölgesiz
+    aramada Vikipedi listeden çıkarılır; Vikipedi sayfaları diğer motorların sonuçlarında zaten çıkıyor."""
+    if not region.lower().endswith("-wt"):
+        return "auto"
+    from ddgs.engines import ENGINES
+
+    return ",".join(k for k in ENGINES["text"] if k != "wikipedia")
+
+
 def web_search(query: str, max_results: int = 5, region: str = "wt-wt", images: bool = False) -> str:
     from ddgs import DDGS  # ağır içe aktarma; sadece gerektiğinde
     from ddgs.exceptions import DDGSException
@@ -45,21 +57,24 @@ def web_search(query: str, max_results: int = 5, region: str = "wt-wt", images: 
     max_results = max(1, min(int(max_results), 10))
     if images:
         return image_search(query, max_results)
-    results, error = None, None
-    # "auto" çalışan motoru kendisi seçer ama bazen yavaş bir motorda zaman aşımına düşer;
-    # o zaman bir kez de doğrudan Bing denenir.
-    for backend in ("auto", "bing"):
+    results, error, empty = None, None, False
+    # Motorlar zaman zaman zaman aşımına düşüyor ya da hiç sonuç vermiyor (çoğu otomatik istemcide "no results"
+    # dönüyor, hangilerinin çalıştığı dakikadan dakikaya değişiyor): bir kez de "us-en" bölgesiyle denenir.
+    # (Eskiden ikinci deneme "bing"di; ddgs 9.x Bing motorunu kapattı ve bilinmeyen motor adında sessizce
+    # "auto"ya dönüyor, yani aynı arama tekrarlanıyordu. "no results"ta da hiç ikinci deneme yapılmıyordu.)
+    for reg, backend in ((region, _backends(region)), ("us-en", "auto")):
         try:
-            results = DDGS().text(query, region=region, safesearch="moderate",
+            results = DDGS().text(query, region=reg, safesearch="moderate",
                                   max_results=max_results, backend=backend)
             break
         except DDGSException as e:
-            if "no results" in str(e).lower():
-                return f"No results for '{query}'. Try different or English keywords."
+            empty = empty or "no results" in str(e).lower()
             error = e
         except Exception as e:  # ağ hatası vb.
             error = e
     if results is None:
+        if empty:
+            return f"No results for '{query}'. Try different or English keywords."
         raise ToolError(f"arama yapılamadı ({type(error).__name__}): {error}")
 
     rows = []
