@@ -19,7 +19,14 @@ from .apps import fold
 from .base import Risk, Tool, ToolError, ToolResult, save_screen
 
 ACTIONS = ("list", "inspect", "focus", "click", "type", "keys")
+# inspect en fazla MAX_WALK öğe toplar, MAX_CONTROLS tanesini numaralar (satır başına ~15 token). Eskiden ilk 80
+# öğede duruyordu: Gezgin'de 80'in hepsini liste satırları aldı, araç çubuğu (New, Sort, View) numara almadı ve
+# adla arama da aynı 80'e bakıyordu (INCELENECEK 11). Şimdi düğme/menü/sekme gibi öğeler önce seçilir; liste
+# satırlarına en az MAX_ROWS yer ayrılır, boş kalan yerleri de onlar doldurur. Adla arama toplananların hepsine bakar.
 MAX_CONTROLS = 80
+MAX_WALK = 300
+MAX_ROWS = 40
+ROW_TYPES = {"ListItemControl", "TreeItemControl"}
 WALK_SECONDS = 4.0
 
 INTERACTIVE = {
@@ -161,7 +168,7 @@ def _collect(win: winapi.Window) -> list[Any]:
         raise ToolError("pencere arayüzüne erişilemedi")
     found, deadline = [], time.time() + WALK_SECONDS
     for ctrl, _depth in auto.WalkControl(root, maxDepth=25):
-        if time.time() > deadline or len(found) >= MAX_CONTROLS:
+        if time.time() > deadline or len(found) >= MAX_WALK:
             break
         try:
             if ctrl.ControlTypeName in INTERACTIVE and not ctrl.IsOffscreen:
@@ -169,6 +176,25 @@ def _collect(win: winapi.Window) -> list[Any]:
         except Exception:  # bazı öğeler gezinirken kaybolabilir
             continue
     return found
+
+
+def _pick(controls: list[Any]) -> list[Any]:
+    """Numaralanacak öğeler, ağaç sırasıyla: önce satır olmayanlar (düğme, menü, sekme, alan), satırlara en az
+    MAX_ROWS yer; toplam MAX_CONTROLS."""
+    if len(controls) <= MAX_CONTROLS:
+        return controls
+
+    def is_row(c: Any) -> bool:
+        try:
+            return c.ControlTypeName in ROW_TYPES
+        except Exception:
+            return True
+
+    rows = [c for c in controls if is_row(c)]
+    others = [c for c in controls if not is_row(c)][:MAX_CONTROLS - min(len(rows), MAX_ROWS)]
+    rows = rows[:MAX_CONTROLS - len(others)]
+    keep = {id(c) for c in others + rows}
+    return [c for c in controls if id(c) in keep]
 
 
 def _screenshot(win: winapi.Window, controls: list[Any]) -> tuple[str | None, str]:
@@ -193,14 +219,20 @@ def _screenshot(win: winapi.Window, controls: list[Any]) -> tuple[str | None, st
 
 def inspect(window: str) -> str:
     win = find_window(window)
-    controls = _collect(win)
+    found = _collect(win)
+    controls = _pick(found)
     _cache.hwnd, _cache.controls = win.hwnd, controls
     shot, note = _screenshot(win, controls)
     if not controls:
         text = f"'{win.title}': no interactive controls found (the app may not support UI Automation)."
     else:
         rows = [f"[{i}] {_label(c)}" for i, c in enumerate(controls)]
-        more = f"\n(first {MAX_CONTROLS} controls shown)" if len(controls) >= MAX_CONTROLS else ""
+        more = ""
+        if len(found) > len(controls):
+            more = (f"\n({len(found) - len(controls)} more controls, mostly list rows, have no number; "
+                    "use their name as target)")
+        if len(found) >= MAX_WALK:
+            more += f"\n(stopped after {MAX_WALK} controls)"
         text = f"Window '{win.title}' [{win.process}]:\n" + "\n".join(rows) + more
     text = f"{text}\n{note}"
     return ToolResult(text, images=[shot], private=True) if shot else text
@@ -216,17 +248,20 @@ def _resolve(win: winapi.Window, target: str) -> Any:
         if i >= len(_cache.controls):
             raise ToolError(f"[{i}] yok; son inspect {len(_cache.controls)} öğe listeledi")
         return _cache.controls[i]
-    controls = _collect(win)
+    found = _collect(win)  # adla arama numaralanmamış öğelere de bakar
+    controls = _pick(found)
     _cache.hwnd, _cache.controls = win.hwnd, controls
     t = fold(target)
-    exact = [c for c in controls if fold(c.Name or "") == t]
-    partial = [c for c in controls if t in fold(c.Name or "")]
+    exact = [c for c in found if fold(c.Name or "") == t]
+    partial = [c for c in found if t in fold(c.Name or "")]
     hits = exact or partial
     if len(hits) == 1:
         return hits[0]
     if not hits:
         raise ToolError(f"'{target}' adında öğe yok; 'inspect' ile öğelere bakın")
-    names = "; ".join(f"[{controls.index(c)}] {_label(c)}" for c in hits[:8])
+    numbers = {id(c): i for i, c in enumerate(controls)}
+    names = "; ".join(f"[{numbers[id(c)]}] {_label(c)}" if id(c) in numbers else f"(no number) {_label(c)}"
+                      for c in hits[:8])
     raise ToolError(f"'{target}' birden fazla öğeyle eşleşiyor: {names}. Numarayla tekrar deneyin.")
 
 

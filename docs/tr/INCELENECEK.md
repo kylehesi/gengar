@@ -232,9 +232,18 @@ bu düğmeleri görüntüde görüyor ama numarayla tıklayamıyor. Adla aramak 
 
 Token maliyetine dikkat: satır başına ~15 token.
 
+**Düzeltildi (v0.0.18).** 300 öğeye kadar toplanıyor ve 80'i numaralanıyor; token maliyeti eskisiyle aynı.
+- Önce düğmeler, menüler, sekmeler ve alanlar geliyor.
+- Liste/ağaç satırlarına en az 40 yer ayrılıyor, kalan boşluğu da onlar dolduruyor.
+- Ağaç sırası korunuyor.
+
+Adla arama toplanan öğelerin hepsine bakıyor: numarası olmayan bir satır adıyla tıklanabiliyor.
+
 ## 12. Küçük işler
 
-- REPL'de eğik çizgisiz yazılan `cls` / `clear` ekranı temizlesin (alışkanlıkla yazılıyor).
+- ~~REPL'de eğik çizgisiz yazılan `cls` / `clear` ekranı temizlesin (alışkanlıkla yazılıyor).~~
+  **Düzeltildi (v0.0.18):** `cls`, `clear` ve `/cls` ekranı temizliyor, sohbet sürüyor. Eğik çizgisiz `exit` ve
+  `quit` çıkıyor.
 - Yetim kalan alt süreçler: 6. madde (Job Object).
 - Kod için ayrı bir model denemek (v0.0.10'da önerildi): indirme (önce sorulacak) ve bir gece koşusu gerekiyor.
   Yalnızca gerçek istekler seti, ekran görüntülerine rağmen kod/web görevlerinin zayıf kaldığını gösterirse

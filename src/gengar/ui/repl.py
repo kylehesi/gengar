@@ -42,10 +42,17 @@ Komutlar:
   /chats          sabitlenen ve son sohbetler     /open <no>   sohbeti aç, kaldığın yerden devam et
   /pin <no>       sohbeti sabitle                 /unpin <no>  sabitlemeyi kaldır
   /export [no]    sohbeti Markdown'a aktar (numarasız: şu anki sohbet)
+  /cls            ekranı temizle (sohbet sürer; eğik çizgisiz cls/clear de olur)
   /help           bu yardım
-  /exit           çık (Ctrl+C de olur)
+  /exit           çık (Ctrl+C de olur; eğik çizgisiz exit/quit de)
 
 Ctrl+C yanıt ya da komut sürerken basılırsa yalnızca o işlemi durdurur."""
+
+
+# Eğik çizgisiz yazılınca komut sayılanlar. "clear" ekranı temizler; /clear ise (eski adıyla) yeni sohbet açar,
+# ama alışkanlıkla "clear" yazan kişi sohbetini kaybetmek istemiyor, yalnızca ekranı temizliyor.
+BARE_COMMANDS = {"cls": "/cls", "clear": "/cls", "exit": "/exit", "quit": "/exit"}
+CLEAR_SCREEN = "\033[2J\033[3J\033[H"  # ekranı ve kaydırma geçmişini sil, imleci başa al
 
 
 # Model bu kadar saniye hiç veri göndermezse kullanıcıya "çalışıyor" uyarısı (sonra her SILENCE_REPEAT'te bir).
@@ -132,6 +139,9 @@ class Repl:
                 return 0
             if not line:
                 continue
+            # Terminal alışkanlığıyla eğik çizgisiz yazılanlar (INCELENECEK 12): modele soru olarak gitmesin.
+            if line.lower() in BARE_COMMANDS:
+                line = BARE_COMMANDS[line.lower()]
             if line.startswith("/"):
                 if not self.handle_command(line):
                     return 0
@@ -147,7 +157,9 @@ class Repl:
 
         if cmd in ("/exit", "/quit", "/q"):
             return False
-        if cmd == "/help":
+        if cmd == "/cls":
+            self.print(CLEAR_SCREEN, end="")
+        elif cmd == "/help":
             self.print(HELP)
         elif cmd in ("/clear", "/new"):
             self.agent.conversation.clear()

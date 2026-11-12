@@ -310,8 +310,11 @@ prompt, 20 tools):
   - **Privacy:** a window screenshot can contain anything on the user's screen (mail, messages). It is marked
     private and only sent to a local model; an API profile gets the text list and a note instead. Screenshots of
     pages the model wrote itself (`view_page`) are not private.
-  - The screenshot also showed a gap in `inspect`: it stops at 80 controls in tree order, so in Explorer the
-    toolbar (New, Sort, View) gets no number. Not fixed yet.
+  - The screenshot also showed a gap in `inspect`: it stopped at 80 controls in tree order, so in Explorer the
+    toolbar (New, Sort, View) got no number. Since v0.0.18 it collects up to 300 controls and numbers 80 of
+    them. Buttons, menus, tabs and fields come first; list and tree rows keep at least 40 places and fill the
+    rest. Tree order is kept. Controls without a number can still be targeted by name, because the name
+    lookup searches all collected controls.
   - Window work needs many steps by nature (look → click → look again). When `windows_ui` is used in a turn,
     that turn's step limit rises from 15 to 30 (`ui_max_steps`). Other turns keep 15: the limit is there to stop
     a model that is going in circles.

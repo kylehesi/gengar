@@ -81,6 +81,40 @@ def test_inspect_attaches_marked_private_screenshot(tmp_path, monkeypatch):
     assert len(list(tmp_path.glob("*_CalculatorApp.png"))) == 1
 
 
+class _Typed(_Ctrl):
+    def __init__(self, name, kind):
+        super().__init__(name, _Rect(0, 0, 9, 9))
+        self.ControlTypeName = kind
+
+
+def test_inspect_numbers_toolbar_before_long_lists(monkeypatch):
+    # Gezgin: ağaçta önce 150 liste satırı, sonra araç çubuğu. Eskiden ilk 80 öğe (hepsi satır) numaralanıyordu.
+    rows = [_Typed(f"dosya{i}.txt", "ListItemControl") for i in range(150)]
+    toolbar = [_Typed(n, "ButtonControl") for n in ("New", "Sort", "View")]
+    found = rows + toolbar
+    win = winapi.Window(1, 1, "Downloads", "explorer.exe")
+    monkeypatch.setattr(ui, "find_window", lambda q: win)
+    monkeypatch.setattr(ui, "_collect", lambda w: found)
+    monkeypatch.setattr(winapi, "capture_window", lambda *a, **k: (_ for _ in ()).throw(OSError("x")))
+    out = ui.inspect("downloads")
+    picked = ui._cache.controls
+    assert len(picked) == ui.MAX_CONTROLS and picked[-3:] == toolbar  # düğmeler numara aldı, ağaç sırası korunur
+    assert "Button 'Sort'" in out and "73 more controls" in out
+    # Numara almayan satır adla bulunur (adla arama toplananların hepsine bakar)
+    assert ui._resolve(win, "dosya120.txt") is rows[120]
+    assert ui._resolve(win, "7") is picked[7]
+
+
+def test_pick_keeps_room_for_rows():
+    buttons = [_Typed(f"b{i}", "ButtonControl") for i in range(100)]
+    rows = [_Typed(f"r{i}", "ListItemControl") for i in range(100)]
+    picked = ui._pick(buttons + rows)
+    assert sum(c in rows for c in picked) == ui.MAX_ROWS and len(picked) == ui.MAX_CONTROLS
+    few = buttons[:5] + rows
+    assert len(ui._pick(few)) == ui.MAX_CONTROLS and ui._pick(few)[:5] == buttons[:5]  # boş yeri satırlar doldurur
+    assert ui._pick(rows[:10]) == rows[:10]
+
+
 def test_inspect_without_screenshot_still_lists(monkeypatch):
     win = winapi.Window(1, 1, "Küçük", "x.exe")
 

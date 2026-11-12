@@ -321,7 +321,12 @@ A = v0.0.2 (eski prompt, 21 araç; ayrı git worktree'de), B = v0.0.4 (kısa pro
     "özel" işaretleniyor ve yalnızca yerel modele gönderiliyor. API profili yerine metin listesini ve bir not
     alıyor. Modelin kendi yazdığı sayfaların görüntüleri (`view_page`) özel değil.
   - Görüntü `inspect`'in bir eksiğini de gösterdi: ağaç sırasıyla 80 öğede durduğu için Gezgin'de araç çubuğu
-    (New, Sort, View) numara almıyor. Henüz düzeltilmedi.
+    (New, Sort, View) numara almıyordu. v0.0.18'den beri 300 öğeye kadar topluyor ve 80'ini numaralıyor:
+    - önce düğmeler, menüler, sekmeler ve alanlar;
+    - liste/ağaç satırlarına en az 40 yer, kalan boşluğu da onlar dolduruyor;
+    - ağaç sırası korunuyor.
+
+    Numara almayan öğeler yine adla hedeflenebiliyor; adla arama toplanan öğelerin hepsine bakıyor.
   - Pencere işleri doğası gereği çok adım istiyor (bak → tıkla → tekrar bak). Bir turda `windows_ui`
     kullanılınca o turun adım sınırı 15'ten 30'a çıkıyor (`ui_max_steps`). Diğer turlar 15'te kalıyor: sınırın
     görevi kısır döngüye giren modeli durdurmak.

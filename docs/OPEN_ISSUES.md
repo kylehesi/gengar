@@ -189,9 +189,16 @@ buttons in the screenshot but cannot click them by number, and a name lookup re-
 collect more (e.g. 200) and list the most useful first: toolbars, menus, tabs and buttons before list rows, or
 collapse long runs of list items. Watch the token cost (~15 tokens per row).
 
+**Fixed (v0.0.18).** Up to 300 controls are collected and 80 are numbered, the same token cost as before.
+Buttons, menus, tabs and fields come first; list and tree rows keep at least 40 places and fill the rest. Tree
+order is kept. A name lookup searches all collected controls, so a row without a number can still be clicked by
+name.
+
 ## 12. Small items
 
-- `cls` / `clear` typed without a slash should clear the screen in the REPL (users type them out of habit).
+- ~~`cls` / `clear` typed without a slash should clear the screen in the REPL (users type them out of habit).~~
+  **Fixed (v0.0.18):** `cls`, `clear` and `/cls` clear the screen, and the chat goes on. `exit` and `quit`
+  without a slash quit.
 - Orphaned child processes: see issue 6 (Job Object).
 - Trying a separate code model (proposed in v0.0.10): needs a download (ask first) and a night run; only worth it
   if the real-requests set shows that code/web tasks stay weak with the screenshots.

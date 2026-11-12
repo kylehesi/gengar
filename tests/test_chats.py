@@ -66,6 +66,19 @@ def make_repl(steps, tmp_path, store):
     return Repl(load_settings(), agent, out=out, read=lambda _: "", chats=store), out
 
 
+def test_bare_cls_clears_screen_not_chat(tmp_path):
+    from gengar.ui.repl import CLEAR_SCREEN
+
+    lines = iter(["Selam", "cls", "clear", "exit"])
+    store = ChatStore(tmp_path / "chats")
+    repl, out = make_repl([("Merhaba!", [])], tmp_path, store)
+    repl.read = lambda _: next(lines)
+    assert repl.run() == 0                           # "exit" çıkar, modele soru olarak gitmez
+    assert out.getvalue().count(CLEAR_SCREEN) == 2   # cls ve clear ekranı temizler
+    assert repl.agent.conversation.history[-1]["content"].strip() == "Merhaba!"  # sohbet duruyor
+    assert len(store.all()) == 1
+
+
 def test_repl_saves_every_turn_and_reopens(tmp_path):
     store = ChatStore(tmp_path / "chats")
     repl, out = make_repl([("Merhaba!", []), ("Yeni sohbet.", []), ("Hatırlıyorum: elma.", [])], tmp_path, store)
