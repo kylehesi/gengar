@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.21](#0021---2026-11-12) | 2026-11-12 | Open issues: survey of the public datasets for the training mix (exact sets, licences, sizes, proposed samples); nothing downloaded |
 | [0.0.20](#0020---2026-11-12) | 2026-11-12 | BFCL subset harness: general tool calling and forgetting, measured before and after training |
 | [0.0.19](#0019---2026-11-12) | 2026-11-12 | Child processes of `run_python` and `run_powershell` end when Gengar ends (Windows Job Object) |
 | [0.0.18](#0018---2026-11-12) | 2026-11-12 | `inspect` numbers toolbars before long lists; `cls`/`clear` clear the screen |
@@ -26,6 +27,23 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.21] - 2026-11-12
+
+### Changed
+- Open issue 9 (public data in the training mix) now holds a survey taken from the Hugging Face API. Nothing
+  was downloaded. For each dataset it lists:
+  - the exact name, licence, size and format;
+  - a proposed sample and how to get it.
+
+  Without Aya the downloads come to about 200 MB. Toucan is sampled through the row API instead of downloading
+  its 21.8 GB. Nemotron-Agentic (5.8 GB, no row API) is skipped for now. The Turkish part of Aya is gated and
+  needs the user's Hugging Face login.
+- Two steps were added to the plan: a BFCL leak check of the training questions before training, and a
+  proposed ratio of about 30 % public data.
+
+### Notes
+- No code changes. Waiting for the user's approval before any download.
 
 ## [0.0.20] - 2026-11-12
 

@@ -216,6 +216,32 @@ Açık sorular:
 - her veri setinin bizim sohbet şablonumuza ve araç biçimimize çevrilmesi;
 - Kaggle'daki token uzunluğu sınırı (5. madde: `MAX_LEN`).
 
+**Ön inceleme (2026-11-12, hiçbir şey indirilmedi).** Kesin veri setleri, lisansları ve boyutları Hugging Face
+arayüzünden alındı. Her biri için bir örneklem önerildi. Herhangi bir indirmeden önce kullanıcının onayı
+bekleniyor.
+
+| Veri seti (Hugging Face) | Lisans | Boyut | Biçim | Önerilen örneklem | Nasıl |
+|---|---|---|---|---|---|
+| `Agent-Ark/Toucan-1.5M`, config `SFT` | Apache-2.0 | 119 bin satır (tüm set 21,8 GB) | `messages` + `tools` (OpenAI biçimi) | 2.000 | satır arayüzü, tamamı indirilmeden (~40 MB) |
+| `nvidia/Nemotron-Agentic-v1` | CC-BY-4.0 | 5,8 GB (2 JSONL dosyası, satır arayüzü yok) | messages | şimdilik atla | çok adımlı kullanımı Toucan karşılıyor |
+| `nvidia/When2Call`, `train_sft` | CC-BY-4.0 | 15 bin satır, 12,5 MB | `tools` (BFCL gibi Python tip adları) + `messages` | 1.500 | tamamı indirilir |
+| `MadeAgents/xlam-irrelevance-7.5k` | CC-BY-4.0 | 7,5 bin satır, 2,6 MB | `query`, `tools` (düz parametre sözlüğü), `answers` = [] | 1.000 | tamamı indirilir |
+| `atasoglu/turkish-function-calling-20k` | MIT | 22 bin satır, 11,7 MB | `tools` (OpenAI biçimi), `query`, `answers` | 1.500 | tamamı indirilir |
+| `bilalabic/turkish-tool-calling`, config `default` | CC-BY-4.0 | 56 bin satır, ~43 MB | `messages` + `tools`; xLAM'ın Türkçe çevirisi | 1.000 | tamamı indirilir |
+| `CohereLabs/aya_dataset`, Türkçe satırlar | Apache-2.0 | toplam 204 bin satır, 138 MB | `inputs`, `targets`, `language` | ~1.000 | **gated**: Hugging Face girişi ve şartların kabulü gerekiyor (kullanıcı) |
+| `bigcode/self-oss-instruct-sc2-exec-filter-50k` | ODC-By | 51 bin satır, 90 MB | `instruction`, `response` | 500 | tamamı indirilir |
+
+- **Toplam indirme:** Aya hariç yaklaşık 200 MB.
+- **Dönüştürme:** Her set bizim sohbet şablonumuza ve Gengar biçiminde araç çağrılarına çevrilmeli.
+  - When2Call Python tip adları kullanıyor (`dict`, `str`, `int`): `evals/bfcl.py`'deki `to_schema` ile aynı
+    çeviri.
+  - xLAM düz bir parametre sözlüğü kullanıyor; JSON Schema'ya çevrilmeli.
+- **Eğitimden önce BFCL sızıntı kontrolü:** irrelevance ve When2Call soruları BFCL'inkilere tür olarak yakın.
+  Her eğitim sorusu 260 BFCL sorusuyla karşılaştırılmalı (birebir ve yakın eşleşme), eşleşenler atılmalı.
+  Yoksa "sonra" sayısı şişer.
+- **Oran (öneri):** Hazır veri eğitim setinin yaklaşık %30'u. Genel becerileri korumaya yetecek kadar, Gengar'ın
+  kendi davranışını sulandırmayacak kadar. BFCL'de önce/sonra ile kontrol edilecek.
+
 ## 10. Kaggle eğitimini yeniden koşmak
 
 Son tam koşu, GPU 1'de bellek yetmediği için 168 adımın 45.'sinde durdu (2026-10-20). Not defteri sonradan

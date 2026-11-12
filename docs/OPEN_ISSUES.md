@@ -186,6 +186,31 @@ Avoid non-commercial licences (APIGen-MT, xLAM-2 models). Each download needs th
 Open questions: the mix ratio (own data vs public), converting each dataset to our chat template and tool format,
 and the token length limit on Kaggle (issue 5: `MAX_LEN`).
 
+**Survey (2026-11-12, nothing downloaded).** Exact datasets, licences and sizes from the Hugging Face API, with a
+proposed sample per dataset. Waiting for the user's approval before any download.
+
+| Dataset (Hugging Face) | Licence | Size | Format | Proposed sample | How |
+|---|---|---|---|---|---|
+| `Agent-Ark/Toucan-1.5M`, config `SFT` | Apache-2.0 | 119k rows (whole set 21.8 GB) | `messages` + `tools` (OpenAI style) | 2,000 | rows API, no full download (~40 MB) |
+| `nvidia/Nemotron-Agentic-v1` | CC-BY-4.0 | 5.8 GB (2 JSONL files, no row API) | messages | skip for now | Toucan covers multi-step use |
+| `nvidia/When2Call`, `train_sft` | CC-BY-4.0 | 15k rows, 12.5 MB | `tools` (BFCL-like Python types) + `messages` | 1,500 | full download |
+| `MadeAgents/xlam-irrelevance-7.5k` | CC-BY-4.0 | 7.5k rows, 2.6 MB | `query`, `tools` (flat parameter dict), `answers` = [] | 1,000 | full download |
+| `atasoglu/turkish-function-calling-20k` | MIT | 22k rows, 11.7 MB | `tools` (OpenAI style), `query`, `answers` | 1,500 | full download |
+| `bilalabic/turkish-tool-calling`, config `default` | CC-BY-4.0 | 56k rows, ~43 MB | `messages` + `tools`; Turkish translation of xLAM | 1,000 | full download |
+| `CohereLabs/aya_dataset`, Turkish rows | Apache-2.0 | 204k rows in all, 138 MB | `inputs`, `targets`, `language` | ~1,000 | **gated**: needs a Hugging Face login and accepting the terms (the user) |
+| `bigcode/self-oss-instruct-sc2-exec-filter-50k` | ODC-By | 51k rows, 90 MB | `instruction`, `response` | 500 | full download |
+
+- **Total download** without Aya: about 200 MB.
+- **Conversion:** every set must become our chat template with Gengar-style tool calls:
+  - When2Call uses Python type names (`dict`, `str`, `int`): the same conversion as `evals/bfcl.py`
+    `to_schema`.
+  - xLAM uses a flat parameter dict, which must be turned into a JSON Schema.
+- **BFCL leak check before training:** the irrelevance and When2Call questions are close in kind to BFCL's.
+  Every training question must be compared with the 260 BFCL questions (exact and near match), and matches
+  dropped. Otherwise the "after" number would be inflated.
+- **Ratio (proposal):** public data about 30 % of the training set. Enough to keep general skills, not so much
+  that Gengar's own behaviour is diluted. To be checked with BFCL before and after.
+
 ## 10. Kaggle training rerun
 
 The last full run ran out of GPU memory on GPU 1 at step 45/168 (2026-10-20). The notebook was changed afterwards
