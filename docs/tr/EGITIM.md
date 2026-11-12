@@ -31,8 +31,12 @@ uv run python evals\export_sft.py "data\trajectories\gen_*seed5000*.jsonl" --out
   üretimindeki gibi öğretmen yazıyor.
 - `bfcl_leaks()`, BFCL alt kümesiyle (`evals/bfcl.py`) aynı ya da çok yakın eğitim sorularını buluyor. Bunlar
   eğitimden önce atılmalı; yoksa "sonra" sayısı şişer.
-- Veri setleri, lisanslar, boyutlar ve önerilen örneklemler [INCELENECEK 9](INCELENECEK.md)'da. İndirmeler
-  kullanıcının onayını bekliyor.
+- Veri setleri, lisanslar, boyutlar ve önerilen örneklemler [INCELENECEK 9](INCELENECEK.md)'da.
+- [`training/fetch_public.py`](../../training/fetch_public.py), ham satırları (2026-11-12'de onaylandı) satır
+  arayüzünden, istek başına 100 satır olarak `data/public/<anahtar>.jsonl`'a indiriyor. Toucan (119 binden
+  4.000), Türkçe xLAM çevirisi (5.000) ve self-oss-instruct (2.000) için her şeyi indirmek yerine sayfalar
+  sabit tohumla seçiliyor. Yarıda kalırsa yeniden çalıştırılır: biten setler atlanır, yarım kalan devam eder.
+  Hiçbir şeyi dönüştürmez.
 
 ## 3. Kaggle'da eğitim
 1. kaggle.com → Datasets → **New Dataset** → `data\sft` içindeki iki `.jsonl` dosyasını yükleyin

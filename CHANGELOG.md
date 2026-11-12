@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.24](#0024---2026-11-12) | 2026-11-12 | Download script for the public datasets (raw rows only); the second real-requests run paused at 32/69 to free the GPU |
 | [0.0.23](#0023---2026-11-12) | 2026-11-12 | Converters from seven public datasets to the training format, and a BFCL leak check |
 | [0.0.22](#0022---2026-11-12) | 2026-11-12 | The "announced but did not do it" nudge no longer misses answers that end with an emoji |
 | [0.0.21](#0021---2026-11-12) | 2026-11-12 | Open issues: survey of the public datasets for the training mix (exact sets, licences, sizes, proposed samples); nothing downloaded |
@@ -29,6 +30,26 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.24] - 2026-11-12
+
+### Added
+- **[`training/fetch_public.py`](training/fetch_public.py)** downloads raw rows of the public datasets into
+  `data/public/` (git-ignored). The user approved the download on 2026-11-12.
+  - It uses the Hugging Face row API (100 rows per request), so no parquet library is needed.
+  - Toucan (4,000 of 119k rows), the Turkish xLAM translation (5,000 of 56k) and self-oss-instruct (2,000)
+    are sampled by pages with a fixed seed. When2Call (`train_sft`), xLAM-irrelevance and the Turkish
+    function-calling set are taken whole.
+  - The pools are larger than the proposed samples, so rows dropped in conversion or by the BFCL leak check
+    can be replaced.
+  - It retries with back-off, resumes a half-done set and skips finished ones.
+  - It converts nothing; that is `public_mix.py`'s job.
+  - Aya is skipped: it is gated and needs the user's Hugging Face login.
+
+### Notes
+- The second real-requests run (v0.0.17 code) was stopped at 32 of 69 runs (repeat 1 complete, 9 tasks of
+  repeat 2), because the user needed the GPU. It can continue later with
+  `--resume data/trajectories/20261112_164035_all_local35_v0017_real.jsonl`.
 
 ## [0.0.23] - 2026-11-12
 

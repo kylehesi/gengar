@@ -31,8 +31,12 @@ tool-calling sets, the Turkish part of Aya, and self-oss-instruct.
   no-tool answer, as in data generation.
 - `bfcl_leaks()` finds training questions that are the same as, or very close to, the BFCL subset
   (`evals/bfcl.py`). Drop them before training, or the "after" number is inflated.
-- The datasets, licences, sizes and proposed samples are in [OPEN_ISSUES 9](../docs/OPEN_ISSUES.md). Downloads
-  wait for the user's approval.
+- The datasets, licences, sizes and proposed samples are in [OPEN_ISSUES 9](../docs/OPEN_ISSUES.md).
+- [`training/fetch_public.py`](fetch_public.py) downloads the raw rows (approved 2026-11-12) into
+  `data/public/<key>.jsonl` through the row API, 100 rows per request. For Toucan (4,000 of 119k rows), the
+  Turkish xLAM translation (5,000) and self-oss-instruct (2,000), pages are chosen with a fixed seed instead of
+  downloading everything. If interrupted, run it again: finished sets are skipped and a half-done one continues.
+  It does not convert anything.
 
 ## 3. Training on Kaggle
 1. kaggle.com → Datasets → **New Dataset** → upload the two `.jsonl` files from `data\sft` (e.g. `gengar-sft`).
