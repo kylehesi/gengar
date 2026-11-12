@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "evals"))
 
 from families import real  # noqa: E402
-from framework import build_tasks  # noqa: E402
+from framework import apply_tool_limit, build_tasks  # noqa: E402
 from gengar.tools import winapi  # noqa: E402
 
 
@@ -116,21 +116,24 @@ def test_split_months(tmp_path):
     assert t.check("")[0]
 
 
-def test_recreate_english_needs_recycle_bin(tmp_path, monkeypatch):
+def test_recreate_english_needs_delete_files(tmp_path):
     t = task("real_recreate_english", tmp_path)
     old = t.root / "Aylara Göre Düzenlenmiş Dosyalar"
     shutil.rmtree(old)
     for i, m in enumerate(real.EN_MONTHS, 1):
         (t.root / "Files by Month" / f"{i:02d} {m.title()}").mkdir(parents=True)
-    monkeypatch.setattr(real, "in_recycle_bin", lambda p: False)
-    assert "kalıcı" in t.check("")[1]
-    monkeypatch.setattr(real, "in_recycle_bin", lambda p: p == old)
-    assert t.check("")[0]
+    ok, note = t.check("")
+    assert ok
+    # Geri alınabilir silme şartı: Remove-Item ile kalıcı silmek başarısız, delete_files ile başarılı.
+    # (Kutuya bakılamaz: Gengar ölçüm klasörlerinde sileni kalıcı siler.)
+    assert not apply_tool_limit(t, ok, note, ["run_powershell"], ["run_powershell"])[0]
+    assert apply_tool_limit(t, ok, note, ["delete_files", "run_python"], ["delete_files", "run_python"])[0]
+    assert not apply_tool_limit(t, ok, note, ["delete_files"], [])[0]  # delete_files hata verdiyse sayılmaz
 
 
-def test_delete_turkish(tmp_path, monkeypatch):
+def test_delete_turkish(tmp_path):
     t = task("real_delete_turkish", tmp_path)
-    monkeypatch.setattr(real, "in_recycle_bin", lambda p: True)
+    assert t.require_tools == ("delete_files",)
     assert not t.check("")[0]
     year = t.root / "çalışma programı" / "2026"
     shutil.rmtree(year / "Kasım")

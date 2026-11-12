@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.15](#0015---2026-11-12) | 2026-11-12 | Benchmark fixes from the first real-requests run: deletion checks no longer need the Recycle Bin; the task-folder approval rule understands every way a path is written |
 | [0.0.14](#0014---2026-11-11) | 2026-11-11 | Benchmark: `--repeat` no longer crashes between repeats (memory databases are closed); `--resume` continues a broken run |
 | [0.0.13](#0013---2026-11-11) | 2026-11-11 | Open issues: plan items that slipped (BFCL, public data mix, Kaggle rerun, before/after measurement, 80-control limit) |
 | [0.0.12](#0012---2026-11-07) | 2026-11-07 | Eyes for window work: `windows_ui inspect` returns a screenshot with each control's number drawn on it; window screenshots go to local models only |
@@ -20,6 +21,46 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.15] - 2026-11-12
+
+### Highlights
+- **First real-requests run (2026-11-11): 26/69 (38%), dev 10/33, test 16/36.** Reading every dev failure
+  sorted them into model skill gaps, Gengar bugs (fixed in the next versions) and two **measurement bugs**,
+  fixed here. Both made correct work fail, so the dev score was lower than the model's real result.
+
+### Fixed
+- `real_delete_turkish` and `real_recreate_english` could never pass. Their checks required the deleted
+  folders to be in the Recycle Bin, but `delete_files` deletes task folders under `data/bench2` permanently,
+  so benchmarks do not fill the bin. Two correct runs failed this way. The checks now require that
+  `delete_files` succeeded (`require_tools`); in the user's own folders that tool always uses the Recycle Bin.
+  Deleting with `Remove-Item` still fails.
+- The `task_only` approval rule denied actions inside the task folder (6 runs). It looked for
+  `<task folder>\` in the approval text, so it denied:
+  - the task folder itself (`New-Item … real_hello_vscode_0`);
+  - paths in Python source written with double backslashes (`"C:\\gengar\\…"`);
+  - a folder kept in a variable and used later (`"$parent\X"`).
+
+  After one denial Gengar refuses the rest of the request, so a single wrong denial ended the run. The new
+  rule, `inside_task`, requires every absolute path in the approval text to be the task folder or inside it.
+  URLs are removed first (`https://fonts…` looked like the drive path `s:\fonts`). A drive letter must follow
+  a separator, so escapes in code (`"Plan:\n"`, `"İ:\n"`) are not paths. Paths next to the folder
+  (`…\task_0.txt`), `..` and home-folder references (`$env:USERPROFILE`, `expanduser`, `~\`) are denied.
+  Replaying all 302 tool calls of the run, 30 decisions changed, all from "no" to "yes", all inside the task
+  folder; none changed the other way.
+- `real_hello_vscode` asks for writing live in VS Code, but its approval denied `windows_ui`, so the model
+  could not focus or type into the editor. `task_apps` now also allows `windows_ui` in VS Code windows (and
+  the last-used window), and nowhere else.
+
+### Changed
+- Result files of the real-requests set (`evals/results/*_real_*.json`) no longer store the model's answers.
+  The answers can repeat the user's own words, and result files go into the public repository. Full answers
+  stay in the local trajectory (`data/trajectories`, git-ignored). The first run's result file was stored
+  this way.
+
+### Added
+- Tests for `inside_task` (16 cases) and the `task_apps` window rule; the deletion tests check
+  `require_tools` instead of the Recycle Bin.
 
 ## [0.0.14] - 2026-11-11
 

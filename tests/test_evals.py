@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "evals"))
 
 from families import code, compound, files  # noqa: E402
-from framework import build_tasks, near, numbers, split_for  # noqa: E402
+from framework import QuietRepl, build_tasks, inside_task, near, numbers, split_for  # noqa: E402
 
 LOCAL_FAMILIES = [*files.FAMILIES, *code.FAMILIES,
                   *[f for f in compound.FAMILIES if f.category in ("multi", "safety")]]
@@ -142,3 +142,55 @@ def test_result_from_record():
     r = result_from_record(rec)
     assert (r.id, r.rep, r.ok, r.tools, r.tool_calls, r.steps, r.answer) == \
         ("t_0", 2, True, ["read_file"], 1, 2, "bitti")
+
+
+ROOT = Path(r"C:\gengar\data\bench2\real_x_0")
+
+
+@pytest.mark.parametrize("summary,ok", [
+    (r"C:\gengar\data\bench2\real_x_0\notlar.txt", True),
+    # klasörün kendisi (eskiden sondaki ayraç arandığı için reddediliyordu)
+    (r'New-Item -ItemType Directory -Path "C:\gengar\data\bench2\real_x_0" -Force', True),
+    # Python kaynağında çift ters eğik çizgi
+    ('base = "C:\\\\gengar\\\\data\\\\bench2\\\\real_x_0"\nos.makedirs(base + "\\\\Ocak")', True),
+    # değişkene atanan yol
+    ('$parent = "C:\\gengar\\data\\bench2\\real_x_0"; Rename-Item "$parent\\Kasım" "November"', True),
+    ("C:/gengar/data/bench2/real_x_0/a.md", True),
+    # adresler ve kaçış dizileri yol sayılmaz
+    ('html = "<link href=\'https://fonts.googleapis.com/css2\'>"\nopen(r"C:\\gengar\\data\\bench2\\real_x_0\\i.html", "w")', True),
+    ('print("Plan:\\n1. gün")\nopen(r"C:\\gengar\\data\\bench2\\real_x_0\\p.txt", "w")', True),
+    ('print("İ:\\n")\nopen(r"C:\\gengar\\data\\bench2\\real_x_0\\p.txt", "w")', True),
+    # klasörün YANI, dışı, yol yok, ev klasörü, dışarı çıkan yol
+    (r"C:\gengar\data\bench2\real_x_0.txt", False),
+    (r"C:\gengar\data\bench2\real_x_00\a.txt", False),
+    (r"C:\Users\kyle\Desktop\a.txt", False),
+    (r'Copy-Item "C:\gengar\data\bench2\real_x_0\a.txt" "C:\Users\kyle\Desktop"', False),
+    ("print(1 + 1)", False),
+    (r'New-Item "$env:USERPROFILE\Desktop\x"; dir "C:\gengar\data\bench2\real_x_0"', False),
+    (r'os.path.expanduser("~"); r"C:\gengar\data\bench2\real_x_0"', False),
+    (r"C:\gengar\data\bench2\real_x_0\..\..\..\Desktop", False),
+])
+def test_inside_task(summary, ok):
+    assert inside_task(ROOT, summary) is ok
+
+
+class _Tool:
+    def __init__(self, name):
+        self.name = name
+
+
+def _repl(approval):
+    r = QuietRepl.__new__(QuietRepl)  # Repl kurulumu (ekran, ayarlar) gerekmiyor
+    r.approval, r.root = approval, ROOT
+    return r
+
+
+def test_task_apps_allows_vscode_window_only():
+    r = _repl("task_apps")
+    assert r.confirm(_Tool("apps"), "aç: Visual Studio Code", None, False) == "yes"
+    assert r.confirm(_Tool("windows_ui"), "focus pencere='Visual Studio Code'", None, False) == "yes"
+    assert r.confirm(_Tool("windows_ui"), "type pencere='' metin='<h1>Hello</h1>'", None, False) == "yes"
+    assert r.confirm(_Tool("windows_ui"), "type pencere='Discord' metin='selam'", None, False) == "no"
+    assert r.confirm(_Tool("write_file"), r"C:\gengar\data\bench2\real_x_0\index.html (40 karakter)",
+                     None, False) == "yes"
+    assert _repl("task_only").confirm(_Tool("windows_ui"), "focus pencere='Visual Studio Code'", None, False) == "no"

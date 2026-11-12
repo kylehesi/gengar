@@ -779,7 +779,7 @@ turns 24 of the user's real October requests into tasks
 | Group | Tasks | Example check |
 |---|---|---|
 | Apps | 5 | a VS Code window opened **during** the task (`AppWatch`); a browser opened without a question |
-| Folders | 7 | a misspelled setting changed in the user's config file, the game's default file untouched; Turkish month folders renamed, not recreated (a marker file must survive); deleted folders are in the Recycle Bin |
+| Folders | 7 | a misspelled setting changed in the user's config file, the game's default file untouched; Turkish month folders renamed, not recreated (a marker file must survive); folders deleted with `delete_files` (the undoable delete) |
 | Saving | 2 | a 4-turn chat: the file is numbered 1…N without restarting ("continue from 16") |
 | Information | 5 | "estoya" in a follow-up is understood as Estonia; a harmful request is refused without tools |
 | Ideas | 2 | the third answer does not repeat the ideas of the first two and is split into categories |
@@ -790,7 +790,13 @@ turns 24 of the user's real October requests into tasks
 - **Nothing real is touched.**
   - "Desktop" becomes the task folder.
   - Writing tasks use `task_only` approval: a write outside the task folder is denied, so the config task
-    cannot change the real game config.
+    cannot change the real game config. The rule (`inside_task`) requires **every** absolute path in the
+    approval text to be the task folder or inside it. Paths written as `C:\\gengar\\…` in Python source,
+    the task folder itself, and a folder kept in a variable (`"$parent\X"`) count as inside. A path next to
+    the folder (`…\task_0.txt`), `..`, and home-folder references (`$env:USERPROFILE`, `expanduser`) do not.
+    URLs are removed first, so `https://fonts…` is not read as a drive path.
+  - `real_hello_vscode` asks for writing live in VS Code, so its `task_apps` approval also allows
+    `windows_ui` in VS Code windows, and only there.
   - App tasks only look at windows opened during the task and close only those.
   - The task that launches the real game (`real_cs2_launch`) runs only when asked for by name.
 - **Three repeats:** in one run about 15% of tasks flip by chance; with 24 tasks one flip moves the score 4 points.
@@ -802,6 +808,17 @@ turns 24 of the user's real October requests into tasks
   - to show which failures the training data must cover.
 - **The checks are tested without the model** (`tests/test_real_family.py`). These tests caught a measurement
   bug before the first run: on Windows `write_text` writes CRLF, so an untouched config file looked "changed".
+- **First run (2026-11-11, v0.0.12 code, 3 repeats): 26/69 (38%), dev 10/33.** Reading the dev failures found
+  two measurement bugs, fixed in v0.0.15:
+  - The deletion checks required the deleted folders to be in the Recycle Bin, but Gengar deletes task
+    folders under `data/bench2` permanently (so benchmarks do not fill the bin). Correct deletions failed
+    (2 runs). The checks now require that `delete_files` was used (`require_tools`); in the user's folders
+    that tool always uses the Recycle Bin.
+  - The old `task_only` rule looked for `<task folder>\` in the approval text. It denied the folder
+    itself, `C:\\gengar\\…` in Python and the VS Code window the task asks for (6 runs). After one denial
+    Gengar stops the rest of the request, so a single wrong denial ended the run. Replaying all 302 tool calls
+    of the run: 30 decisions changed, all from "no" to "yes", all inside the task folder; none changed the
+    other way.
 
 ---
 

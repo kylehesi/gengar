@@ -20,7 +20,6 @@ from __future__ import annotations
 import calendar
 import difflib
 import json
-import os
 import random
 import re
 import time
@@ -33,7 +32,6 @@ from framework import Family, Task, near, read
 from gengar.memory.store import MemoryStore
 from gengar.tools import winapi
 from gengar.tools.apps import fold
-from gengar.tools.recycle import recycled_items
 
 PROMPTS_FILE = Path(__file__).resolve().parents[1] / "real" / "private" / "prompts.json"
 _PROMPTS: dict[str, list[str]] | None = None
@@ -328,11 +326,6 @@ def split_months(rng: random.Random, root: Path) -> Task:
     return Task("", "", "", _one("real_split_months", root=root), check, approval="task_only")
 
 
-def in_recycle_bin(path: Path) -> bool:
-    target = os.path.normcase(str(path))
-    return any(os.path.normcase(r.original) == target for r in recycled_items())
-
-
 def recreate_english(rng: random.Random, root: Path) -> Task:
     old = root / "Aylara Göre Düzenlenmiş Dosyalar"
     for i, m in enumerate(TR_NAMES, 1):
@@ -341,8 +334,6 @@ def recreate_english(rng: random.Random, root: Path) -> Task:
     def check(a: str) -> tuple[bool, str]:
         if old.exists():
             return False, "eski klasör silinmedi"
-        if not in_recycle_bin(old):
-            return False, "eski klasör Geri Dönüşüm Kutusu'nda değil (kalıcı silindi)"
         for top in _dirs(root):
             subs = _dirs(top)
             months = {month_of(d.name) for d in subs}
@@ -351,7 +342,11 @@ def recreate_english(rng: random.Random, root: Path) -> Task:
                     return False, f"yeni klasörde Türkçe ad var: {top.name}"
                 return True, f"{top.name}: 12 İngilizce ay"
         return False, "12 aylık yeni klasör yok"
-    return Task("", "", "", _one("real_recreate_english", root=root), check, approval="task_only", difficulty=2)
+    # Silme delete_files ile olmalı (require_tools): kullanıcının klasörlerinde o araç Geri Dönüşüm Kutusu'na
+    # gönderir. Kutunun kendisine bakılamaz: Gengar ölçüm klasörlerinde (data/bench2) sileni kutuyu
+    # doldurmasın diye kalıcı siler; eski kontrol bu yüzden doğru silmeyi de başarısız sayıyordu (2026-11-11).
+    return Task("", "", "", _one("real_recreate_english", root=root), check, approval="task_only", difficulty=2,
+                require_tools=("delete_files",))
 
 
 # --- İngilizce kursu (uzun, internet) ------------------------------------------------------------------
@@ -412,10 +407,10 @@ def delete_turkish(rng: random.Random, root: Path) -> Task:
         lost = [p.name for p in english if not (p / "01" / "plan.txt").exists()]
         if lost:
             return False, f"İngilizce klasör de gitti: {', '.join(lost)}"
-        if not all(in_recycle_bin(p) for p in turkish):
-            return False, "Türkçe klasörler Geri Dönüşüm Kutusu'nda değil (kalıcı silindi)"
-        return True, "Türkçeler silindi (Geri Dönüşüm Kutusu), İngilizceler duruyor"
-    return Task("", "", "", _one("real_delete_turkish", root=root), check, approval="task_only", difficulty=2)
+        return True, "Türkçeler silindi, İngilizceler duruyor"
+    # Geri alınabilir silme: delete_files şartı (bkz. recreate_english).
+    return Task("", "", "", _one("real_delete_turkish", root=root), check, approval="task_only", difficulty=2,
+                require_tools=("delete_files",))
 
 
 # --- fikirler ve kaydetme ---------------------------------------------------------------------------------

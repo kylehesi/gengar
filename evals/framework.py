@@ -36,6 +36,45 @@ BENCH_ROOT = PROJECT_ROOT / "data" / "bench2"
 TRAJ_ROOT = PROJECT_ROOT / "data" / "trajectories"
 RESULTS = PROJECT_ROOT / "evals" / "results"
 
+# Onay özetindeki mutlak Windows yolları (boşlukta, tırnakta, ayraçta biter).
+# Önünde metnin başı ya da bir ayraç olmalı: kodda "Plan:\n1." ya da "İ:\n" (küçültülünce i + birleşik nokta)
+# gibi kaçış dizileri yol sanılmasın.
+_ABS_PATH = re.compile(r"(?<![^\s\"'=(\[{,;|>`@])[a-z]:\\[^\"'\s;,|()<>`*?]*")
+_URL = re.compile(r"[a-z][a-z0-9+.-]*://\S+")
+# Yolu açıkça yazmadan kullanıcının klasörlerine ulaşan yazımlar (görev klasörü dışı sayılır).
+_HOME_REF = re.compile(r"\$env:|%[a-z_]+%|expanduser|path\.home|getenv|environ|~[\\]")
+
+
+def inside_task(root: Path | None, summary: str) -> bool:
+    """Onay özetindeki eylem yalnızca görev klasörüne mi dokunuyor?
+
+    Özetteki BÜTÜN mutlak yollar görev klasörü ya da içi olmalı. Kabul edilenler:
+    - Klasörün kendisi ("New-Item ...\\gorev_0"): eskiden sondaki ayraç arandığı için reddediliyordu.
+    - Python kaynağındaki çift ters eğik çizgi ("C:\\\\gengar\\\\..."): teke indirilir.
+    - Değişkene atanıp sonra kullanılan yol ("$parent = '...\\gorev_0'; ... \"$parent\\X\"").
+    Reddedilenler: hiç yol yoksa, görev klasörünün yanına yazılan "…\\gorev_0.txt", ev klasörüne
+    değişkenle ulaşan yazımlar ($env:USERPROFILE, expanduser, ~\\).
+    2026-11-11 gerçek istekler ölçümünde görev klasörü içindeki 5 eylem eski kuralla reddedildi; Gengar bir
+    retten sonra o isteğin geri kalanını durdurduğu için bu tek ret bütün koşuyu bitiriyordu.
+    """
+    if root is None:
+        return False
+    r = str(root).lower().replace("/", "\\").rstrip("\\")
+    s = _URL.sub(" ", summary.lower())  # "https://fonts..." ayraç çevrilince "s:\fonts" yolu gibi görünüyordu
+    s = re.sub(r"\\{2,}", r"\\", s.replace("/", "\\"))
+    if _HOME_REF.search(s):
+        return False
+    if "\\.." in s:  # "…\gorev_0\..\..\Desktop": klasörden dışarı çıkan yol
+        return False
+    paths = [p.rstrip(".") for p in _ABS_PATH.findall(s)]
+    return bool(paths) and all(p.rstrip("\\") == r or p.startswith(r + "\\") for p in paths)
+
+
+# task_apps görevlerinde (VS Code'da canlı yazma) pencere işlemlerine izin verilen pencereler. Boş pencere
+# adı "son kullanılan pencere" demek; görevde o da VS Code'dur.
+TASK_WINDOWS = ("code", "visual studio")
+
+
 DANGEROUS = re.compile(r"delete_files|Remove-Item|\brm\b|\bdel\b|rmdir|Format-Volume|Stop-|shutdown|Restart-|\breg\b|"
                        r"Set-ItemProperty|Uninstall|Clear-|apps.*kapat|winget", re.IGNORECASE)
 
@@ -226,13 +265,16 @@ class QuietRepl(Repl):
             return "yes"  # görev klasörüyle sınırlı silme vb.
         if self.approval == "task_apps" and tool.name == "apps" and summary.startswith("aç"):
             return "yes"  # uygulama açmaya izin; geri kalan her şey task_only gibi
+        if self.approval == "task_apps" and tool.name == "windows_ui":
+            # Görev "VS Code'da canlı yaz" diyor: o pencerede çalışmaya izin, başka pencerelere değil
+            # (ölçüm kullanıcının gerçek masaüstünde koşuyor).
+            window = re.search(r"pencere='([^']*)'", summary)
+            name = (window.group(1) if window else "").lower()
+            return "yes" if not name or any(w in name for w in TASK_WINDOWS) else "no"
         if self.approval in ("task_only", "task_apps"):
             # Yalnızca görev klasörü içindeki eylemler: model kullanıcının klasörlerine (Masaüstü, Belgeler)
             # yazamasın (2026-10-20: save_answer_md ölçümünde iki kez istenmeden yazdı).
-            # Ayraçla birlikte: "…\gorev.md" (klasörün YANI) "…\gorev" metnini içerir ama içeride değildir.
-            root = str(self.root).lower().replace("/", "\\").rstrip("\\") + "\\" if self.root else None
-            inside = root and root in summary.lower().replace("/", "\\")
-            return "yes" if inside else "no"
+            return "yes" if inside_task(self.root, summary) else "no"
         return "no" if DANGEROUS.search(f"{tool.name} {summary}") else "yes"
 
     def on_delta(self, delta):
@@ -384,8 +426,13 @@ def summarize(results: list[Result], label: str) -> dict[str, Any]:
 def save_results(results: list[Result], label: str, meta: dict[str, Any]) -> Path:
     RESULTS.mkdir(parents=True, exist_ok=True)
     out = RESULTS / f"{datetime.now():%Y%m%d_%H%M%S}_{re.sub(r'[^A-Za-z0-9_.-]+', '_', label)}.json"
+    rows = [r.__dict__ for r in results]
+    if meta.get("suite") == "real":
+        # Gerçek istekler setinde cevaplar kullanıcının kendi cümlelerini tekrarlayabiliyor; sonuç dosyaları
+        # depoya giriyor (depo açık). Cevapların tamamı yerel dökümde (data/trajectories, gitignore) duruyor.
+        rows = [{**row, "answer": ""} for row in rows]
     out.write_text(json.dumps({**meta, "label": label, "passed": sum(r.ok for r in results),
                                "total": len(results), "seconds": round(sum(r.seconds for r in results), 1),
-                               "results": [r.__dict__ for r in results]}, ensure_ascii=False, indent=2),
+                               "results": rows}, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     return out

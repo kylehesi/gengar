@@ -30,5 +30,8 @@ the computer is not in use.
 
 - Tune on `dev` only; `test` is for reporting.
 - These trajectories are never training data.
-- Nothing outside the task folder is written: writing tasks use `task_only` approval. App tasks close only
-  the windows that opened during the task.
+- Nothing outside the task folder is written: writing tasks use `task_only` approval (every absolute path
+  in the approval text must be inside the task folder, see `inside_task`). App tasks close only the windows
+  that opened during the task; `real_hello_vscode` may also operate VS Code windows.
+- Deleting must use `delete_files` (the undoable delete). The Recycle Bin itself cannot be checked: Gengar
+  deletes task folders under `data/bench2` permanently.

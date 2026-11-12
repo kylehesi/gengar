@@ -807,7 +807,7 @@ ayındaki gerçek isteklerinden 24 görev kuruyor
 | Grup | Görev | Örnek kontrol |
 |---|---|---|
 | Uygulamalar | 5 | Görev **sırasında** bir VS Code penceresi açıldı mı (`AppWatch`); tarayıcı soru sormadan açıldı mı |
-| Klasörler | 7 | Yazım hatalı istenen ayar kullanıcı dosyasında değişti mi, oyunun varsayılan dosyası duruyor mu; Türkçe ay klasörleri yeniden adlandırıldı mı (yeniden oluşturulmadı: işaret dosyası kaybolmamalı); silinenler Geri Dönüşüm Kutusu'nda mı |
+| Klasörler | 7 | Yazım hatalı istenen ayar kullanıcı dosyasında değişti mi, oyunun varsayılan dosyası duruyor mu; Türkçe ay klasörleri yeniden adlandırıldı mı (yeniden oluşturulmadı: işaret dosyası kaybolmamalı); klasörler `delete_files` ile (geri alınabilir silme) silindi mi |
 | Kaydetme | 2 | 4 turlu sohbet: dosya 1…N kesintisiz numaralı ("16'dan devam et") |
 | Bilgi | 5 | Devam sorusundaki "estoya" Estonya olarak anlaşıldı mı; zararlı istek araçsız reddedildi mi |
 | Fikirler | 2 | Üçüncü cevap ilk ikisindeki fikirleri tekrar etmiyor ve kategorilere ayrılmış |
@@ -818,7 +818,17 @@ ayındaki gerçek isteklerinden 24 görev kuruyor
 - **Gerçek hiçbir şeye dokunulmuyor.**
   - "Masaüstü" yerine görev klasörü kullanılıyor.
   - Yazan görevler `task_only` onayıyla koşuyor; görev klasörü dışına yazma reddediliyor. Ayar görevi gerçek oyun
-    ayarını değiştiremez.
+    ayarını değiştiremez. Kural (`inside_task`) onay metnindeki **bütün** mutlak yolların görev klasörü ya da
+    içi olmasını istiyor. İçeride sayılanlar:
+    - Python kaynağında `C:\\gengar\\…` diye yazılan yollar;
+    - görev klasörünün kendisi;
+    - bir değişkende tutulan klasör (`"$parent\X"`).
+
+    İçeride sayılmayanlar: klasörün yanındaki yol (`…\gorev_0.txt`), `..`, ev klasörüne değişkenle ulaşan
+    yazımlar (`$env:USERPROFILE`, `expanduser`). Adresler önce çıkarılıyor; yoksa `https://fonts…` bir sürücü
+    yolu gibi okunuyordu.
+  - `real_hello_vscode` VS Code'da canlı yazmayı istiyor. Bu yüzden `task_apps` onayı `windows_ui`'a da izin
+    veriyor, ama yalnızca VS Code pencerelerinde.
   - Uygulama görevleri yalnızca görev sırasında açılan pencerelere bakıyor ve sadece onları kapatıyor.
   - Gerçek oyunu başlatan görev (`real_cs2_launch`) yalnızca adıyla istenirse çalışıyor.
 - **Üç tekrar:** Tek koşuda görevlerin ~%15'i rastlantıyla değişiyor. 24 görevde tek bir değişiklik 4 puan oynatır.
@@ -830,6 +840,17 @@ ayındaki gerçek isteklerinden 24 görev kuruyor
   - eğitim verisinin hangi hataları kapsaması gerektiğini göstermek.
 - **Kontroller model olmadan test ediliyor** (`tests/test_real_family.py`). Bu testler daha ilk koşudan önce bir
   ölçüm hatası yakaladı: Windows'ta `write_text` CRLF yazıyor, dokunulmamış ayar dosyası "değişmiş" görünüyordu.
+- **İlk koşu (2026-11-11, v0.0.12 kodu, 3 tekrar): 26/69 (%38), dev 10/33.** Dev hataları okunurken iki ölçüm
+  hatası bulundu (v0.0.15'te düzeltildi):
+  - Silme kontrolleri silinen klasörlerin Geri Dönüşüm Kutusu'nda olmasını istiyordu. Ama Gengar
+    `data/bench2` altındaki görev klasörlerinde sileni kalıcı siliyor (ölçümler kutuyu doldurmasın diye).
+    Doğru silmeler başarısız sayıldı (2 koşu). Kontroller artık `delete_files`'ın kullanılmasını istiyor
+    (`require_tools`); kullanıcının klasörlerinde o araç her zaman kutuyu kullanıyor.
+  - Eski `task_only` kuralı onay metninde `<görev klasörü>\` arıyordu. Klasörün kendisini, Python'daki
+    `C:\\gengar\\…` yazımını ve görevin istediği VS Code penceresini reddetti (6 koşu). Gengar bir retten sonra
+    isteğin geri kalanını durdurduğu için tek bir yanlış ret bütün koşuyu bitiriyordu. Koşunun 302 araç
+    çağrısının hepsi yeni kuralla yeniden değerlendirildi: 30 karar değişti. Hepsi "hayır"dan "evet"e ve hepsi
+    görev klasörünün içinde; ters yönde değişen yok.
 
 ---
 
