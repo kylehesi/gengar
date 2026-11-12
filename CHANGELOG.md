@@ -6,6 +6,7 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 
 | Version | Date | Summary |
 |---|---|---|
+| [0.0.22](#0022---2026-11-12) | 2026-11-12 | The "announced but did not do it" nudge no longer misses answers that end with an emoji |
 | [0.0.21](#0021---2026-11-12) | 2026-11-12 | Open issues: survey of the public datasets for the training mix (exact sets, licences, sizes, proposed samples); nothing downloaded |
 | [0.0.20](#0020---2026-11-12) | 2026-11-12 | BFCL subset harness: general tool calling and forgetting, measured before and after training |
 | [0.0.19](#0019---2026-11-12) | 2026-11-12 | Child processes of `run_python` and `run_powershell` end when Gengar ends (Windows Job Object) |
@@ -27,6 +28,21 @@ bigger milestone. Turkish design notes: [`docs/tr/MIMARI.md`](docs/tr/MIMARI.md)
 | [0.0.3](#003---2026-10-26) | 2026-10-26 | Fixed prompt prefix 4,611 → 3,685 tokens (−20%), measured with the model's own template |
 | [0.0.2](#002---2026-10-26) | 2026-10-26 | Thinking off by default; `auto` thinks only on the first step of hard requests and after a failure |
 | [0.0.1](#001---2026-10-12--2026-10-26) | 2026-10-12 – 2026-10-26 | First version: agent, 21 tools, safety layers, memory, benchmark, training pipeline |
+
+## [0.0.22] - 2026-11-12
+
+### Fixed
+- **The "do it now" nudge missed announcements that end with an emoji.** In the second real-requests run (dev
+  task `real_vscode_slang`, 3/3 in the first run) the model answered "Tamam kardeşim, VS Code'ı açıp Python
+  yapalım! 🐍💜" ("sure, let's open VS Code and do some Python") and called no tool. The detector checks only
+  the last sentence, and it took "🐍💜" to be that sentence. Parts without letters no longer count as
+  sentences.
+- Checked on the 1,630 distinct stopping answers in the recorded trajectories: 3 decisions changed, all from
+  "no" to "yes".
+  - Two were real announcements: this one, and "I will save your birthday as 14 March 🎂", where nothing was
+    saved.
+  - One was conversational ("let's start with this! 🎉"). Without the emoji the old rule would have caught it
+    too.
 
 ## [0.0.21] - 2026-11-12
 

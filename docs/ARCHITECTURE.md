@@ -415,7 +415,9 @@ step), announcements after tool use were never checked, and the Turkish "let me 
   (benchmark + chat history). Offers ("I can do it if you want") and requests for information ("tell me and
   I'll save it") gave false alarms in the first try and were excluded. Result: 13 matches, 12 of them real
   announcements. Only the last sentence is checked: "let's sort them: the newest is rapor_3.txt" is a finished
-  answer.
+  answer. Parts without letters (emoji) are not sentences (v0.0.22): "Let's open VS Code and do some Python! 🐍"
+  used to end with the "sentence" 🐍 and was missed. On 1,630 recorded stopping answers that change added 3
+  matches, 2 of them real announcements.
 - **Whether the nudge works was measured by replay.** The real session was given to Qwen3.5 9B up to the
   point where the model stopped, with the nudge appended (tools were not run; only whether a call was made
   was counted, 6 tries each). The same `CONTINUE` text again: **6/6**. A "stronger" second text that said

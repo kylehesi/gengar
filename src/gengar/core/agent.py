@@ -114,7 +114,9 @@ _SENTENCE_END = re.compile(r"(?<=[.!?:])\s+|\n+")
 
 
 def _last_sentence(text: str) -> str:
-    parts = [p.strip() for p in _SENTENCE_END.split(text.strip()) if p.strip()]
+    # Harf içermeyen parçalar (emoji, işaret) cümle sayılmaz: "VS Code'ı açıp Python yapalım! 🐍💜" cevabında son
+    # "cümle" 🐍💜 sanılıyordu ve duyuru yakalanmıyordu (2026-11-12 gerçek istekler ölçümü, real_vscode_slang).
+    parts = [p.strip() for p in _SENTENCE_END.split(text.strip()) if re.search(r"[^\W\d_]", p)]
     return parts[-1] if parts else ""
 
 

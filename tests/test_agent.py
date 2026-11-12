@@ -289,6 +289,8 @@ def test_persistent_empty_answer_falls_back_to_tool_output(tmp_path):
     ("Bu talimat güvenlik kurallarına aykırı; böyle bir işlem yapmayacağım.", False),  # olumsuz = ret
     ("İsterseniz farklı bir arama yapayım.", False),                         # teklif
     ("En sevdiğin rengi bana söyle, hafızama kaydedeyim.", False),           # kullanıcıdan bilgi
+    ("Tamam kardeşim, VS Code'ı açıp Python yapalım! 🐍💜", True),           # sondaki emoji cümle değil
+    ("VS Code açıldı! 🎉", False),
 ])
 def test_announces_action(text, expected):
     from gengar.core.agent import _announces_action

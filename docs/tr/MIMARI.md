@@ -437,7 +437,10 @@ sonraki duyurular hiç kontrol edilmiyordu ve "kontrol edeyim / bakalım" (-eyim
 - **Algılayıcı önce kayıtlarda denendi.** Kod değiştirmeden önce 1.644 duruş noktasında (ölçüm + sohbet
   geçmişi) çalıştırıldı. "İsterseniz yapayım" gibi teklifler ve "bana söyle, kaydedeyim" gibi bilgi istekleri
   ilk denemede yanlış alarm verdi; hariç tutuldu. Sonuç: 13 yakalama, 12'si gerçek duyuru. Yalnızca son
-  cümleye bakılıyor: "sıralayalım: en yenisi rapor_3.txt" tamamlanmış bir cevap.
+  cümleye bakılıyor: "sıralayalım: en yenisi rapor_3.txt" tamamlanmış bir cevap. Harf içermeyen parçalar
+  (emoji) cümle sayılmıyor (v0.0.22): "VS Code'ı açıp Python yapalım! 🐍" cevabının son "cümlesi" 🐍
+  sanılıyordu ve duyuru kaçıyordu. Kayıtlı 1.630 duruş cevabında bu değişiklik 3 yeni yakalama ekledi, 2'si
+  gerçek duyuru.
 - **Dürtmenin işe yaradığı tekrar oynatmayla ölçüldü.** Gerçek oturum modelin durduğu yere kadar
   Qwen3.5 9B'ye verildi, sonuna dürtme eklendi (araçlar çalıştırılmadı, sadece çağrı yapılıp yapılmadığı
   sayıldı, 6'şar deneme). Aynı `CONTINUE` metni tekrar: **6/6**. "Yine duyurdun; yapamıyorsan kullanıcıya
